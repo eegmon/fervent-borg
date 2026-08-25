@@ -367,6 +367,41 @@ export default function App() {
     t => `${t?.hyeongjeNo || ''} 입건 기록이`
   );
 
+  // Handler: Designate Case as requiring supervisor approval before disposition
+  // Called by supervisor (SENIOR_PROSECUTOR+) from MyCasesLedger or SecretariatAdmin
+  const handleDesignateCase = (caseId, supervisorUser) => {
+    setLedgerData(prev => prev.map(item => {
+      if (item.id === caseId) {
+        return {
+          ...item,
+          supervisorDesignated: true,
+          supervisorId: supervisorUser.id,
+          supervisorName: supervisorUser.name,
+        };
+      }
+      return item;
+    }));
+    const target = ledgerData.find(c => c.id === caseId);
+    showToast(`🔒 [결재 지정] ${target?.hyeongjeNo || caseId} 사건이 결재 필수 사건으로 지정되었습니다.`, 'warning');
+  };
+
+  // Handler: Undesignate Case (remove supervisor approval requirement)
+  const handleUndesignateCase = (caseId) => {
+    setLedgerData(prev => prev.map(item => {
+      if (item.id === caseId) {
+        return {
+          ...item,
+          supervisorDesignated: false,
+          supervisorId: '',
+          supervisorName: '',
+        };
+      }
+      return item;
+    }));
+    const target = ledgerData.find(c => c.id === caseId);
+    showToast(`🔓 [결재 지정 해제] ${target?.hyeongjeNo || caseId} 사건의 결재 필수 지정이 해제되었습니다.`, 'info');
+  };
+
   // Handler: Reassign Prosecutor for a Case (Secretariat Action)
   const handleReassignCase = (hyeongjeNo, newProsecutorName, newProsecutorId) => {
     setLedgerData(prev => prev.map(item => {
@@ -925,6 +960,9 @@ export default function App() {
                 onUpdateCase={handleUpdateCase}
                 onOpenLoginModal={() => setIsLoginModalOpen(true)}
                 onAddApproval={handleAddApprovalFromMyCases}
+                approvalsData={approvalsData}
+                onDesignateCase={(caseId) => handleDesignateCase(caseId, currentUser)}
+                onUndesignateCase={handleUndesignateCase}
               />
             )}
 
@@ -947,6 +985,10 @@ export default function App() {
                 onCreateApproval={handleCreateApprovalForCase}
                 onUpdateCase={handleUpdateCase}
                 currentRole={currentUser ? currentUser.id : 'yooa7374'}
+                currentUser={currentUser}
+                approvalsData={approvalsData}
+                onDesignateCase={(caseId) => handleDesignateCase(caseId, currentUser)}
+                onUndesignateCase={handleUndesignateCase}
               />
             )}
 
@@ -978,6 +1020,8 @@ export default function App() {
                 onReassignCase={handleReassignCase}
                 onUpdateCase={handleUpdateCase}
                 onDeleteCase={handleDeleteCase}
+                onDesignateCase={(caseId) => handleDesignateCase(caseId, currentUser)}
+                onUndesignateCase={handleUndesignateCase}
                 onDeleteAppeal={handleDeleteAppeal}
                 onDeleteApproval={handleDeleteApproval}
                 onDeleteReport={handleDeleteReport}

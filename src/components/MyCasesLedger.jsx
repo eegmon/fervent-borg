@@ -332,6 +332,9 @@ export default function MyCasesLedger({
   onUpdateCase,
   onOpenLoginModal,
   onAddApproval,
+  approvalsData = [],
+  onDesignateCase,
+  onUndesignateCase,
 }) {
   const [selectedProsecutorFilter, setSelectedProsecutorFilter] = useState(currentUser?.name || '');
   const [searchTerm, setSearchTerm] = useState('');
@@ -388,9 +391,27 @@ export default function MyCasesLedger({
   const indictmentCount = myCases.filter(c => (c.disposition || '').includes('기소') && !(c.disposition || '').includes('불기소')).length;
   const nonIndictmentCount = myCases.filter(c => (c.disposition || '').includes('불기소') || (c.disposition || '').includes('종국')).length;
 
+  // 결재 완료 여부 확인: 해당 사건의 결재 문서 중 최종승인된 것이 있는지 체크
+  const isCaseApprovalComplete = (caseItem) => {
+    return approvalsData.some(doc =>
+      doc.hyeongjeNo === caseItem.hyeongjeNo &&
+      (doc.status === '최종승인' || doc.status === '최종승인 (전결)' || doc.status === '대결승인')
+    );
+  };
+
   const handleSaveStatusChange = (e) => {
     e.preventDefault();
     if (!statusChangeCase) return;
+
+    // 결재 필수 사건 차단
+    if (statusChangeCase.supervisorDesignated && !isCaseApprovalComplete(statusChangeCase)) {
+      alert(
+        `🔒 [결재 필수 사건]\n\n이 사건은 직근상급자(${statusChangeCase.supervisorName || '상급자'})가 결재 필수로 지정하였습니다.\n\n` +
+        `전자 결재함에서 결재를 완료한 후에만 처분을 변경할 수 있습니다.`
+      );
+      return;
+    }
+
     if (onUpdateCase) onUpdateCase({ ...statusChangeCase, disposition: newStatus, bookingStatus: newStatus });
     setStatusChangeCase(null);
   };
@@ -414,7 +435,18 @@ export default function MyCasesLedger({
       createdBy: currentUser.name,
     };
     if (onAddApproval) onAddApproval(newDoc);
-    // 사건 원부 처분 상태도 동시 업데이트
+
+    // 결재 필수 사건은 상신만 하고, 처분 상태 즉시 반영은 결재 승인 후로 미룸
+    if (caseItem.supervisorDesignated && !isCaseApprovalComplete(caseItem)) {
+      alert(
+        `📨 [결재 상신 완료]\n\n[${dispositionType}] 결재 문서가 전자결재함에 상신되었습니다.\n\n` +
+        `⚠️ 이 사건은 직근상급자(${caseItem.supervisorName || '상급자'})가 결재 필수로 지정하였습니다.\n` +
+        `처분 상태는 결재가 최종 승인된 후에 자동으로 반영됩니다.`
+      );
+      return;
+    }
+
+    // 일반 사건: 상신과 동시에 처분 상태 업데이트
     if (onUpdateCase) onUpdateCase({ ...caseItem, disposition: dispositionType, bookingStatus: dispositionType });
     alert(`✅ [${dispositionType}] 결재 문서가 전자결재함에 상신되었습니다.\n담당자: ${approvalLine[0]?.name || currentUser.name}`);
   };
@@ -505,6 +537,16 @@ export default function MyCasesLedger({
                         ⚖️ {item.hyeongjeNo && item.hyeongjeNo !== '-' ? item.hyeongjeNo : (item.sujeNo || item.hyeongjeNo).replace('수제', '형제')}
                       </span>
                     )}
+                    {item.supervisorDesignated && !isCaseApprovalComplete(item) && (
+                      <span className="badge" style={{ background: 'rgba(245,158,11,0.18)', color: 'var(--primary-amber)', border: '1px solid rgba(245,158,11,0.4)', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        🔒 결재 필수
+                      </span>
+                    )}
+                    {item.supervisorDesignated && isCaseApprovalComplete(item) && (
+                      <span className="badge" style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.35)', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        ✅ 결재 완료
+                      </span>
+                    )}
                     <span className="badge" style={{ background: `${statusColor}20`, color: statusColor, fontSize: '0.75rem' }}>
                       {item.disposition || item.bookingStatus || '수사중'}
                     </span>
@@ -557,8 +599,15 @@ export default function MyCasesLedger({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button onClick={() => { setStatusChangeCase(item); setNewStatus(item.disposition || item.bookingStatus || '입건 : 수사 진행 중'); }}
-                      className="btn btn-gold" style={{ fontSize: '0.78rem', padding: '5px 12px', gap: 5 }}>
-                      <RefreshCw size={13} /> 상태 변경
+                      className="btn btn-gold"
+                      style={{
+                        fontSize: '0.78rem', padding: '5px 12px', gap: 5,
+                        opacity: (item.supervisorDesignated && !isCaseApprovalComplete(item)) ? 0.7 : 1,
+                      }}>
+                      {item.supervisorDesignated && !isCaseApprovalComplete(item)
+                        ? <><Lock size={13} /> 상태 변경 (결재 필수)</>
+                        : <><RefreshCw size={13} /> 상태 변경</>
+                      }
                     </button>
 
                     {/* 전자 결재 상신 — 인라인 모달 오픈 */}
@@ -606,6 +655,15 @@ export default function MyCasesLedger({
             <div style={{ fontSize: '0.75rem', color: 'var(--primary-amber)', fontFamily: 'monospace', marginBottom: 16 }}>
               {statusChangeCase.hyeongjeNo}호 | 피의자: {statusChangeCase.suspectName}
             </div>
+            {statusChangeCase.supervisorDesignated && !isCaseApprovalComplete(statusChangeCase) && (
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', color: 'var(--primary-amber)', fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.6, marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <Lock size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontWeight: 800, marginBottom: 2 }}>🔒 결재 필수 사건</div>
+                  <div>지정자: {statusChangeCase.supervisorName || '상급자'} · 전자결재 최종 승인 후에만 처분 변경이 가능합니다.</div>
+                </div>
+              </div>
+            )}
             <form onSubmit={handleSaveStatusChange} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>변경할 처분 상태 *</label>

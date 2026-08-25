@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, ExternalLink, User, FileCheck, Scale, AlertCircle, Eye, Filter, Pencil } from 'lucide-react';
+import { Search, ExternalLink, User, FileCheck, Scale, AlertCircle, Eye, Filter, Pencil, Lock } from 'lucide-react';
 import EditCaseModal from './EditCaseModal';
 
 const STATUS_COLOR = (s) => {
@@ -21,13 +21,52 @@ const COURT_PILL = ({ no, result, label, color }) => {
   );
 };
 
-export default function MainLedger({ ledgerData, departmentsData = [], prosecutorsList = [], onSelectEvidence, onSelectSuspect, onCreateApproval, onUpdateCase }) {
+export default function MainLedger({
+  ledgerData,
+  departmentsData = [],
+  prosecutorsList = [],
+  onSelectEvidence,
+  onSelectSuspect,
+  onCreateApproval,
+  onUpdateCase,
+  currentUser,
+  approvalsData = [],
+  onDesignateCase,
+  onUndesignateCase,
+}) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [prosecutorFilter, setProsecutorFilter] = useState('ALL');
   const [deptFilter, setDeptFilter] = useState('ALL');
   const [expandedId, setExpandedId] = useState(null);
   const [editingCase, setEditingCase] = useState(null);
+
+  // 결재 완료 여부: 해당 사건의 최종승인된 결재 문서 존재 여부
+  const isCaseApprovalComplete = (caseItem) =>
+    approvalsData.some(doc =>
+      doc.hyeongjeNo === caseItem.hyeongjeNo &&
+      (doc.status === '최종승인' || doc.status === '최종승인 (전결)' || doc.status === '대결승인')
+    );
+
+  // EditCaseModal의 onSave를 가로채어 결재 필수 사건 차단
+  const handleSaveGuarded = (updatedCase) => {
+    const original = (ledgerData || []).find(c => c.id === updatedCase.id);
+    if (original?.supervisorDesignated && !isCaseApprovalComplete(original)) {
+      alert(
+        `🔒 [결재 필수 사건]\n\n이 사건은 직근상급자(${original.supervisorName || '상급자'})가 결재 필수로 지정하였습니다.\n\n` +
+        `전자 결재함에서 결재가 최종 승인된 후에만 사건 정보를 수정할 수 있습니다.`
+      );
+      return;
+    }
+    if (onUpdateCase) onUpdateCase(updatedCase);
+  };
+
+  // 상급자 여부 (지정/해제 버튼 노출 조건)
+  const canDesignate = currentUser && (
+    currentUser.isSuperAdmin ||
+    ['SUPER_ADMIN', 'PROSECUTOR_GENERAL', 'CHIEF_PROSECUTOR', 'DEPUTY_CHIEF',
+     'CHIEF_ADMINISTRATOR', 'SENIOR_PROSECUTOR'].includes(currentUser.roleLevel)
+  );
 
   const filtered = (ledgerData || []).filter(item => {
     const q = (searchTerm || '').toLowerCase().trim();
@@ -190,21 +229,73 @@ export default function MainLedger({ ledgerData, departmentsData = [], prosecuto
                 </div>
 
                 {/* Actions */}
-                <div style={{ flexShrink: 0, display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ flexShrink: 0, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {/* 결재 필수 / 완료 배지 */}
+                  {item.supervisorDesignated && !isCaseApprovalComplete(item) && (
+                    <span style={{
+                      fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary-amber)',
+                      background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)',
+                      borderRadius: 6, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4,
+                    }}>
+                      <Lock size={10} /> 결재 필수
+                    </span>
+                  )}
+                  {item.supervisorDesignated && isCaseApprovalComplete(item) && (
+                    <span style={{
+                      fontSize: '0.7rem', fontWeight: 800, color: '#34d399',
+                      background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.35)',
+                      borderRadius: 6, padding: '3px 8px',
+                    }}>
+                      ✅ 결재 완료
+                    </span>
+                  )}
+
                   {item.bookingBasis?.includes('http') && (
                     <button onClick={e => { e.stopPropagation(); onSelectEvidence(item.bookingBasis, item.hyeongjeNo, item.suspectName); }}
                       className="btn btn-outline" style={{ padding: '5px 10px', fontSize: '0.75rem', color: 'var(--primary-amber)', border: '1px solid rgba(245,158,11,0.3)' }}>
                       <ExternalLink size={12} />증거
                     </button>
                   )}
-                  <button onClick={e => { e.stopPropagation(); setEditingCase(item); }}
-                    className="btn btn-outline" style={{ padding: '5px 10px', fontSize: '0.75rem', color: '#93c5fd', border: '1px solid rgba(147,197,253,0.3)' }}>
-                    <Pencil size={12} />수정
+
+                  {/* 수정 버튼 — 결재 필수 사건은 잠금 표시 */}
+                  <button
+                    onClick={e => { e.stopPropagation(); setEditingCase(item); }}
+                    className="btn btn-outline"
+                    style={{
+                      padding: '5px 10px', fontSize: '0.75rem',
+                      color: (item.supervisorDesignated && !isCaseApprovalComplete(item)) ? 'rgba(147,197,253,0.5)' : '#93c5fd',
+                      border: `1px solid ${(item.supervisorDesignated && !isCaseApprovalComplete(item)) ? 'rgba(147,197,253,0.15)' : 'rgba(147,197,253,0.3)'}`,
+                    }}>
+                    {item.supervisorDesignated && !isCaseApprovalComplete(item)
+                      ? <><Lock size={11} />수정</>
+                      : <><Pencil size={12} />수정</>
+                    }
                   </button>
+
                   <button onClick={e => { e.stopPropagation(); onCreateApproval(item); }}
                     className="btn btn-gold" style={{ padding: '5px 10px', fontSize: '0.75rem' }}>
                     <FileCheck size={12} />결재
                   </button>
+
+                  {/* 지정/해제 버튼 — 상급자만 표시 */}
+                  {canDesignate && (
+                    item.supervisorDesignated
+                      ? (
+                        <button
+                          onClick={e => { e.stopPropagation(); onUndesignateCase && onUndesignateCase(item.id); }}
+                          className="btn btn-outline"
+                          style={{ padding: '5px 10px', fontSize: '0.72rem', color: '#94a3b8', border: '1px solid rgba(100,116,139,0.3)' }}>
+                          🔓 지정해제
+                        </button>
+                      ) : (
+                        <button
+                          onClick={e => { e.stopPropagation(); onDesignateCase && onDesignateCase(item.id); }}
+                          className="btn btn-outline"
+                          style={{ padding: '5px 10px', fontSize: '0.72rem', color: 'var(--primary-amber)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                          🔒 결재지정
+                        </button>
+                      )
+                  )}
                 </div>
               </div>
 
@@ -242,8 +333,10 @@ export default function MainLedger({ ledgerData, departmentsData = [], prosecuto
                   <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <span style={{ fontWeight: 800, fontSize: '0.78rem', color: 'var(--primary-amber)' }}>📅 일자 & 공소시효</span>
-                      <button onClick={() => setEditingCase(item)} className="btn btn-outline" style={{ padding: '2px 8px', fontSize: '0.7rem' }}>
-                        ✏️ 사건정보 전체 수정
+                      <button onClick={() => setEditingCase(item)} className="btn btn-outline" style={{ padding: '2px 8px', fontSize: '0.7rem',
+                        opacity: (item.supervisorDesignated && !isCaseApprovalComplete(item)) ? 0.5 : 1,
+                      }}>
+                        {item.supervisorDesignated && !isCaseApprovalComplete(item) ? '🔒 수정 잠김' : '✏️ 사건정보 전체 수정'}
                       </button>
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-main)', lineHeight: 1.8 }}>
@@ -264,7 +357,7 @@ export default function MainLedger({ ledgerData, departmentsData = [], prosecuto
         isOpen={!!editingCase}
         onClose={() => setEditingCase(null)}
         caseItem={editingCase}
-        onSave={onUpdateCase}
+        onSave={handleSaveGuarded}
         prosecutorsList={prosecutorsList}
       />
     </div>
