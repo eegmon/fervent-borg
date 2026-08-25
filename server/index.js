@@ -27,12 +27,13 @@ if (!JWT_SECRET) {
 // ── CORS 설정 ────────────────────────────────────────────────────────
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['http://localhost:5173'];
+  : [];
 
 app.use(cors({
   origin: (origin, cb) => {
-    // 서버-간 요청(origin 없음)이나 허용 목록에 있으면 통과
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    // 같은 도메인(origin 없음) 또는 허용 목록이면 통과
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return cb(null, true);
     cb(new Error(`CORS: ${origin} 은 허용되지 않는 출처입니다.`));
   },
   credentials: true,
