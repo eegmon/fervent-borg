@@ -450,7 +450,21 @@ export default function ApprovalSystem({
   onToast,
   prosecutorsList = [],
 }) {
-  const [selectedDoc, setSelectedDoc] = useState(approvals[0] || null);
+  const approvalList = (Array.isArray(approvals) ? approvals : []).map(
+    (doc) => ({
+      ...doc,
+      status: String(doc.status || "결재대기"),
+      approvals: (Array.isArray(doc.approvals) ? doc.approvals : []).map(
+        (step) => ({
+          ...step,
+          role: String(step.role || "결재자"),
+          name: String(step.name || "미지정"),
+          status: String(step.status || "결재대기"),
+        }),
+      ),
+    }),
+  );
+  const [selectedDoc, setSelectedDoc] = useState(approvalList[0] || null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [isEditingDoc, setIsEditingDoc] = useState(false);
   const [isEditingHwp, setIsEditingHwp] = useState(false);
@@ -497,26 +511,26 @@ export default function ApprovalSystem({
     const names = new Set(
       prosecutorsList.map((prosecutor) => prosecutor.name).filter(Boolean),
     );
-    approvals.forEach((doc) => {
+    approvalList.forEach((doc) => {
       if (doc.prosecutorName) names.add(doc.prosecutorName);
       (doc.approvals || []).forEach(
         (approver) => approver.name && names.add(approver.name),
       );
     });
     return ["ALL", ...names];
-  }, [prosecutorsList, approvals]);
+  }, [prosecutorsList, approvalList]);
 
   const filteredApprovals = useMemo(() => {
     if (!selectedPersonFilter || selectedPersonFilter === "ALL")
-      return approvals;
-    return approvals.filter((doc) => {
+      return approvalList;
+    return approvalList.filter((doc) => {
       const isAuthor = doc.prosecutorName?.includes(selectedPersonFilter);
       const isInLine = doc.approvals?.some((app) =>
         app.name?.includes(selectedPersonFilter),
       );
       return isAuthor || isInLine;
     });
-  }, [approvals, selectedPersonFilter]);
+  }, [approvalList, selectedPersonFilter]);
 
   const handleSelectApproverFromGrid = (personName) => {
     if (!personName) return;
@@ -526,7 +540,7 @@ export default function ApprovalSystem({
       .trim();
     setSelectedPersonFilter(cleanName);
 
-    const matchingDoc = approvals.find(
+    const matchingDoc = approvalList.find(
       (doc) =>
         doc.prosecutorName?.includes(cleanName) ||
         doc.approvals?.some((app) => app.name?.includes(cleanName)),
@@ -919,7 +933,7 @@ export default function ApprovalSystem({
                   onClick={() => {
                     setSelectedPersonFilter(person);
                     if (person !== "ALL") {
-                      const match = approvals.find(
+                      const match = approvalList.find(
                         (d) =>
                           d.prosecutorName?.includes(person) ||
                           d.approvals?.some((a) => a.name?.includes(person)),
@@ -2157,7 +2171,8 @@ export default function ApprovalSystem({
                         <div>
                           {selectedDoc.attachments?.length ? (
                             <>
-                              붙 임: {selectedDoc.attachments.map((item, index) => (
+                              붙 임:{" "}
+                              {selectedDoc.attachments.map((item, index) => (
                                 <React.Fragment key={`${item}-${index}`}>
                                   {index > 0 && <br />}
                                   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;

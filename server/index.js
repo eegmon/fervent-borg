@@ -143,6 +143,33 @@ function hasSecretariatWorkAccess(user) {
   );
 }
 
+function isAssignableProsecutor(account) {
+  return Boolean(
+    account &&
+    !String(account.dept || "").includes("사무국") &&
+    account.roleLevel !== "CHIEF_ADMINISTRATOR" &&
+    account.status === "ACTIVE",
+  );
+}
+
+async function validateCaseAssignee(prosecutorId) {
+  if (!prosecutorId) return true;
+  const result = await db.execute({
+    sql: "SELECT role_level, dept, status FROM prosecutors WHERE id = ?",
+    args: [prosecutorId],
+  });
+  return isAssignableProsecutor(result.rows[0] && toCamel(result.rows[0]));
+}
+
+async function validateForcedCaseAssignee(prosecutorId) {
+  if (!prosecutorId) return false;
+  const result = await db.execute({
+    sql: "SELECT status FROM prosecutors WHERE id = ?",
+    args: [prosecutorId],
+  });
+  return ["ACTIVE", "ON_LEAVE"].includes(result.rows[0]?.status);
+}
+
 function requireApprovalAuthority(req, res, next) {
   if (!APPROVAL_ROLES.has(req.user.roleLevel)) {
     return res
@@ -470,6 +497,12 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
   const reportId = `REP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const bookingId = `BKG-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const createdAt = new Date().toISOString().replace("T", " ").substring(0, 16);
+  if (assignedId && !(await validateCaseAssignee(assignedId))) {
+    return res.status(400).json({
+      success: false,
+      message: "사무국 소속 또는 비활성 계정은 담당검사로 배정할 수 없습니다.",
+    });
+  }
   const caseArgs = [
     id,
     c.hyeongjeNo || "",
@@ -576,6 +609,27 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
 
 app.put("/api/cases/:id", requireAuth, requireCaseScope, async (req, res) => {
   const c = req.body;
+  if (c.forceReassign) {
+    if (
+      !hasSecretariatWorkAccess(req.user) &&
+      !GLOBAL_DATA_ROLES.has(req.user.roleLevel)
+    ) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "사무국 탭에서만 강제 재배당할 수 있습니다.",
+        });
+    }
+    if (!(await validateForcedCaseAssignee(c.prosecutorId))) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "활성 상태의 담당검사를 선택해주세요.",
+        });
+    }
+  }
   const assignedId = hasGlobalDataAccess(req.user)
     ? String(c.prosecutorId || "")
     : req.user.id;

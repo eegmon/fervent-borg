@@ -69,6 +69,9 @@ export default function IntakeModal({
   const sortedP = [...prosecutorsList].sort(
     (a, b) => (a.activeCases || 0) - (b.activeCases || 0),
   );
+  const isAssignableProsecutor = (prosecutor) =>
+    !prosecutor.dept?.includes("사무국") &&
+    prosecutor.roleLevel !== "CHIEF_ADMINISTRATOR";
   const set = (k, v) => setFormData((p) => ({ ...p, [k]: v }));
 
   // Suspect Array Actions
@@ -146,19 +149,17 @@ export default function IntakeModal({
 
     // 자동배정 제외 대상(isAutoAssignExcluded) 및 휴직자(ON_LEAVE) 제외 후 사건 수 최저 검사 선정
     const validAssignees = sortedP
-      .filter(
-        (p) =>
-          p.roleLevel !== "CHIEF_ADMINISTRATOR" &&
-          p.status !== "ON_LEAVE" &&
-          !p.isAutoAssignExcluded,
-      )
+      .filter((p) => isAssignableProsecutor(p))
+      .filter((p) => p.status !== "ON_LEAVE" && !p.isAutoAssignExcluded)
       .sort((a, b) => (a.activeCases || 0) - (b.activeCases || 0));
 
     let assignedProsecutor = null;
     if (formData.prosecutorId === "AUTO_ASSIGN") {
       assignedProsecutor = validAssignees[0];
     } else {
-      assignedProsecutor = sortedP.find((p) => p.id === formData.prosecutorId);
+      assignedProsecutor = sortedP.find(
+        (p) => p.id === formData.prosecutorId && isAssignableProsecutor(p),
+      );
     }
 
     onSubmitIntake({
@@ -608,15 +609,13 @@ export default function IntakeModal({
                 <option value="AUTO_ASSIGN">
                   🎲 검사 자동 배정 (사건 보유 최저 검사 우선)
                 </option>
-                {sortedP
-                  .filter((p) => p.roleLevel !== "CHIEF_ADMINISTRATOR")
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.position || p.title} / {p.dept})
-                      {p.isAutoAssignExcluded ? " [🚫 자동배정 제외]" : ""}
-                      {p.status === "ON_LEAVE" ? " [🟡 휴직중]" : ""}
-                    </option>
-                  ))}
+                {sortedP.filter(isAssignableProsecutor).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.position || p.title} / {p.dept})
+                    {p.isAutoAssignExcluded ? " [🚫 자동배정 제외]" : ""}
+                    {p.status === "ON_LEAVE" ? " [🟡 휴직중]" : ""}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

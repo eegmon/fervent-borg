@@ -681,6 +681,7 @@ export default function App() {
       ...target,
       prosecutorName: newProsecutorName,
       prosecutorId: newProsecutorId,
+      forceReassign: true,
     });
     if (!res?.success) {
       showToast(

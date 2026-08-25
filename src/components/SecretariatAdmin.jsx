@@ -4127,10 +4127,11 @@ export default function SecretariatAdmin({
                 onChange={(e) => setTargetPId(e.target.value)}
               >
                 {prosecutorsList
-                  .filter((p) => p.id !== "admin_secretariat")
+                  .filter((p) => ["ACTIVE", "ON_LEAVE"].includes(p.status))
                   .map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} ({p.title} / {p.dept})
+                      {p.status === "ON_LEAVE" ? " [휴직중]" : ""}
                     </option>
                   ))}
               </select>
