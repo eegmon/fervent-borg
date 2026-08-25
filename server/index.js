@@ -2052,6 +2052,76 @@ app.get(
   },
 );
 
+app.post(
+  "/api/audit-logs",
+  requireAuth,
+  requireSecretariat,
+  async (req, res) => {
+    const {
+      action,
+      entityType = "system",
+      entityId = "",
+      entityLabel = "",
+      detail = "",
+    } = req.body || {};
+    const allowedActions = new Set([
+      "CREATE",
+      "UPDATE",
+      "DELETE",
+      "APPROVE",
+      "REJECT",
+      "LOGIN",
+      "LOGOUT",
+    ]);
+    if (!allowedActions.has(action)) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "감사 로그 행위가 올바르지 않습니다.",
+        });
+    }
+    try {
+      const id = `AL-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const now = new Date().toISOString().replace("T", " ").substring(0, 19);
+      await db.execute({
+        sql: `INSERT INTO audit_logs (id, action, entity_type, entity_id, entity_label, actor_id, actor_name, detail, created_at)
+              VALUES (?,?,?,?,?,?,?,?,?)`,
+        args: [
+          id,
+          action,
+          entityType,
+          String(entityId),
+          String(entityLabel),
+          req.user.id,
+          req.user.name,
+          String(detail),
+          now,
+        ],
+      });
+      res.json({
+        success: true,
+        log: {
+          id,
+          action,
+          entityType,
+          entityId: String(entityId),
+          entityLabel: String(entityLabel),
+          actorId: req.user.id,
+          actorName: req.user.name,
+          detail: String(detail),
+          createdAt: now,
+        },
+      });
+    } catch (err) {
+      console.error("[POST /audit-logs]", err);
+      res
+        .status(500)
+        .json({ success: false, message: "감사 로그 저장에 실패했습니다." });
+    }
+  },
+);
+
 // ════════════════════════════════════════════════════════════════════
 // 12. 사건 수정 이력 (Case History)
 // ════════════════════════════════════════════════════════════════════

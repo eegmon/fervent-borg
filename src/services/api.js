@@ -333,6 +333,13 @@ export function fetchAuditLogs() {
   return apiFetch("/audit-logs");
 }
 
+export function createAuditLogApi(log) {
+  return apiFetch("/audit-logs", {
+    method: "POST",
+    body: JSON.stringify(log),
+  });
+}
+
 // ════════════════════════════════════════════════════════════════════
 // Case History
 // ════════════════════════════════════════════════════════════════════

@@ -51,6 +51,7 @@ import {
   updateOfficeDocumentApi,
   createChargeApi,
   deleteChargeApi,
+  createAuditLogApi,
 } from "../services/api";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1680,12 +1681,13 @@ export default function SecretariatAdmin({
   onUpdateCaseNumberSettings,
   chargesData = [],
   onUpdateCharges,
+  auditLogs: initialAuditLogs = [],
 }) {
   const [activeSubTab, setActiveSubTab] = useState("registrations");
   const prosecutorsList = (propProsecutorsList || PROSECUTORS).filter(
     (p) => !p.isSuperAdmin,
   );
-  const [auditLogs, setAuditLogs] = useState(INITIAL_AUDIT_LOGS);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [newP, setNewP] = useState({
     id: "",
     name: "",
@@ -1703,6 +1705,10 @@ export default function SecretariatAdmin({
   const [regFilter, setRegFilter] = useState("PENDING"); // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
   const [newCharge, setNewCharge] = useState("");
   const [chargeMessage, setChargeMessage] = useState("");
+
+  useEffect(() => {
+    if (Array.isArray(initialAuditLogs)) setAuditLogs(initialAuditLogs);
+  }, [initialAuditLogs]);
 
   // 가입 신청 목록 로드
   const loadRegistrations = async () => {
@@ -1963,16 +1969,25 @@ export default function SecretariatAdmin({
   };
 
   const addLog = (action, details) => {
-    setAuditLogs((prev) => [
-      {
-        id: Date.now(),
-        action,
-        details,
-        actor: "admin_secretariat",
-        timestamp: new Date().toISOString().replace("T", " ").substring(0, 19),
-      },
-      ...prev,
-    ]);
+    const actionType = action.includes("삭제")
+      ? "DELETE"
+      : action.includes("허가") || action.includes("승인")
+        ? "APPROVE"
+        : action.includes("생성") || action.includes("등록")
+          ? "CREATE"
+          : "UPDATE";
+    createAuditLogApi({
+      action: actionType,
+      entityType: "system",
+      entityLabel: action,
+      detail: details,
+    })
+      .then((result) => {
+        if (result?.success && result.log)
+          setAuditLogs((prev) => [result.log, ...prev]);
+        else console.warn("[audit log] 저장 실패", result?.message);
+      })
+      .catch((error) => console.warn("[audit log] 네트워크 오류", error));
   };
 
   const handleAddProsecutor = (e) => {
@@ -5689,21 +5704,7 @@ export default function SecretariatAdmin({
           currentUser={currentUser}
           onDesignateCase={onDesignateCase}
           onUndesignateCase={onUndesignateCase}
-          addLog={(log) =>
-            setAuditLogs((prev) => [
-              {
-                id: prev.length + 1,
-                action: log,
-                details: "",
-                actor: currentUser?.name || "-",
-                timestamp: new Date()
-                  .toISOString()
-                  .replace("T", " ")
-                  .substring(0, 16),
-              },
-              ...prev,
-            ])
-          }
+          addLog={(log) => addLog(log, "결재 필수 지정 상태 변경")}
         />
       )}
 
@@ -5748,7 +5749,7 @@ export default function SecretariatAdmin({
                         fontSize: "0.72rem",
                       }}
                     >
-                      LOG-{log.id}
+                      {log.id}
                     </td>
                     <td
                       style={{ fontWeight: 700, color: "var(--primary-amber)" }}
@@ -5757,11 +5758,11 @@ export default function SecretariatAdmin({
                     </td>
                     <td style={{ maxWidth: 300 }}>
                       <div style={{ whiteSpace: "normal", lineHeight: 1.4 }}>
-                        {log.details}
+                        {log.detail || log.details || "-"}
                       </div>
                     </td>
                     <td style={{ fontFamily: "monospace", color: "#60a5fa" }}>
-                      {log.actor}
+                      {log.actorName || log.actor || "-"}
                     </td>
                     <td
                       style={{
@@ -5770,7 +5771,7 @@ export default function SecretariatAdmin({
                         color: "var(--text-muted)",
                       }}
                     >
-                      {log.timestamp}
+                      {log.createdAt || log.timestamp || "-"}
                     </td>
                   </tr>
                 ))}

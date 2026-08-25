@@ -1595,6 +1595,7 @@ export default function App() {
                 onUpdateCaseNumberSettings={setCaseNumberSettings}
                 chargesData={chargesData}
                 onUpdateCharges={setChargesData}
+                auditLogs={auditLogs}
               />
             )}
 
