@@ -54,6 +54,7 @@ export async function initDb() {
     "dual_dept TEXT DEFAULT ''",
     "dual_role_level TEXT DEFAULT ''",
     "dual_secretariat_work INTEGER DEFAULT 0",
+    "note TEXT DEFAULT ''",
   ]) {
     try {
       await db.execute(`ALTER TABLE prosecutors ADD COLUMN ${column}`);

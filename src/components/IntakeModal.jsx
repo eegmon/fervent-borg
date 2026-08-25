@@ -40,7 +40,7 @@ export default function IntakeModal({
     chargeName: "자본시장법 위반 및 사기",
     bookingStatus: "입건:불구속",
     prosecutorId: "AUTO_ASSIGN",
-    bookingBasis: "https://cafe.naver.com/f-e/cafes/29669442/menus/262",
+    bookingBasis: "https://cafe.naver.com/doseonline/",
     content: "",
     confiscation: "0 원",
     incidentDate: todayStr,

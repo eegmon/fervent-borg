@@ -235,6 +235,16 @@ function toCamel(row) {
   return out;
 }
 
+function parseJsonArray(value) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════
 // 1. Auth
 // ════════════════════════════════════════════════════════════════════
@@ -981,8 +991,8 @@ app.get("/api/approvals", requireAuth, async (req, res) => {
   res.json(
     result.rows.map((row) => ({
       ...toCamel(row),
-      approvals: JSON.parse(row.approvals_json || "[]"),
-      attachments: JSON.parse(row.attachments_json || "[]"),
+      approvals: parseJsonArray(row.approvals_json),
+      attachments: parseJsonArray(row.attachments_json),
     })),
   );
 });
