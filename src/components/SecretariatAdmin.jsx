@@ -3053,6 +3053,9 @@ export default function SecretariatAdmin({
                                     setStatusModalUser(p);
                                     setStatusForm({
                                       status: p.status || "ACTIVE",
+                                      roleLevel: p.roleLevel || "PROSECUTOR",
+                                      rank: p.rank || "",
+                                      position: p.position || p.title || "",
                                       delegateTo: p.delegateTo || "",
                                       delegateReason: p.delegateReason || "",
                                       dualPosition: p.dualPosition || "",
@@ -3144,6 +3147,82 @@ export default function SecretariatAdmin({
                     >
                       ✕
                     </button>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: "12px",
+                      borderRadius: 8,
+                      background: "rgba(245,158,11,0.08)",
+                      border: "1px solid rgba(245,158,11,0.25)",
+                      marginBottom: 14,
+                    }}
+                  >
+                    <Label>승진·직급 변경</Label>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 8,
+                      }}
+                    >
+                      <select
+                        className="select-field"
+                        value={
+                          statusForm.roleLevel ||
+                          statusModalUser.roleLevel ||
+                          "PROSECUTOR"
+                        }
+                        onChange={(e) => {
+                          const roleLevel = e.target.value;
+                          const labels = {
+                            PROSECUTOR_GENERAL: "검찰총장",
+                            CHIEF_PROSECUTOR: "검사장",
+                            DEPUTY_CHIEF: "차장검사",
+                            CHIEF_ADMINISTRATOR: "검찰관리관",
+                            SENIOR_PROSECUTOR: "부장검사",
+                            PROSECUTOR: "평검사",
+                            PROBATIONARY: "검사시보",
+                            ADMINISTRATOR: "검찰사무관",
+                            ADMIN_PROBATIONARY: "검찰사무관시보",
+                          };
+                          setStatusForm({
+                            ...statusForm,
+                            roleLevel,
+                            rank: labels[roleLevel] || roleLevel,
+                          });
+                        }}
+                      >
+                        {ROLE_HIERARCHY.filter(
+                          (role) => role !== "SUPER_ADMIN",
+                        ).map((role) => (
+                          <option key={role} value={role}>
+                            {ROLE_LABELS[role]}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        className="input-field"
+                        value={statusForm.rank || ""}
+                        onChange={(e) =>
+                          setStatusForm({ ...statusForm, rank: e.target.value })
+                        }
+                        placeholder="직급 표시명"
+                      />
+                    </div>
+                    <input
+                      className="input-field"
+                      style={{ marginTop: 8 }}
+                      value={statusForm.position || ""}
+                      onChange={(e) =>
+                        setStatusForm({
+                          ...statusForm,
+                          position: e.target.value,
+                          title: e.target.value,
+                        })
+                      }
+                      placeholder="직위 (예: 형사부장)"
+                    />
                   </div>
 
                   <div

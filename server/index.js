@@ -1342,6 +1342,8 @@ app.patch(
     const allowedFields = {
       status: "status",
       dept: "dept",
+      roleLevel: "role_level",
+      rank: "rank",
       delegateTo: "delegate_to",
       delegateReason: "delegate_reason",
       dualPosition: "dual_position",
@@ -1355,6 +1357,39 @@ app.patch(
     const updates = Object.entries(allowedFields)
       .filter(([field]) => req.body[field] !== undefined)
       .map(([field, column]) => ({ column, value: req.body[field] }));
+    const allowedRoleLevels = new Set([
+      "PROSECUTOR_GENERAL",
+      "CHIEF_PROSECUTOR",
+      "DEPUTY_CHIEF",
+      "CHIEF_ADMINISTRATOR",
+      "SENIOR_PROSECUTOR",
+      "PROSECUTOR",
+      "PROBATIONARY",
+      "ADMINISTRATOR",
+      "ADMIN_PROBATIONARY",
+    ]);
+    if (
+      req.body.roleLevel !== undefined &&
+      !allowedRoleLevels.has(req.body.roleLevel)
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "허용되지 않는 직급입니다." });
+    }
+    if (
+      (req.body.roleLevel !== undefined || req.body.rank !== undefined) &&
+      ![
+        "SUPER_ADMIN",
+        "PROSECUTOR_GENERAL",
+        "CHIEF_PROSECUTOR",
+        "DEPUTY_CHIEF",
+        "CHIEF_ADMINISTRATOR",
+      ].includes(req.user.roleLevel)
+    ) {
+      return res
+        .status(403)
+        .json({ success: false, message: "승진·직급 변경 권한이 필요합니다." });
+    }
     if (updates.length === 0)
       return res
         .status(400)
@@ -2074,12 +2109,10 @@ app.post(
       "LOGOUT",
     ]);
     if (!allowedActions.has(action)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "감사 로그 행위가 올바르지 않습니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "감사 로그 행위가 올바르지 않습니다.",
+      });
     }
     try {
       const id = `AL-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
