@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;700;900&family=Nanum+Myeongjo:wght@700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;700;900&family=Nanum+Myeongjo:wght@700;800&display=swap");
 
 :root {
   --bg-dark: #060b18;
@@ -9,7 +9,7 @@
   --primary-amber: #f59e0b;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --border-subtle: rgba(255,255,255,0.06);
+  --border-subtle: rgba(255, 255, 255, 0.06);
 }
 
 * {
@@ -19,7 +19,7 @@
 }
 
 body {
-  font-family: 'Noto Sans KR', 'Inter', sans-serif;
+  font-family: "Noto Sans KR", "Inter", sans-serif;
   background-color: var(--bg-dark);
   color: var(--text-main);
   line-height: 1.6;
@@ -57,7 +57,9 @@ body {
 }
 
 /* Inputs */
-.input-field, .select-field, .textarea-field {
+.input-field,
+.select-field,
+.textarea-field {
   background-color: var(--bg-input);
   border: 1px solid var(--border-subtle);
   color: var(--text-main);
@@ -68,7 +70,9 @@ body {
   outline: none;
   width: 100%;
 }
-.input-field:focus, .select-field:focus, .textarea-field:focus {
+.input-field:focus,
+.select-field:focus,
+.textarea-field:focus {
   border-color: var(--primary-amber);
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
 }
@@ -83,11 +87,26 @@ body {
   font-size: 0.75rem;
   font-weight: 700;
 }
-.badge-danger { background-color: rgba(220, 38, 38, 0.15); color: #fca5a5; }
-.badge-success { background-color: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
-.badge-warning { background-color: rgba(245, 158, 11, 0.15); color: #fcd34d; }
-.badge-info { background-color: rgba(59, 130, 246, 0.15); color: #93c5fd; }
-.badge-gold { background-color: var(--primary-amber); color: #000; }
+.badge-danger {
+  background-color: rgba(220, 38, 38, 0.15);
+  color: #fca5a5;
+}
+.badge-success {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+}
+.badge-warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+}
+.badge-info {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+}
+.badge-gold {
+  background-color: var(--primary-amber);
+  color: #000;
+}
 
 /* Buttons */
 .btn {
@@ -118,7 +137,7 @@ body {
   border: 1px solid var(--border-subtle);
 }
 .btn-secondary:hover {
-  background-color: rgba(255,255,255,0.1);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 .btn-outline {
   background-color: transparent;
@@ -158,22 +177,25 @@ body {
   background-color: #ffffff;
   color: #000000;
   padding: 50px 60px;
-  font-family: 'Noto Sans KR', sans-serif;
+  font-family: "Noto Sans KR", sans-serif;
   border: 1px solid #ccc;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   position: relative;
   min-height: 800px;
   border-radius: 4px;
 }
 .approval-top-bar {
   position: absolute;
-  top: 0; left: 0; right: 0; height: 4px;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
   background-color: var(--bg-dark);
 }
 .approval-title {
   text-align: center;
   font-size: 2.2rem;
-  font-family: 'Nanum Myeongjo', serif;
+  font-family: "Nanum Myeongjo", serif;
   font-weight: 800;
   letter-spacing: 1.5rem;
   margin-left: 1.5rem;
@@ -213,7 +235,8 @@ body {
   margin-top: 3rem;
   text-align: center;
 }
-.approval-sign-table th, .approval-sign-table td {
+.approval-sign-table th,
+.approval-sign-table td {
   border: 1px solid #000;
   padding: 10px;
 }
@@ -277,7 +300,7 @@ body {
   word-wrap: break-word;
 }
 .ledger-table tbody tr:hover {
-  background-color: rgba(255,255,255,0.02);
+  background-color: rgba(255, 255, 255, 0.02);
 }
 
 /* Lists and Cards */
@@ -291,31 +314,164 @@ body {
   cursor: pointer;
 }
 .card-row:hover {
-  background-color: rgba(255,255,255,0.02);
-  border-color: rgba(255,255,255,0.1);
+  background-color: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Misc Utilities for easy styling without tailwind */
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.items-center { align-items: center; }
-.justify-between { justify-content: space-between; }
-.justify-center { justify-content: center; }
-.gap-1 { gap: 0.25rem; }
-.gap-2 { gap: 0.5rem; }
-.gap-3 { gap: 0.75rem; }
-.gap-4 { gap: 1rem; }
-.w-full { width: 100%; }
-.mt-2 { margin-top: 0.5rem; }
-.mt-4 { margin-top: 1rem; }
-.mb-2 { margin-bottom: 0.5rem; }
-.mb-4 { margin-bottom: 1rem; }
-.p-4 { padding: 1rem; }
-.text-xs { font-size: 0.75rem; }
-.text-sm { font-size: 0.875rem; }
-.text-lg { font-size: 1.125rem; }
-.font-bold { font-weight: 700; }
-.text-amber { color: var(--primary-amber); }
-.text-blue { color: var(--primary-blue); }
-.text-muted { color: var(--text-muted); }
-.text-white { color: var(--text-main); }
+.flex {
+  display: flex;
+}
+.flex-col {
+  flex-direction: column;
+}
+.items-center {
+  align-items: center;
+}
+.justify-between {
+  justify-content: space-between;
+}
+.justify-center {
+  justify-content: center;
+}
+.gap-1 {
+  gap: 0.25rem;
+}
+.gap-2 {
+  gap: 0.5rem;
+}
+.gap-3 {
+  gap: 0.75rem;
+}
+.gap-4 {
+  gap: 1rem;
+}
+.w-full {
+  width: 100%;
+}
+.mt-2 {
+  margin-top: 0.5rem;
+}
+.mt-4 {
+  margin-top: 1rem;
+}
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+.mb-4 {
+  margin-bottom: 1rem;
+}
+.p-4 {
+  padding: 1rem;
+}
+.text-xs {
+  font-size: 0.75rem;
+}
+.text-sm {
+  font-size: 0.875rem;
+}
+.text-lg {
+  font-size: 1.125rem;
+}
+.font-bold {
+  font-weight: 700;
+}
+.text-amber {
+  color: var(--primary-amber);
+}
+.text-blue {
+  color: var(--primary-blue);
+}
+.text-muted {
+  color: var(--text-muted);
+}
+.text-white {
+  color: var(--text-main);
+}
+
+/* 담당 사건 화면은 휴대폰에서도 검색과 처리 버튼을 우선 노출한다. */
+@media (max-width: 640px) {
+  .main-content {
+    padding: 12px;
+  }
+
+  .my-cases-view {
+    gap: 12px !important;
+  }
+
+  .my-cases-banner {
+    padding: 16px !important;
+  }
+
+  .my-cases-banner > div:first-child {
+    align-items: flex-start !important;
+  }
+
+  .my-cases-banner > div:first-child > div:first-child {
+    align-items: flex-start !important;
+  }
+
+  .my-cases-banner .badge {
+    white-space: nowrap;
+  }
+
+  .my-cases-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .my-cases-filter {
+    padding: 10px !important;
+    align-items: stretch !important;
+  }
+
+  .my-cases-search {
+    flex-basis: 100%;
+    min-width: 0 !important;
+  }
+
+  .my-cases-filter > .select-field {
+    width: 100% !important;
+  }
+
+  .my-case-card {
+    padding: 14px !important;
+    gap: 10px !important;
+  }
+
+  .my-case-heading {
+    align-items: flex-start !important;
+  }
+
+  .my-case-heading > div:first-child {
+    width: 100%;
+    gap: 5px !important;
+  }
+
+  .my-case-heading > div:last-child {
+    width: 100%;
+    justify-content: space-between;
+    font-size: 0.68rem !important;
+  }
+
+  .my-case-card > div:nth-child(2) {
+    grid-template-columns: 1fr !important;
+    padding: 12px !important;
+  }
+
+  .my-case-actions {
+    width: 100%;
+  }
+
+  .my-case-actions .btn,
+  .my-case-card > div:last-child > .btn {
+    flex: 1 1 calc(50% - 6px);
+    min-height: 40px;
+    padding: 8px 6px !important;
+    font-size: 0.75rem !important;
+  }
+
+  .my-case-card > div:last-child {
+    align-items: stretch !important;
+  }
+}
