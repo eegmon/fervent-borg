@@ -519,7 +519,7 @@ const distPath = join(__dirname, '..', 'dist');
 app.use(express.static(distPath));
 
 // API 라우트가 아닌 모든 요청은 index.html로 (SPA 라우팅)
-app.get('*', (req, res) => {
+app.get('/{*splat}', (req, res) => {
   res.sendFile(join(distPath, 'index.html'));
 });
 
