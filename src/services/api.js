@@ -38,9 +38,11 @@ async function apiFetch(path, options = {}) {
 
     // 401 → 토큰 만료 또는 미인증: 세션 초기화 후 강제 로그아웃
     if (res.status === 401) {
+      // 토큰이 있었던 경우만 (만료된 세션) reload — 미로그인 상태에서는 무시
+      const hadToken = !!getToken();
       clearToken();
       try { sessionStorage.removeItem('dose_pros_session'); } catch {}
-      window.location.reload();
+      if (hadToken) window.location.reload();
       return null;
     }
 

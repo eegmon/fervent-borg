@@ -146,6 +146,7 @@ export default function App() {
 
   // Load Persistence from Backend DB on mount
   useEffect(() => {
+    if (!currentUser) return; // 로그인 상태일 때만 로드
     async function loadDbData() {
       const serverCases = await fetchCases();
       if (serverCases && serverCases.length > 0) {
@@ -158,7 +159,7 @@ export default function App() {
       }
     }
     loadDbData();
-  }, []);
+  }, [currentUser]);
 
   const pendingApprovalsCount = approvalsData.filter(a => a.status.includes('대기')).length;
 
