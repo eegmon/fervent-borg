@@ -7,28 +7,36 @@
  * - 모든 에러는 콘솔에 기록하고 null 반환 (앱이 폴백 데이터로 동작)
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 // ── 토큰 헬퍼 ────────────────────────────────────────────────────────
-const TOKEN_KEY = 'dose_pros_token';
+const TOKEN_KEY = "dose_pros_token";
 
 export function saveToken(token) {
-  try { sessionStorage.setItem(TOKEN_KEY, token); } catch {}
+  try {
+    sessionStorage.setItem(TOKEN_KEY, token);
+  } catch {}
 }
 
 export function getToken() {
-  try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
+  try {
+    return sessionStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export function clearToken() {
-  try { sessionStorage.removeItem(TOKEN_KEY); } catch {}
+  try {
+    sessionStorage.removeItem(TOKEN_KEY);
+  } catch {}
 }
 
 // ── 공통 fetch 래퍼 ──────────────────────────────────────────────────
 async function apiFetch(path, options = {}) {
   const token = getToken();
   const headers = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
@@ -41,14 +49,19 @@ async function apiFetch(path, options = {}) {
       // 토큰이 있었던 경우만 (만료된 세션) reload — 미로그인 상태에서는 무시
       const hadToken = !!getToken();
       clearToken();
-      try { sessionStorage.removeItem('dose_pros_session'); } catch {}
+      try {
+        sessionStorage.removeItem("dose_pros_session");
+      } catch {}
       if (hadToken) window.location.reload();
       return null;
     }
 
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      console.warn(`[API] ${options.method || 'GET'} ${path} → ${res.status}`, text);
+      const text = await res.text().catch(() => "");
+      console.warn(
+        `[API] ${options.method || "GET"} ${path} → ${res.status}`,
+        text,
+      );
       return null;
     }
 
@@ -63,8 +76,8 @@ async function apiFetch(path, options = {}) {
 // Auth
 // ════════════════════════════════════════════════════════════════════
 export async function loginApi(id, password) {
-  const data = await apiFetch('/auth/login', {
-    method: 'POST',
+  const data = await apiFetch("/auth/login", {
+    method: "POST",
     body: JSON.stringify({ id, password }),
   });
   // 로그인 성공 시 토큰 저장
@@ -82,48 +95,48 @@ export function logoutApi() {
 // Cases
 // ════════════════════════════════════════════════════════════════════
 export function fetchCases() {
-  return apiFetch('/cases');
+  return apiFetch("/cases");
 }
 
 export function fetchCaseNumberSettings() {
-  return apiFetch('/settings/case-number');
+  return apiFetch("/settings/case-number");
 }
 
 export function updateCaseNumberSettings(settings) {
-  return apiFetch('/settings/case-number', {
-    method: 'PATCH',
+  return apiFetch("/settings/case-number", {
+    method: "PATCH",
     body: JSON.stringify(settings),
   });
 }
 
 export function createCaseApi(caseData) {
-  return apiFetch('/cases', {
-    method: 'POST',
+  return apiFetch("/cases", {
+    method: "POST",
     body: JSON.stringify(caseData),
   });
 }
 
 export function createIntakeBundleApi(caseData) {
-  return apiFetch('/cases/intake-bundle', {
-    method: 'POST',
+  return apiFetch("/cases/intake-bundle", {
+    method: "POST",
     body: JSON.stringify(caseData),
   });
 }
 
 export function updateCaseApi(id, caseData) {
   return apiFetch(`/cases/${id}`, {
-    method: 'PUT',
+    method: "PUT",
     body: JSON.stringify(caseData),
   });
 }
 
 export function fetchDepartments() {
-  return apiFetch('/departments');
+  return apiFetch("/departments");
 }
 
 export function saveDepartmentsApi(departments) {
-  return apiFetch('/departments', {
-    method: 'PUT',
+  return apiFetch("/departments", {
+    method: "PUT",
     body: JSON.stringify({ departments }),
   });
 }
@@ -132,12 +145,12 @@ export function saveDepartmentsApi(departments) {
 // Reports
 // ════════════════════════════════════════════════════════════════════
 export function fetchReports() {
-  return apiFetch('/reports');
+  return apiFetch("/reports");
 }
 
 export function createReportApi(reportData) {
-  return apiFetch('/reports', {
-    method: 'POST',
+  return apiFetch("/reports", {
+    method: "POST",
     body: JSON.stringify(reportData),
   });
 }
@@ -146,19 +159,19 @@ export function createReportApi(reportData) {
 // Appeals
 // ════════════════════════════════════════════════════════════════════
 export function fetchAppeals() {
-  return apiFetch('/appeals');
+  return apiFetch("/appeals");
 }
 
 export function createAppealApi(appealData) {
-  return apiFetch('/appeals', {
-    method: 'POST',
+  return apiFetch("/appeals", {
+    method: "POST",
     body: JSON.stringify(appealData),
   });
 }
 
 export function updateAppealApi(id, appealData) {
   return apiFetch(`/appeals/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify(appealData),
   });
 }
@@ -167,12 +180,12 @@ export function updateAppealApi(id, appealData) {
 // Bookings
 // ════════════════════════════════════════════════════════════════════
 export function fetchBookings() {
-  return apiFetch('/bookings');
+  return apiFetch("/bookings");
 }
 
 export function createBookingApi(bookingData) {
-  return apiFetch('/bookings', {
-    method: 'POST',
+  return apiFetch("/bookings", {
+    method: "POST",
     body: JSON.stringify(bookingData),
   });
 }
@@ -181,71 +194,71 @@ export function createBookingApi(bookingData) {
 // Approvals
 // ════════════════════════════════════════════════════════════════════
 export function fetchApprovals() {
-  return apiFetch('/approvals');
+  return apiFetch("/approvals");
 }
 
 export function createApprovalApi(approvalData) {
-  return apiFetch('/approvals', {
-    method: 'POST',
+  return apiFetch("/approvals", {
+    method: "POST",
     body: JSON.stringify(approvalData),
   });
 }
 
 export function updateApprovalApi(id, approvalData) {
   return apiFetch(`/approvals/${id}`, {
-    method: 'PUT',
+    method: "PUT",
     body: JSON.stringify(approvalData),
   });
 }
 
 export function approveDocApi(docId) {
-  return apiFetch(`/approvals/${docId}/approve`, { method: 'PUT' });
+  return apiFetch(`/approvals/${docId}/approve`, { method: "PUT" });
 }
 
 // ════════════════════════════════════════════════════════════════════
 // DELETE 엔드포인트 (검찰사무국 전용)
 // ════════════════════════════════════════════════════════════════════
 export function deleteCaseApi(id) {
-  return apiFetch(`/cases/${id}`, { method: 'DELETE' });
+  return apiFetch(`/cases/${id}`, { method: "DELETE" });
 }
 
 export function deleteAppealApi(id) {
-  return apiFetch(`/appeals/${id}`, { method: 'DELETE' });
+  return apiFetch(`/appeals/${id}`, { method: "DELETE" });
 }
 
 export function deleteApprovalApi(id) {
-  return apiFetch(`/approvals/${id}`, { method: 'DELETE' });
+  return apiFetch(`/approvals/${id}`, { method: "DELETE" });
 }
 
 export function deleteReportApi(id) {
-  return apiFetch(`/reports/${id}`, { method: 'DELETE' });
+  return apiFetch(`/reports/${id}`, { method: "DELETE" });
 }
 
 export function deleteBookingApi(id) {
-  return apiFetch(`/bookings/${id}`, { method: 'DELETE' });
+  return apiFetch(`/bookings/${id}`, { method: "DELETE" });
 }
 
 export function deleteProsecutorApi(id) {
-  return apiFetch(`/prosecutors/${id}`, { method: 'DELETE' });
+  return apiFetch(`/prosecutors/${id}`, { method: "DELETE" });
 }
 
 // ════════════════════════════════════════════════════════════════════
 // Prosecutors
 // ════════════════════════════════════════════════════════════════════
 export function fetchProsecutors() {
-  return apiFetch('/prosecutors');
+  return apiFetch("/prosecutors");
 }
 
 export function createProsecutorApi(prosecutor) {
-  return apiFetch('/prosecutors', {
-    method: 'POST',
+  return apiFetch("/prosecutors", {
+    method: "POST",
     body: JSON.stringify(prosecutor),
   });
 }
 
 export function updateProsecutorApi(userId, changes) {
   return apiFetch(`/prosecutors/${userId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify(changes),
   });
 }
@@ -253,7 +266,7 @@ export function updateProsecutorApi(userId, changes) {
 /** 비밀번호 변경 (본인 또는 관리자) */
 export function changePasswordApi(userId, currentPassword, newPassword) {
   return apiFetch(`/prosecutors/${userId}/password`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify({ currentPassword, newPassword }),
   });
 }
@@ -269,31 +282,31 @@ export function changePasswordApi(userId, currentPassword, newPassword) {
 export async function registerApi(data) {
   try {
     const res = await fetch(`${API_BASE}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
     return await res.json();
   } catch (e) {
-    console.error('[API] 회원가입 신청 오류:', e.message);
-    return { success: false, message: '네트워크 오류가 발생했습니다.' };
+    console.error("[API] 회원가입 신청 오류:", e.message);
+    return { success: false, message: "네트워크 오류가 발생했습니다." };
   }
 }
 
 /** 가입 신청 목록 조회 (검찰사무국 전용) */
 export function fetchRegistrations() {
-  return apiFetch('/registrations');
+  return apiFetch("/registrations");
 }
 
 /** 가입 신청 허가 */
 export function approveRegistrationApi(regId) {
-  return apiFetch(`/registrations/${regId}/approve`, { method: 'PUT' });
+  return apiFetch(`/registrations/${regId}/approve`, { method: "PUT" });
 }
 
 /** 가입 신청 거부 */
 export function rejectRegistrationApi(regId, reason) {
   return apiFetch(`/registrations/${regId}/reject`, {
-    method: 'PUT',
+    method: "PUT",
     body: JSON.stringify({ reason }),
   });
 }
@@ -302,7 +315,7 @@ export function rejectRegistrationApi(regId, reason) {
 // Audit Logs
 // ════════════════════════════════════════════════════════════════════
 export function fetchAuditLogs() {
-  return apiFetch('/audit-logs');
+  return apiFetch("/audit-logs");
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -318,37 +331,55 @@ export function fetchEvidence(caseNo) {
 
 export function createEvidenceApi(caseNo, evidence) {
   return apiFetch(`/cases/${encodeURIComponent(caseNo)}/evidence`, {
-    method: 'POST',
+    method: "POST",
     body: JSON.stringify(evidence),
   });
 }
 
 export function deleteEvidenceApi(evidenceId) {
-  return apiFetch(`/evidence/${encodeURIComponent(evidenceId)}`, { method: 'DELETE' });
+  return apiFetch(`/evidence/${encodeURIComponent(evidenceId)}`, {
+    method: "DELETE",
+  });
 }
 
 export function updateEvidenceApi(evidenceId, evidence) {
   return apiFetch(`/evidence/${encodeURIComponent(evidenceId)}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify(evidence),
   });
 }
 
-export const fetchWarrants = () => apiFetch('/warrants');
-export const createWarrantApi = warrant => apiFetch('/warrants', { method: 'POST', body: JSON.stringify(warrant) });
-export const updateWarrantApi = (id, changes) => apiFetch(`/warrants/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(changes) });
-export const deleteWarrantApi = id => apiFetch(`/warrants/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export const fetchWarrants = () => apiFetch("/warrants");
+export const createWarrantApi = (warrant) =>
+  apiFetch("/warrants", { method: "POST", body: JSON.stringify(warrant) });
+export const updateWarrantApi = (id, changes) =>
+  apiFetch(`/warrants/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(changes),
+  });
+export const deleteWarrantApi = (id) =>
+  apiFetch(`/warrants/${encodeURIComponent(id)}`, { method: "DELETE" });
 
-export const fetchOfficeDocuments = type => apiFetch(`/office-documents?type=${encodeURIComponent(type)}`);
-export const createOfficeDocumentApi = (type, document) => apiFetch('/office-documents', { method: 'POST', body: JSON.stringify({ type, document }) });
-export const deleteOfficeDocumentApi = id => apiFetch(`/office-documents/${encodeURIComponent(id)}`, { method: 'DELETE' });
-export const updateOfficeDocumentApi = (id, document) => apiFetch(`/office-documents/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ document }) });
+export const fetchOfficeDocuments = (type) =>
+  apiFetch(`/office-documents?type=${encodeURIComponent(type)}`);
+export const createOfficeDocumentApi = (type, document) =>
+  apiFetch("/office-documents", {
+    method: "POST",
+    body: JSON.stringify({ type, document }),
+  });
+export const deleteOfficeDocumentApi = (id) =>
+  apiFetch(`/office-documents/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const updateOfficeDocumentApi = (id, document) =>
+  apiFetch(`/office-documents/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ document }),
+  });
 
 // ════════════════════════════════════════════════════════════════════
 // 문서번호 서버 채번
 // ════════════════════════════════════════════════════════════════════
 export function fetchNextDocNo() {
-  return apiFetch('/approvals/next-doc-no');
+  return apiFetch("/approvals/next-doc-no");
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -356,7 +387,7 @@ export function fetchNextDocNo() {
 // ════════════════════════════════════════════════════════════════════
 export function rejectDocApi(docId, reason) {
   return apiFetch(`/approvals/${docId}/reject`, {
-    method: 'PUT',
+    method: "PUT",
     body: JSON.stringify({ reason }),
   });
 }

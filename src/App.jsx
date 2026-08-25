@@ -1104,9 +1104,16 @@ export default function App() {
           role: "부장검사",
           name: supervisor?.name || "",
           status: supervisor ? "검토승인" : "결재대기",
-          date: supervisor ? new Date().toISOString().replace("T", " ").substring(0, 16) : "-",
+          date: supervisor
+            ? new Date().toISOString().replace("T", " ").substring(0, 16)
+            : "-",
         },
-        { role: "지검장", name: chief?.name || "", status: "결재대기", date: "-" },
+        {
+          role: "지검장",
+          name: chief?.name || "",
+          status: "결재대기",
+          date: "-",
+        },
       ],
     };
 
