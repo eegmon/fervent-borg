@@ -15,8 +15,13 @@ import "dotenv/config";
 const url = process.env.TURSO_DATABASE_URL || ":memory:";
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
-if (process.env.NODE_ENV === "production" && (!process.env.TURSO_DATABASE_URL || !authToken)) {
-  throw new Error("운영 환경에서는 TURSO_DATABASE_URL과 TURSO_AUTH_TOKEN이 필요합니다.");
+if (
+  process.env.NODE_ENV === "production" &&
+  (!process.env.TURSO_DATABASE_URL || !authToken)
+) {
+  throw new Error(
+    "운영 환경에서는 TURSO_DATABASE_URL과 TURSO_AUTH_TOKEN이 필요합니다.",
+  );
 }
 
 export const db = createClient(
@@ -59,7 +64,8 @@ export async function initDb() {
     try {
       await db.execute(`ALTER TABLE prosecutors ADD COLUMN ${column}`);
     } catch (error) {
-      if (!String(error.message || error).includes("duplicate column")) throw error;
+      if (!String(error.message || error).includes("duplicate column"))
+        throw error;
     }
   }
 
@@ -109,7 +115,8 @@ export async function initDb() {
     try {
       await db.execute(`ALTER TABLE cases ADD COLUMN ${column}`);
     } catch (error) {
-      if (!String(error.message || error).includes("duplicate column")) throw error;
+      if (!String(error.message || error).includes("duplicate column"))
+        throw error;
     }
   }
 
@@ -209,14 +216,20 @@ export async function initDb() {
     )
   `);
   try {
-    await db.execute("ALTER TABLE approvals ADD COLUMN hwp_html TEXT DEFAULT ''");
+    await db.execute(
+      "ALTER TABLE approvals ADD COLUMN hwp_html TEXT DEFAULT ''",
+    );
   } catch (error) {
-    if (!String(error.message || error).includes("duplicate column")) throw error;
+    if (!String(error.message || error).includes("duplicate column"))
+      throw error;
   }
   try {
-    await db.execute("ALTER TABLE approvals ADD COLUMN attachments_json TEXT DEFAULT '[]'");
+    await db.execute(
+      "ALTER TABLE approvals ADD COLUMN attachments_json TEXT DEFAULT '[]'",
+    );
   } catch (error) {
-    if (!String(error.message || error).includes("duplicate column")) throw error;
+    if (!String(error.message || error).includes("duplicate column"))
+      throw error;
   }
 
   // ── registrations (회원가입 신청) ──────────────────────────────
@@ -302,11 +315,20 @@ export async function initDb() {
       deleted_at TEXT DEFAULT ''
     )
   `);
-  for (const table of ["cases", "reports", "appeals", "bookings", "approvals"]) {
+  for (const table of [
+    "cases",
+    "reports",
+    "appeals",
+    "bookings",
+    "approvals",
+  ]) {
     try {
-      await db.execute(`ALTER TABLE ${table} ADD COLUMN deleted_at TEXT DEFAULT ''`);
+      await db.execute(
+        `ALTER TABLE ${table} ADD COLUMN deleted_at TEXT DEFAULT ''`,
+      );
     } catch (error) {
-      if (!String(error.message || error).includes("duplicate column")) throw error;
+      if (!String(error.message || error).includes("duplicate column"))
+        throw error;
     }
   }
 

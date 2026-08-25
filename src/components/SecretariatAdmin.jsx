@@ -1266,7 +1266,9 @@ function ActingOrderPanel({
   const today = new Date().toISOString().slice(0, 10);
   const [orders, setOrders] = useState([]);
   useEffect(() => {
-    fetchOfficeDocuments("order").then(data => { if (Array.isArray(data)) setOrders(data); });
+    fetchOfficeDocuments("order").then((data) => {
+      if (Array.isArray(data)) setOrders(data);
+    });
   }, []);
 
   const [form, setForm] = useState({
@@ -1300,7 +1302,10 @@ function ActingOrderPanel({
     };
 
     const saved = await createOfficeDocumentApi("order", newOrder);
-    if (!saved?.success) { alert(saved?.message || "직무대리명령 저장에 실패했습니다."); return; }
+    if (!saved?.success) {
+      alert(saved?.message || "직무대리명령 저장에 실패했습니다.");
+      return;
+    }
     setOrders((prev) => [saved.document || newOrder, ...prev]);
 
     if (onUpdateProsecutorStatus) {
@@ -1322,8 +1327,13 @@ function ActingOrderPanel({
 
   const handleRevokeOrder = async (orderId, origUserId) => {
     if (!window.confirm("해당 직무대리명령을 해제하시겠습니까?")) return;
-    const saved = await updateOfficeDocumentApi(orderId, { status: "해제완료" });
-    if (!saved?.success) { alert(saved?.message || "직무대리명령 저장에 실패했습니다."); return; }
+    const saved = await updateOfficeDocumentApi(orderId, {
+      status: "해제완료",
+    });
+    if (!saved?.success) {
+      alert(saved?.message || "직무대리명령 저장에 실패했습니다.");
+      return;
+    }
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? saved.document : o)),
     );
@@ -1808,7 +1818,11 @@ export default function SecretariatAdmin({
   const [sentDocs, setSentDocs] = useState([]);
   const [archivedDocs, setArchivedDocs] = useState([]);
   useEffect(() => {
-    Promise.all([fetchOfficeDocuments("receive"), fetchOfficeDocuments("send"), fetchOfficeDocuments("archive")]).then(([received, sent, archived]) => {
+    Promise.all([
+      fetchOfficeDocuments("receive"),
+      fetchOfficeDocuments("send"),
+      fetchOfficeDocuments("archive"),
+    ]).then(([received, sent, archived]) => {
       if (Array.isArray(received)) setReceivedDocs(received);
       if (Array.isArray(sent)) setSentDocs(sent);
       if (Array.isArray(archived)) setArchivedDocs(archived);
@@ -2682,7 +2696,10 @@ export default function SecretariatAdmin({
               신규 검사 계정 등록
             </div>
             <form
-              onSubmit={handleAddProsecutor}
+              onSubmit={(event) => {
+                event.preventDefault();
+                onAddProsecutor(newP);
+              }}
               style={{ display: "flex", flexDirection: "column", gap: 12 }}
             >
               <div>
@@ -4497,9 +4514,18 @@ export default function SecretariatAdmin({
                       status: "접수완료",
                       note: newReceive.note,
                     };
-                    const saved = await createOfficeDocumentApi("receive", item);
-                    if (!saved?.success) { alert(saved?.message || "문서 저장에 실패했습니다."); return; }
-                    setReceivedDocs((prev) => [saved.document || item, ...prev]);
+                    const saved = await createOfficeDocumentApi(
+                      "receive",
+                      item,
+                    );
+                    if (!saved?.success) {
+                      alert(saved?.message || "문서 저장에 실패했습니다.");
+                      return;
+                    }
+                    setReceivedDocs((prev) => [
+                      saved.document || item,
+                      ...prev,
+                    ]);
                     addLog(
                       "문서 접수 등록",
                       `[${newNo}] ${newReceive.title} (발신: ${newReceive.from})`,
@@ -4652,9 +4678,19 @@ export default function SecretariatAdmin({
                           <td style={{ textAlign: "center" }}>
                             <button
                               onClick={async () => {
-                                const result = await deleteOfficeDocumentApi(doc.id);
-                                if (!result?.success) { alert(result?.message || "문서 삭제에 실패했습니다."); return; }
-                                setReceivedDocs((prev) => prev.filter((d) => d.id !== doc.id));
+                                const result = await deleteOfficeDocumentApi(
+                                  doc.id,
+                                );
+                                if (!result?.success) {
+                                  alert(
+                                    result?.message ||
+                                      "문서 삭제에 실패했습니다.",
+                                  );
+                                  return;
+                                }
+                                setReceivedDocs((prev) =>
+                                  prev.filter((d) => d.id !== doc.id),
+                                );
                                 addLog(
                                   "접수문서 삭제",
                                   `${doc.docNo} (${doc.title})`,
@@ -4720,7 +4756,10 @@ export default function SecretariatAdmin({
                       note: newSend.note,
                     };
                     const saved = await createOfficeDocumentApi("send", item);
-                    if (!saved?.success) { alert(saved?.message || "문서 저장에 실패했습니다."); return; }
+                    if (!saved?.success) {
+                      alert(saved?.message || "문서 저장에 실패했습니다.");
+                      return;
+                    }
                     setSentDocs((prev) => [saved.document || item, ...prev]);
                     addLog(
                       "문서 발송 등록",
@@ -4860,9 +4899,19 @@ export default function SecretariatAdmin({
                           <td style={{ textAlign: "center" }}>
                             <button
                               onClick={async () => {
-                                const result = await deleteOfficeDocumentApi(doc.id);
-                                if (!result?.success) { alert(result?.message || "문서 삭제에 실패했습니다."); return; }
-                                setSentDocs((prev) => prev.filter((d) => d.id !== doc.id));
+                                const result = await deleteOfficeDocumentApi(
+                                  doc.id,
+                                );
+                                if (!result?.success) {
+                                  alert(
+                                    result?.message ||
+                                      "문서 삭제에 실패했습니다.",
+                                  );
+                                  return;
+                                }
+                                setSentDocs((prev) =>
+                                  prev.filter((d) => d.id !== doc.id),
+                                );
                                 addLog(
                                   "발송문서 삭제",
                                   `${doc.docNo} (${doc.title})`,
@@ -4926,9 +4975,18 @@ export default function SecretariatAdmin({
                       category: newArchive.category,
                       status: "보존중",
                     };
-                    const saved = await createOfficeDocumentApi("archive", item);
-                    if (!saved?.success) { alert(saved?.message || "문서 저장에 실패했습니다."); return; }
-                    setArchivedDocs((prev) => [saved.document || item, ...prev]);
+                    const saved = await createOfficeDocumentApi(
+                      "archive",
+                      item,
+                    );
+                    if (!saved?.success) {
+                      alert(saved?.message || "문서 저장에 실패했습니다.");
+                      return;
+                    }
+                    setArchivedDocs((prev) => [
+                      saved.document || item,
+                      ...prev,
+                    ]);
                     addLog(
                       "문서 보존 등록",
                       `[${newNo}] ${newArchive.title} (보존기간: ${newArchive.retentionYears}년)`,
@@ -5117,9 +5175,19 @@ export default function SecretariatAdmin({
                           <td style={{ textAlign: "center" }}>
                             <button
                               onClick={async () => {
-                                const result = await deleteOfficeDocumentApi(doc.id);
-                                if (!result?.success) { alert(result?.message || "문서 삭제에 실패했습니다."); return; }
-                                setArchivedDocs((prev) => prev.filter((d) => d.id !== doc.id));
+                                const result = await deleteOfficeDocumentApi(
+                                  doc.id,
+                                );
+                                if (!result?.success) {
+                                  alert(
+                                    result?.message ||
+                                      "문서 삭제에 실패했습니다.",
+                                  );
+                                  return;
+                                }
+                                setArchivedDocs((prev) =>
+                                  prev.filter((d) => d.id !== doc.id),
+                                );
                                 addLog(
                                   "보존문서 삭제",
                                   `${doc.docNo} (${doc.title})`,

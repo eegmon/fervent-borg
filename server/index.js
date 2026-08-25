@@ -215,12 +215,10 @@ function requireRecordScope(table) {
       args: [req.params.id, value],
     });
     if (!result.rows.length)
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "해당 자료에 접근할 권한이 없습니다.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "해당 자료에 접근할 권한이 없습니다.",
+      });
     next();
   };
 }
@@ -332,12 +330,10 @@ app.patch(
         (value) => !Number.isInteger(value) || value < 1,
       )
     ) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "시작번호는 1 이상의 정수여야 합니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "시작번호는 1 이상의 정수여야 합니다.",
+      });
     }
     const now = new Date().toISOString().replace("T", " ").substring(0, 19);
     await db.batch(
@@ -378,12 +374,10 @@ app.put(
   requireSecretariat,
   async (req, res) => {
     if (!Array.isArray(req.body?.departments))
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "부서 목록 형식이 올바르지 않습니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "부서 목록 형식이 올바르지 않습니다.",
+      });
     const now = new Date().toISOString().replace("T", " ").substring(0, 19);
     await db.execute({
       sql: "UPDATE system_settings SET value=?, updated_at=?, updated_by=? WHERE key='departments_json'",
@@ -1140,20 +1134,16 @@ app.post(
       "ADMIN_PROBATIONARY",
     ];
     if (!id || !name || !password || !allowedRoles.includes(roleLevel)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "계정 ID, 이름, 비밀번호 또는 역할이 올바르지 않습니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "계정 ID, 이름, 비밀번호 또는 역할이 올바르지 않습니다.",
+      });
     }
     if (password.length < 10) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "비밀번호는 10자 이상이어야 합니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "비밀번호는 10자 이상이어야 합니다.",
+      });
     }
     try {
       const existing = await db.execute({
@@ -1803,12 +1793,10 @@ app.patch("/api/prosecutors/:id/password", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { currentPassword, newPassword } = req.body || {};
   if (id !== req.user.id && !hasGlobalDataAccess(req.user)) {
-    return res
-      .status(403)
-      .json({
-        success: false,
-        message: "본인 계정의 비밀번호만 변경할 수 있습니다.",
-      });
+    return res.status(403).json({
+      success: false,
+      message: "본인 계정의 비밀번호만 변경할 수 있습니다.",
+    });
   }
 
   // 본인 또는 사무국 관리자만 변경 가능
@@ -1852,12 +1840,10 @@ app.patch("/api/prosecutors/:id/password", requireAuth, async (req, res) => {
         !storedPassword ||
         !(await bcrypt.compare(currentPassword, storedPassword))
       ) {
-        return res
-          .status(401)
-          .json({
-            success: false,
-            message: "현재 비밀번호가 일치하지 않습니다.",
-          });
+        return res.status(401).json({
+          success: false,
+          message: "현재 비밀번호가 일치하지 않습니다.",
+        });
       }
     }
     const hashed = await bcrypt.hash(newPassword, 10);
@@ -1954,12 +1940,10 @@ app.get("/api/cases/:caseNo/evidence", requireAuth, async (req, res) => {
   try {
     const caseItem = await findCaseForEvidence(req.params.caseNo, req.user);
     if (!caseItem)
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "해당 사건에 접근할 권한이 없습니다.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "해당 사건에 접근할 권한이 없습니다.",
+      });
     const result = await db.execute({
       sql: "SELECT * FROM evidence WHERE case_no = ? AND deleted_at = '' ORDER BY created_at DESC",
       args: [req.params.caseNo],
@@ -1981,12 +1965,10 @@ app.post("/api/cases/:caseNo/evidence", requireAuth, async (req, res) => {
   try {
     const caseItem = await findCaseForEvidence(req.params.caseNo, req.user);
     if (!caseItem)
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "해당 사건에 접근할 권한이 없습니다.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "해당 사건에 접근할 권한이 없습니다.",
+      });
     const id = `EVD-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date().toISOString();
     await db.execute({
