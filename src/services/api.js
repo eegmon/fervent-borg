@@ -7,7 +7,7 @@
  * - 모든 에러는 콘솔에 기록하고 null 반환 (앱이 폴백 데이터로 동작)
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // ── 토큰 헬퍼 ────────────────────────────────────────────────────────
 const TOKEN_KEY = 'dose_pros_token';
