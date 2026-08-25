@@ -57,18 +57,12 @@ export const ROLE_COLORS = {
 };
 
 export const INITIAL_DEPARTMENTS = [
-  { id: 'dept_general', name: '검찰총장실', headId: 'AndyLab', headName: 'Andy', desc: '검찰 사무 및 지휘 총괄', canIntake: true },
-  { id: 'dept_central', name: '서울중앙지방검찰청', headId: 'eegmon', headName: 'Eegmon', desc: '지방검찰청 사건 수사 총괄', canIntake: true },
-  { id: 'dept_public', name: '공공수사부', headId: 'Solips_', headName: 'Solips', desc: '공공안전 및 선거/노동 사건', canIntake: false },
-  { id: 'dept_tech', name: '첨단범죄수사부', headId: 'yooa7374', headName: 'Yooa', desc: '디지털 및 정보통신 범죄', canIntake: false },
-  { id: 'dept_finance', name: '금융조세범죄부', headId: 'jjaehee1013', headName: 'Jjaehee', desc: '자본시장법 위반 및 금융 사기', canIntake: false },
-  { id: 'dept_violent', name: '강력범죄수사부', headId: 'nsy_', headName: 'Namsang', desc: '조직범죄 및 강력 사건', canIntake: false },
-  { id: 'dept_admin', name: '검찰사무국', headId: 'admin_secretariat', headName: '검찰사무국', desc: '검찰 행정, 문서관리, 기록보존 및 인사', canIntake: true },
+  { id: 'dept_general', name: '검찰총장실', headId: '', headName: '', desc: '검찰 사무 및 지휘 총괄', canIntake: true },
+  { id: 'dept_admin', name: '검찰사무국', headId: '', headName: '', desc: '검찰 행정, 문서관리, 기록보존 및 인사', canIntake: true },
 ];
 
 
 export const PROSECUTORS = [
-  // ── 최고 관리자 (Super Admin) ───────────────────────────
   {
     id: 'sys_admin',
     name: '최고 시스템 관리자',
@@ -81,113 +75,6 @@ export const PROSECUTORS = [
     activeCases: 0,
     isSuperAdmin: true,
     note: '모든 퍼미션과 관리 권한을 보유한 슈퍼 관리자 계정'
-  },
-  // ── 검찰청직원 ──────────────────────────────────────────
-  {
-    id: 'admin_secretariat',
-    name: '검찰사무국',
-    rank: '검찰관리관',
-    position: '검찰사무국장',
-    title: '검찰사무국장 (검찰관리관)',
-    roleLevel: 'CHIEF_ADMINISTRATOR', // 차장검사 대우
-    dept: '검찰사무국',
-    password: '1234',
-    activeCases: 0,
-    status: 'ACTIVE',
-    delegateTo: '',
-    delegateReason: '',
-    note: '직급: 검찰관리관 (차장검사 대우) / 직위: 검찰사무국장'
-  },
-  // ── 검사 ─────────────────────────────────────────────────
-  {
-    id: 'AndyLab',
-    name: 'Andy',
-    rank: '검찰총장',
-    position: '검찰총장',
-    title: '검찰총장',
-    roleLevel: 'PROSECUTOR_GENERAL',
-    dept: '검찰총장실',
-    password: '1234',
-    activeCases: 5,
-    status: 'ACTIVE',
-    delegateTo: '',
-    delegateReason: '',
-    isAutoAssignExcluded: true
-  },
-  {
-    id: 'eegmon',
-    name: 'Eegmon',
-    rank: '검사장',
-    position: '서울중앙지검장',
-    title: '검사장',
-    roleLevel: 'CHIEF_PROSECUTOR',
-    dept: '서울중앙지방검찰청',
-    password: '1234',
-    activeCases: 22,
-    status: 'ACTIVE',
-    delegateTo: '',
-    delegateReason: '',
-    isAutoAssignExcluded: true
-  },
-  {
-    id: 'Solips_',
-    name: 'Solips',
-    rank: '부장검사',
-    position: '공공수사부장',
-    title: '부장검사',
-    roleLevel: 'SENIOR_PROSECUTOR',
-    dept: '공공수사부',
-    password: '1234',
-    activeCases: 18,
-    status: 'DELEGATED',
-    delegateTo: 'Yooa',
-    delegateReason: '연가 (결재권한 위임)',
-    isAutoAssignExcluded: false
-  },
-  {
-    id: 'yooa7374',
-    name: 'Yooa',
-    rank: '평검사',
-    position: '첨단범죄수사부 검사',
-    title: '평검사',
-    roleLevel: 'PROSECUTOR',
-    dept: '첨단범죄수사부',
-    password: '1234',
-    activeCases: 14,
-    status: 'ACTIVE',
-    delegateTo: '',
-    delegateReason: '',
-    isAutoAssignExcluded: false
-  },
-  {
-    id: 'jjaehee1013',
-    name: 'Jjaehee',
-    rank: '평검사',
-    position: '금융조세범죄부 검사',
-    title: '평검사',
-    roleLevel: 'PROSECUTOR',
-    dept: '금융조세범죄부',
-    password: '1234',
-    activeCases: 9,
-    status: 'ON_LEAVE',
-    delegateTo: 'Yooa',
-    delegateReason: '육아 휴직',
-    isAutoAssignExcluded: false
-  },
-  {
-    id: 'nsy_',
-    name: 'Namsang',
-    rank: '검사시보',
-    position: '강력범죄수사부 시보검사',
-    title: '검사시보',
-    roleLevel: 'PROBATIONARY',
-    dept: '강력범죄수사부',
-    password: '1234',
-    activeCases: 11,
-    status: 'ACTIVE',
-    delegateTo: '',
-    delegateReason: '',
-    isAutoAssignExcluded: false
   },
 ];
 
@@ -313,182 +200,16 @@ export const DOCUMENT_TYPES = [
 ];
 
 
-export const INITIAL_AUDIT_LOGS = [
-  { id: 1, action: '사건 접수 & 자동 배당', details: '2026형제196호 사건 접수 (담당: Yooa)', actor: 'admin_secretariat', timestamp: '2026-08-24 10:15:20' },
-  { id: 2, action: '전자결재 관인 날인', details: '2026-결재-089 구속기소 처분 지검장 승인', actor: 'AndyLab', timestamp: '2026-08-24 14:00:10' },
-  { id: 3, action: '사건 담당자 재배당', details: '2026형제210호 담당자 재배당 (Eegmon)', actor: 'admin_secretariat', timestamp: '2026-08-24 16:30:45' }
-];
+export const INITIAL_AUDIT_LOGS = [];
 
-export const INITIAL_MAIN_LEDGER = [
-  {
-    id: 1,
-    hyeongjeNo: '2026형제196',
-    gyeongjeNo: '2026경제104',
-    latestHyeongjeNo: '2026형제196',
-    prosecutorName: 'Yooa',
-    prosecutorId: 'yooa7374',
-    suspectName: 'Donut_0824',
-    suspectUuid: '4fb7a73d914649ba8e5a3ca10f676aba',
-    bookingStatus: '입건:불구속',
-    bookingDate: '2026-07-05',
-    bookingBasis: 'https://cafe.naver.com/doseonline/128529',
-    disposition: '피의자(구속기소)',
-    reAppeal: '-',
-    court1No: '2026고단104',
-    court1Result: '징역 1년 6월 (집행유예 3년)',
-    court1Doc: 'https://cafe.naver.com/doseonline/128529',
-    court1Appealed: '항소',
-    court1Appellant: '피의자',
-    court2No: '2026노412',
-    court2Dismissed: '원심유지 (항소기각)',
-    court2Result: '징역 1년 6월',
-    court2Doc: 'https://cafe.naver.com/doseonline/129433',
-    court3Appealed: '미상고',
-    court3Appellant: '-',
-    court3No: '-',
-    court3Remanded: '-',
-    court3Result: '형 확정',
-    court3Doc: '-',
-    notes: '자본시장법 위반 및 시세조종 관련 주요 사건',
-    content: '도스온라인 거래소 미공개 정보 이용 매매 및 부당이득 취득 혐의',
-    confiscation: '125,000,000 골드 추징',
-    chargeName: '자본시장법 위반 / 전자금융거래법 위반'
-  },
-  {
-    id: 2,
-    hyeongjeNo: '2026형제210',
-    gyeongjeNo: '2026경제112',
-    latestHyeongjeNo: '2026형제210',
-    prosecutorName: 'Eegmon',
-    prosecutorId: 'eegmon',
-    suspectName: 'jjaehee1013',
-    suspectUuid: 'b822ec95-6964-489d-9fbd-cfcaf6f5b3ce',
-    bookingStatus: '입건:구속',
-    bookingDate: '2026-07-12',
-    bookingBasis: 'https://cafe.naver.com/doseonline/128986',
-    disposition: '기소(구속)',
-    reAppeal: '-',
-    court1No: '2026고합88',
-    court1Result: '징역 2년 6월 (실형)',
-    court1Doc: 'https://cafe.naver.com/doseonline/128986',
-    court1Appealed: '항소',
-    court1Appellant: '검사',
-    court2No: '2026노520',
-    court2Dismissed: '형량가중 (징역 3년 6월)',
-    court2Result: '징역 3년 6월 실형 선고',
-    court2Doc: 'https://cafe.naver.com/doseonline/130189',
-    court3Appealed: '상고',
-    court3Appellant: '피의자',
-    court3No: '2026도301',
-    court3Remanded: '상고기각',
-    court3Result: '징역 3년 6월 확정',
-    court3Doc: 'https://cafe.naver.com/doseonline/130189',
-    notes: '조직적 사기 및 범죄단체 조직 혐의',
-    content: '다수의 유저를 상대로 희귀 아이템 거래 사기 및 대포계정 운용',
-    confiscation: '450,000,000 골드 몰수',
-    chargeName: '특정경제범죄가중처벌법 위반 (사기)'
-  }
-];
+export const INITIAL_MAIN_LEDGER = [];
 
-export const INITIAL_REPORTS = [
-  {
-    id: 101,
-    reportNo: '2026접수-101',
-    hyeongjeNo: '2026형제196',
-    title: '도스온라인 주식시세 조종 및 미공개 정보 이용 신고 건',
-    prosecutorName: 'Yooa',
-    suspectName: 'Donut_0824',
-    suspectUuid: '4fb7a73d914649ba8e5a3ca10f676aba',
-    status: '입건 완료',
-    createdAt: '2026-07-02 14:20',
-    basisUrl: 'https://cafe.naver.com/doseonline/128529',
-    period: '2026.07.02 ~ 2026.08.05',
-    confiscation: '125,000,000 골드'
-  }
-];
+export const INITIAL_REPORTS = [];
 
-export const INITIAL_APPEALS = [
-  {
-    id: 201,
-    jibulhangNo: '2026지불항1',
-    gobulhangNo: '2026고불항1',
-    jaebulhangNo: '2026재불항1',
-    daejaebulhangNo: '2026대재불항1',
-    sujeNo: '2026수제196',
-    hyeongjeNo: '2026형제196',
-    beobwonNo: '-',
-    chargeName: '협박, 모욕',
-    prosecutorName: 'yooa7374',
-    chiefProsecutor: '_Memento__Mori_',
-    prosecutorGeneral: 'Ace_0516',
-    suspectName: 'Donut_0824',
-    suspectUuid: '4fb7a73d914649ba8e5a3ca10f676aba',
-    appealStatus: '항고기각(직접경정)',
-    status: '항고기각(직접경정)',
-    appealDisposition: '원처분 유지 및 기각 결정',
-    appealDate: '2026. 7. 5',
-    appealBasisUrl: 'https://cafe.naver.com/doseonline/130189',
-    appealDecision: '항고기각',
-    appealNoticeUrl: 'https://cafe.naver.com/doseonline/130189',
-    originalStatus: '종국:불기소',
-    intakeDate: '2026. 7. 5',
-    intakeBasisUrl: 'https://cafe.naver.com/doseonline/128529',
-    indictmentStatus: '혐의없음(범죄인정안됨)',
-    indictmentDocUrl: 'https://naver.me/GwfVSyyA',
-    disposition: '원처분 유지 및 항고기각 (범죄인정안됨)',
-    dispositionDate: '2026-07-05',
-    basisUrl: 'https://cafe.naver.com/doseonline/130189',
-    appealNo: '2026지불항1',
-  }
-];
+export const INITIAL_APPEALS = [];
 
-export const INITIAL_BOOKINGS = [
-  {
-    id: 301,
-    hyeongjeNo: '2026형제196',
-    prosecutorName: 'Yooa',
-    suspectName: 'Donut_0824',
-    suspectUuid: '4fb7a73d914649ba8e5a3ca10f676aba',
-    dispositionStatus: '기소(구속기소)',
-    bookingDate: '2026-07-05',
-    basisUrl: 'https://cafe.naver.com/doseonline/128529',
-    daysElapsed: 12,
-    indictmentDecision: '구속기소 완료'
-  }
-];
+export const INITIAL_BOOKINGS = [];
 
-export const INITIAL_APPROVALS = [
-  {
-    id: 'APP-2026-001',
-    docNo: '2026-결재-089',
-    docType: 'DISPOSITION',
-    docTypeName: '검찰 처분 결의서',
-    title: '2026형제210호 피의자 jjaehee1013 특정경제범죄가중처벌법위반 구속기소 처분 결의서',
-    hyeongjeNo: '2026형제210',
-    prosecutorId: 'eegmon',
-    prosecutorName: 'Eegmon',
-    suspectName: 'jjaehee1013',
-    dispositionType: '구속기소',
-    chargeName: '특정경제범죄가중처벌등에관한법률 위반 (사기)',
-    summary: '피의자는 다수의 피해자를 상대로 거래 사기를 범하고 피해액이 4억 5천만 골드에 달하며 증거인멸 위험이 상존함. 구속기소함이 타당함.',
-    status: '최종승인',
-    createdAt: '2026-07-15',
-    approvals: [
-      { role: '담당검사', name: 'Eegmon', status: '상신완료', date: '2026-07-15 10:00' },
-      { role: '부장검사', name: 'Solips', status: '검토승인', date: '2026-07-15 11:30' },
-      { role: '지검장', name: 'Andy', status: '최종결재(인장날인)', date: '2026-07-15 14:00' }
-    ]
-  }
-];
+export const INITIAL_APPROVALS = [];
 
-export const SUSPECT_HISTORIES = {
-  'Donut_0824': {
-    name: 'Donut_0824',
-    uuid: '4fb7a73d914649ba8e5a3ca10f676aba',
-    priorsCount: 2,
-    records: [
-      { date: '2025-11-10', caseNo: '2025형제882', charge: '명예훼손', outcome: '벌금 50만원' },
-      { date: '2026-07-05', caseNo: '2026형제196', charge: '자본시장법 위반', outcome: '1심 징역 1년 6월 집행유예 3년' }
-    ]
-  }
-};
+export const SUSPECT_HISTORIES = {};
