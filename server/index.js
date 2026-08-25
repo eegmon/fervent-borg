@@ -477,7 +477,7 @@ app.post("/api/cases", requireAuth, async (req, res) => {
     entityId: id,
     entityLabel: c.hyeongjeNo || id,
     actorId: req.user.id,
-    actorName: req.user.id,
+    actorName: req.user.name,
     detail: `피의자: ${c.suspectName || ""}, 죄명: ${c.chargeName || ""}`,
   });
   res.json({ success: true, case: { ...c, id } });
@@ -614,20 +614,16 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, async (req, res) => {
       !hasSecretariatWorkAccess(req.user) &&
       !GLOBAL_DATA_ROLES.has(req.user.roleLevel)
     ) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "사무국 탭에서만 강제 재배당할 수 있습니다.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "사무국 탭에서만 강제 재배당할 수 있습니다.",
+      });
     }
     if (!(await validateForcedCaseAssignee(c.prosecutorId))) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "활성 상태의 담당검사를 선택해주세요.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "활성 상태의 담당검사를 선택해주세요.",
+      });
     }
   }
   const assignedId = hasGlobalDataAccess(req.user)
@@ -670,7 +666,7 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, async (req, res) => {
               req.params.id,
               c.hyeongjeNo || old.hyeongjeNo,
               req.user.id,
-              req.user.id,
+              req.user.name,
               label,
               oldVal,
               newVal,
@@ -714,8 +710,10 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, async (req, res) => {
     entityId: req.params.id,
     entityLabel: c.hyeongjeNo || req.params.id,
     actorId: req.user.id,
-    actorName: req.user.id,
-    detail: `처분: ${c.disposition || ""}, 상태: ${c.bookingStatus || ""}`,
+    actorName: req.user.name,
+    detail: c.forceReassign
+      ? `강제 재배당: ${assignedName} (${assignedId})`
+      : `처분: ${c.disposition || ""}, 상태: ${c.bookingStatus || ""}`,
   });
   res.json({ success: true });
 });
@@ -1077,6 +1075,15 @@ app.post("/api/approvals", requireAuth, async (req, res) => {
       JSON.stringify(doc.attachments || []),
     ],
   });
+  await writeAuditLog({
+    action: "CREATE",
+    entityType: "approval",
+    entityId: doc.id,
+    entityLabel: doc.docNo || doc.id,
+    actorId: req.user.id,
+    actorName: req.user.name,
+    detail: `결재 문서 상신: ${doc.docTypeName || doc.docType || "서식"}`,
+  });
   res.json({ success: true, doc });
 });
 
@@ -1142,7 +1149,7 @@ app.put(
       entityId: req.params.id,
       entityLabel: doc.docNo,
       actorId: req.user.id,
-      actorName: req.user.id,
+      actorName: req.user.name,
       detail: `문서유형: ${doc.docTypeName || doc.docType}, 처분: ${doc.dispositionType}`,
     });
 
@@ -1226,6 +1233,15 @@ app.post(
           note,
         ],
       });
+      await writeAuditLog({
+        action: "CREATE",
+        entityType: "prosecutor",
+        entityId: id,
+        entityLabel: id,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        detail: `계정 발급: ${name} (${roleLevel}, ${dept || "부서 미지정"})`,
+      });
       const prosecutor = {
         id,
         name,
@@ -1298,6 +1314,15 @@ app.patch(
       await db.execute({
         sql: `UPDATE prosecutors SET ${setClause} WHERE id=?`,
         args: [...updates.map(({ value }) => value), req.params.id],
+      });
+      await writeAuditLog({
+        action: "UPDATE",
+        entityType: "prosecutor",
+        entityId: req.params.id,
+        entityLabel: req.params.id,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        detail: `계정 상태 및 권한 변경: ${updates.map(({ column }) => column).join(", ")}`,
       });
       res.json({ success: true });
     } catch (err) {
@@ -1492,6 +1517,15 @@ app.put(
       "CHIEF_ADMINISTRATOR",
     ];
     const isSecretariat = allowed.includes(req.user.roleLevel);
+    await writeAuditLog({
+      action: "UPDATE",
+      entityType: "approval",
+      entityId: req.params.id,
+      entityLabel: doc.docNo || req.params.id,
+      actorId: req.user.id,
+      actorName: req.user.name,
+      detail: "결재 문서 내용 및 첨부서류 수정",
+    });
 
     if (!isSecretariat) {
       return res
@@ -1716,7 +1750,7 @@ app.delete(
         entityId: id,
         entityLabel: label,
         actorId: req.user.id,
-        actorName: req.user.id,
+        actorName: req.user.name,
       });
       res.json({ success: true });
     } catch (err) {
@@ -2206,7 +2240,7 @@ app.put(
         entityId: req.params.id,
         entityLabel: doc.docNo,
         actorId: req.user.id,
-        actorName: req.user.id,
+        actorName: req.user.name,
         detail: reason,
       });
       res.json({ success: true, status: rejectStatus });
