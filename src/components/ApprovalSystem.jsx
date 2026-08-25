@@ -474,6 +474,16 @@ export default function ApprovalSystem({
     summary: "",
     attachments: DEFAULT_ATTACHMENTS,
   });
+  const [newDocData, setNewDocData] = useState({
+    docType: "GIAN",
+    hyeongjeNo: ledgerData[0]?.hyeongjeNo || "",
+    suspectName: ledgerData[0]?.suspectName || "",
+    chargeName: ledgerData[0]?.chargeName || "",
+    dispositionType: "기안 및 청구",
+    summary:
+      "피의자의 범죄 혐의 및 수사 건과 관련하여 기안문(별지 제34호서식) 및 첨부 서류를 작성하여 상신합니다.",
+    attachments: [...DEFAULT_ATTACHMENTS],
+  });
 
   useEffect(() => {
     const template = getHwpTemplateForDoc(selectedDoc);
@@ -615,16 +625,6 @@ export default function ApprovalSystem({
   };
   const [viewMode, setViewMode] = useState("HWP"); // 'HWP' | 'GOV_PAPER'
 
-  const [newDocData, setNewDocData] = useState({
-    docType: "GIAN",
-    hyeongjeNo: ledgerData[0]?.hyeongjeNo || "",
-    suspectName: ledgerData[0]?.suspectName || "",
-    chargeName: ledgerData[0]?.chargeName || "",
-    dispositionType: "기안 및 청구",
-    summary:
-      "피의자의 범죄 혐의 및 수사 건과 관련하여 기안문(별지 제34호서식) 및 첨부 서류를 작성하여 상신합니다.",
-    attachments: [...DEFAULT_ATTACHMENTS],
-  });
   const [approvalLine, setApprovalLine] = useState([
     {
       role: "담당검사",
