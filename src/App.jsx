@@ -66,7 +66,7 @@ export default function App() {
   const [bookingsData, setBookingsData] = useState(INITIAL_BOOKINGS);
   const [approvalsData, setApprovalsData] = useState(INITIAL_APPROVALS);
   const [departmentsData, setDepartmentsData] = useState(INITIAL_DEPARTMENTS);
-  const [prosecutorsList, setProsecutorsList] = useState(PROSECUTORS.filter(p => p.id !== 'sys_admin'));
+  const [prosecutorsList, setProsecutorsList] = useState(PROSECUTORS);
 
   // 문서번호 자동 순번 카운터 (INITIAL_APPROVALS 길이 기준 시작)
   const [docNoCounter, setDocNoCounter] = useState(INITIAL_APPROVALS.length + 1);

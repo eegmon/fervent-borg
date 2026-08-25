@@ -177,5 +177,35 @@ export async function initDb() {
     )
   `);
 
+  // ── sys_admin 기본 계정 보장 ───────────────────────────────────────
+  // DB에 sys_admin이 없을 경우 자동으로 삽입합니다 (비밀번호: 1234)
+  const existing = await db.execute({
+    sql: "SELECT id FROM prosecutors WHERE id = 'sys_admin'",
+    args: [],
+  });
+  if (existing.rows.length === 0) {
+    // bcrypt hash of '1234' with salt rounds 12
+    const SYS_ADMIN_PW_HASH = '$2b$12$mBJRZVAYl/.SfSjxYvO7YOkUFNi66LbVfZu0EtUxiGH8Udm9CmWke';
+    await db.execute({
+      sql: `INSERT INTO prosecutors
+              (id, name, rank, position, title, role_level, dept,
+               password, active_cases, status, delegate_to, delegate_reason,
+               is_super_admin, is_auto_assign_excluded, note)
+            VALUES (?,?,?,?,?,?,?,?,0,'ACTIVE','','',1,1,?)`,
+      args: [
+        'sys_admin',
+        '최고 시스템 관리자',
+        '최고 총괄 관리자',
+        '시스템 총괄 관리자',
+        '최고 관리자 (All Permissions)',
+        'SUPER_ADMIN',
+        '검찰총장실',
+        SYS_ADMIN_PW_HASH,
+        '모든 퍼미션과 관리 권한을 보유한 슈퍼 관리자 계정',
+      ],
+    });
+    console.log('[DB] sys_admin 기본 계정 생성 완료');
+  }
+
   console.log('[DB] 테이블 초기화 완료');
 }
