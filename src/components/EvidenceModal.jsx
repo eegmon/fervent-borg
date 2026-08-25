@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, ExternalLink, Plus, Trash2, FileText, CheckCircle2, Shield, FolderPlus } from 'lucide-react';
+import { createEvidenceApi, deleteEvidenceApi, fetchEvidence, updateEvidenceApi } from '../services/api';
 
 const EVIDENCE_TYPES = [
   { id: 'CAFE', label: '카페 게시글 링크', color: '#f59e0b' },
@@ -10,42 +11,86 @@ const EVIDENCE_TYPES = [
 ];
 
 export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectName, onSaveEvidence }) {
-  if (!isOpen) return null;
-
   const [activeUrl, setActiveUrl] = useState(url || '');
-  const [evidenceList, setEvidenceList] = useState([
-    ...(url ? [{ id: 1, title: '원 사건 입건/신고 근거 증거', url, type: 'CAFE', date: new Date().toISOString().split('T')[0] }] : [])
-  ]);
+  const [evidenceList, setEvidenceList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newUrl, setNewUrl] = useState('');
   const [newType, setNewType] = useState('CAFE');
+  const [newRecord, setNewRecord] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editingRecord, setEditingRecord] = useState('');
 
-  const handleAddEvidence = (e) => {
+  useEffect(() => {
+    if (!isOpen || !caseNo) return;
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    fetchEvidence(caseNo).then(data => {
+      if (cancelled) return;
+      if (Array.isArray(data)) setEvidenceList(data);
+      else setError('증거자료를 불러오지 못했습니다.');
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [isOpen, caseNo]);
+
+  useEffect(() => {
+    setActiveUrl(url || '');
+  }, [url]);
+
+  if (!isOpen) return null;
+
+  const handleAddEvidence = async (e) => {
     e.preventDefault();
     if (!newUrl.trim()) {
       alert('증거 URL 또는 파일 링크를 입력해주세요.');
       return;
     }
-    const item = {
-      id: Date.now(),
+    setSaving(true);
+    setError('');
+    const res = await createEvidenceApi(caseNo, {
       title: newTitle.trim() || `신규 증거 자료 #${evidenceList.length + 1}`,
       url: newUrl.trim(),
       type: newType,
-      date: new Date().toISOString().split('T')[0],
-    };
+      record: newRecord.trim(),
+    });
+    setSaving(false);
+    if (!res?.success) {
+      setError(res?.message || '증거자료 저장에 실패했습니다.');
+      return;
+    }
+    const item = res.evidence;
     setEvidenceList(prev => [item, ...prev]);
     setActiveUrl(item.url);
-    if (onSaveEvidence) onSaveEvidence(caseNo, item);
     setNewTitle('');
     setNewUrl('');
+    setNewRecord('');
     setShowAddForm(false);
     alert('✅ 신규 증거 자료가 정상적으로 저장되었습니다.');
   };
 
-  const handleRemoveEvidence = (id) => {
+  const handleRemoveEvidence = async (id) => {
+    const res = await deleteEvidenceApi(id);
+    if (!res?.success) {
+      setError(res?.message || '증거자료 삭제에 실패했습니다.');
+      return;
+    }
     setEvidenceList(prev => prev.filter(e => e.id !== id));
+  };
+
+  const handleUpdateRecord = async (item) => {
+    const res = await updateEvidenceApi(item.id, { record: editingRecord });
+    if (!res?.success) {
+      setError(res?.message || '사건기록 수정에 실패했습니다.');
+      return;
+    }
+    setEvidenceList(prev => prev.map(e => e.id === item.id ? { ...e, record: editingRecord } : e));
+    setEditingId(null);
   };
 
   return (
@@ -111,12 +156,24 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
                   ))}
                 </select>
               </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>사건기록 / 증거 설명</label>
+                <textarea
+                  className="textarea-field"
+                  rows={3}
+                  placeholder="증거의 입수 경위, 관련 사실, 분석 내용 등을 기록하세요."
+                  value={newRecord}
+                  onChange={e => setNewRecord(e.target.value)}
+                />
+              </div>
               <button type="submit" className="btn btn-gold" style={{ padding: '8px 14px', fontSize: '0.8rem', gap: 4 }}>
-                <CheckCircle2 size={14} /> 저장
+                <CheckCircle2 size={14} /> {saving ? '저장 중...' : '저장'}
               </button>
             </form>
           </div>
         )}
+
+        {error && <div style={{ padding: '8px 16px', color: '#f87171', background: 'rgba(239,68,68,0.1)', fontSize: '0.78rem' }}>{error}</div>}
 
         {/* Main Split Layout: Left Stored Evidence List, Right Active Preview */}
         <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', height: '68vh' }}>
@@ -125,7 +182,9 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
             <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', padding: '4px 6px' }}>
               저장된 증거 목록 ({evidenceList.length}건)
             </div>
-            {evidenceList.length === 0 ? (
+            {loading ? (
+              <div style={{ padding: '24px 12px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>증거자료를 불러오는 중...</div>
+            ) : evidenceList.length === 0 ? (
               <div style={{ padding: '24px 12px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                 저장된 증거가 없습니다. 상단에서 신규 증거를 추가하세요.
               </div>
@@ -163,8 +222,19 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
                       <span style={{ fontFamily: 'monospace', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {item.url}
                       </span>
-                      <span>{item.date}</span>
+                      <span>{(item.createdAt || item.date || '').slice(0, 10)}</span>
                     </div>
+                    {editingId === item.id ? (
+                      <div style={{ marginTop: 7 }}>
+                        <textarea className="textarea-field" rows={3} value={editingRecord} onChange={e => setEditingRecord(e.target.value)} />
+                        <button type="button" className="btn btn-gold" style={{ marginTop: 5, fontSize: '0.68rem' }} onClick={() => handleUpdateRecord(item)}>기록 저장</button>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: 7, fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'pre-wrap' }}>
+                        {item.record || '사건기록 없음'}
+                        <button type="button" className="btn btn-outline" style={{ marginLeft: 6, padding: '2px 6px', fontSize: '0.65rem' }} onClick={(e) => { e.stopPropagation(); setEditingId(item.id); setEditingRecord(item.record || ''); }}>기록 수정</button>
+                      </div>
+                    )}
                   </div>
                 );
               })

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Scale, FileSpreadsheet, FileCheck, Building2, FileText,
   ShieldAlert, AlertOctagon, Search, BarChart3, PlusCircle,
-  LogOut, Lock, Bell, KeyRound, UserCheck
+  LogOut, Lock, Bell, KeyRound, UserCheck, ClipboardList
 } from 'lucide-react';
 
 const TABS = [
@@ -16,11 +16,13 @@ const TABS = [
   { id: 'bookings',    label: '입건 현황',     icon: AlertOctagon },
   { id: 'search',      label: '사건 조회',     icon: Search },
   { id: 'analytics',   label: '통계 현황',     icon: BarChart3 },
+  { id: 'auditlog',    label: '감사 로그',     icon: ClipboardList, adminOnly: true },
 ];
 
 export default function Header({
   activeTab, setActiveTab, currentUser, onLogout, onOpenLoginModal, onOpenPasswordModal,
-  pendingApprovalsCount, onOpenIntakeModal, onOpenDeadlineModal, onOpenTemplateModal, totalAlertsCount = 0
+  pendingApprovalsCount, onOpenIntakeModal, onOpenDeadlineModal, onOpenTemplateModal,
+  totalAlertsCount = 0, isGlobalAdmin = false
 }) {
   return (
     <header style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)', position: 'sticky', top: 0, zIndex: 50 }}>
@@ -111,6 +113,8 @@ export default function Header({
       {/* Tab Navigation */}
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 24px', display: 'flex', gap: 4, overflowX: 'auto' }}>
         {TABS.map(tab => {
+          // adminOnly 탭은 전역 관리자만 표시
+          if (tab.adminOnly && !isGlobalAdmin) return null;
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (

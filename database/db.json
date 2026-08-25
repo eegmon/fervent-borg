@@ -1,21 +1,5 @@
 {
-  "prosecutors": [
-    {
-      "id": "sys_admin",
-      "name": "최고 시스템 관리자",
-      "rank": "최고 총괄 관리자",
-      "position": "시스템 총괄 관리자",
-      "title": "최고 관리자 (All Permissions)",
-      "roleLevel": "SUPER_ADMIN",
-      "dept": "검찰총장실",
-      "password": "$2b$12$mBJRZVAYl/.SfSjxYvO7YOkUFNi66LbVfZu0EtUxiGH8Udm9CmWke",
-      "activeCases": 0,
-      "status": "ACTIVE",
-      "isSuperAdmin": true,
-      "isAutoAssignExcluded": true,
-      "note": "모든 퍼미션과 관리 권한을 보유한 슈퍼 관리자 계정"
-    }
-  ],
+  "prosecutors": [],
   "cases": [],
   "reports": [],
   "appeals": [],

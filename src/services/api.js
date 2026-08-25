@@ -85,8 +85,26 @@ export function fetchCases() {
   return apiFetch('/cases');
 }
 
+export function fetchCaseNumberSettings() {
+  return apiFetch('/settings/case-number');
+}
+
+export function updateCaseNumberSettings(settings) {
+  return apiFetch('/settings/case-number', {
+    method: 'PATCH',
+    body: JSON.stringify(settings),
+  });
+}
+
 export function createCaseApi(caseData) {
   return apiFetch('/cases', {
+    method: 'POST',
+    body: JSON.stringify(caseData),
+  });
+}
+
+export function createIntakeBundleApi(caseData) {
+  return apiFetch('/cases/intake-bundle', {
     method: 'POST',
     body: JSON.stringify(caseData),
   });
@@ -96,6 +114,17 @@ export function updateCaseApi(id, caseData) {
   return apiFetch(`/cases/${id}`, {
     method: 'PUT',
     body: JSON.stringify(caseData),
+  });
+}
+
+export function fetchDepartments() {
+  return apiFetch('/departments');
+}
+
+export function saveDepartmentsApi(departments) {
+  return apiFetch('/departments', {
+    method: 'PUT',
+    body: JSON.stringify({ departments }),
   });
 }
 
@@ -123,6 +152,13 @@ export function fetchAppeals() {
 export function createAppealApi(appealData) {
   return apiFetch('/appeals', {
     method: 'POST',
+    body: JSON.stringify(appealData),
+  });
+}
+
+export function updateAppealApi(id, appealData) {
+  return apiFetch(`/appeals/${id}`, {
+    method: 'PATCH',
     body: JSON.stringify(appealData),
   });
 }
@@ -155,8 +191,42 @@ export function createApprovalApi(approvalData) {
   });
 }
 
+export function updateApprovalApi(id, approvalData) {
+  return apiFetch(`/approvals/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(approvalData),
+  });
+}
+
 export function approveDocApi(docId) {
   return apiFetch(`/approvals/${docId}/approve`, { method: 'PUT' });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DELETE 엔드포인트 (검찰사무국 전용)
+// ════════════════════════════════════════════════════════════════════
+export function deleteCaseApi(id) {
+  return apiFetch(`/cases/${id}`, { method: 'DELETE' });
+}
+
+export function deleteAppealApi(id) {
+  return apiFetch(`/appeals/${id}`, { method: 'DELETE' });
+}
+
+export function deleteApprovalApi(id) {
+  return apiFetch(`/approvals/${id}`, { method: 'DELETE' });
+}
+
+export function deleteReportApi(id) {
+  return apiFetch(`/reports/${id}`, { method: 'DELETE' });
+}
+
+export function deleteBookingApi(id) {
+  return apiFetch(`/bookings/${id}`, { method: 'DELETE' });
+}
+
+export function deleteProsecutorApi(id) {
+  return apiFetch(`/prosecutors/${id}`, { method: 'DELETE' });
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -164,6 +234,28 @@ export function approveDocApi(docId) {
 // ════════════════════════════════════════════════════════════════════
 export function fetchProsecutors() {
   return apiFetch('/prosecutors');
+}
+
+export function createProsecutorApi(prosecutor) {
+  return apiFetch('/prosecutors', {
+    method: 'POST',
+    body: JSON.stringify(prosecutor),
+  });
+}
+
+export function updateProsecutorApi(userId, changes) {
+  return apiFetch(`/prosecutors/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  });
+}
+
+/** 비밀번호 변경 (본인 또는 관리자) */
+export function changePasswordApi(userId, currentPassword, newPassword) {
+  return apiFetch(`/prosecutors/${userId}/password`, {
+    method: 'PATCH',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -201,6 +293,69 @@ export function approveRegistrationApi(regId) {
 /** 가입 신청 거부 */
 export function rejectRegistrationApi(regId, reason) {
   return apiFetch(`/registrations/${regId}/reject`, {
+    method: 'PUT',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Audit Logs
+// ════════════════════════════════════════════════════════════════════
+export function fetchAuditLogs() {
+  return apiFetch('/audit-logs');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Case History
+// ════════════════════════════════════════════════════════════════════
+export function fetchCaseHistory(caseId) {
+  return apiFetch(`/cases/${caseId}/history`);
+}
+
+export function fetchEvidence(caseNo) {
+  return apiFetch(`/cases/${encodeURIComponent(caseNo)}/evidence`);
+}
+
+export function createEvidenceApi(caseNo, evidence) {
+  return apiFetch(`/cases/${encodeURIComponent(caseNo)}/evidence`, {
+    method: 'POST',
+    body: JSON.stringify(evidence),
+  });
+}
+
+export function deleteEvidenceApi(evidenceId) {
+  return apiFetch(`/evidence/${encodeURIComponent(evidenceId)}`, { method: 'DELETE' });
+}
+
+export function updateEvidenceApi(evidenceId, evidence) {
+  return apiFetch(`/evidence/${encodeURIComponent(evidenceId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(evidence),
+  });
+}
+
+export const fetchWarrants = () => apiFetch('/warrants');
+export const createWarrantApi = warrant => apiFetch('/warrants', { method: 'POST', body: JSON.stringify(warrant) });
+export const updateWarrantApi = (id, changes) => apiFetch(`/warrants/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(changes) });
+export const deleteWarrantApi = id => apiFetch(`/warrants/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
+export const fetchOfficeDocuments = type => apiFetch(`/office-documents?type=${encodeURIComponent(type)}`);
+export const createOfficeDocumentApi = (type, document) => apiFetch('/office-documents', { method: 'POST', body: JSON.stringify({ type, document }) });
+export const deleteOfficeDocumentApi = id => apiFetch(`/office-documents/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export const updateOfficeDocumentApi = (id, document) => apiFetch(`/office-documents/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ document }) });
+
+// ════════════════════════════════════════════════════════════════════
+// 문서번호 서버 채번
+// ════════════════════════════════════════════════════════════════════
+export function fetchNextDocNo() {
+  return apiFetch('/approvals/next-doc-no');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 결재 반려
+// ════════════════════════════════════════════════════════════════════
+export function rejectDocApi(docId, reason) {
+  return apiFetch(`/approvals/${docId}/reject`, {
     method: 'PUT',
     body: JSON.stringify({ reason }),
   });

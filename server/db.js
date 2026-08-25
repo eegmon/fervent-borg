@@ -9,16 +9,18 @@
  * 로컬 개발 시 TURSO_DATABASE_URL을 설정하지 않으면
  * 인메모리 SQLite(:memory:)로 자동 폴백합니다.
  */
-import { createClient } from '@libsql/client';
-import 'dotenv/config';
+import { createClient } from "@libsql/client";
+import "dotenv/config";
 
-const url   = process.env.TURSO_DATABASE_URL || ':memory:';
+const url = process.env.TURSO_DATABASE_URL || ":memory:";
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
+if (process.env.NODE_ENV === "production" && (!process.env.TURSO_DATABASE_URL || !authToken)) {
+  throw new Error("운영 환경에서는 TURSO_DATABASE_URL과 TURSO_AUTH_TOKEN이 필요합니다.");
+}
+
 export const db = createClient(
-  url === ':memory:'
-    ? { url }
-    : { url, authToken }
+  url === ":memory:" ? { url } : { url, authToken },
 );
 
 /** 테이블 생성 및 초기 시드 (최초 1회) */
@@ -38,11 +40,27 @@ export async function initDb() {
       status       TEXT DEFAULT 'ACTIVE',
       delegate_to  TEXT DEFAULT '',
       delegate_reason TEXT DEFAULT '',
+      dual_position TEXT DEFAULT '',
+      dual_dept TEXT DEFAULT '',
+      dual_role_level TEXT DEFAULT '',
+      dual_secretariat_work INTEGER DEFAULT 0,
       is_super_admin  INTEGER DEFAULT 0,
       is_auto_assign_excluded INTEGER DEFAULT 0,
       note         TEXT DEFAULT ''
     )
   `);
+  for (const column of [
+    "dual_position TEXT DEFAULT ''",
+    "dual_dept TEXT DEFAULT ''",
+    "dual_role_level TEXT DEFAULT ''",
+    "dual_secretariat_work INTEGER DEFAULT 0",
+  ]) {
+    try {
+      await db.execute(`ALTER TABLE prosecutors ADD COLUMN ${column}`);
+    } catch (error) {
+      if (!String(error.message || error).includes("duplicate column")) throw error;
+    }
+  }
 
   // ── cases ──────────────────────────────────────────────────────
   await db.execute(`
@@ -82,6 +100,40 @@ export async function initDb() {
       created_at          TEXT DEFAULT (datetime('now'))
     )
   `);
+  for (const column of [
+    "supervisor_designated INTEGER DEFAULT 0",
+    "supervisor_id TEXT DEFAULT ''",
+    "supervisor_name TEXT DEFAULT ''",
+  ]) {
+    try {
+      await db.execute(`ALTER TABLE cases ADD COLUMN ${column}`);
+    } catch (error) {
+      if (!String(error.message || error).includes("duplicate column")) throw error;
+    }
+  }
+
+  // ── system_settings ───────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')),
+      updated_by TEXT DEFAULT ''
+    )
+  `);
+  await db.execute({
+    sql: `INSERT OR IGNORE INTO system_settings (key, value) VALUES
+            ('case_number_hyeongje_start', '280'),
+            ('case_number_teuggong_start', '1'),
+            ('case_number_teughyeong_start', '1'),
+            ('case_number_teugapje_start', '1'),
+            ('case_number_apje_start', '1')`,
+    args: [],
+  });
+  await db.execute({
+    sql: "INSERT OR IGNORE INTO system_settings (key, value) VALUES ('departments_json', '[]')",
+    args: [],
+  });
 
   // ── reports ────────────────────────────────────────────────────
   await db.execute(`
@@ -155,6 +207,16 @@ export async function initDb() {
       approvals_json   TEXT   -- JSON 배열 (결재선)
     )
   `);
+  try {
+    await db.execute("ALTER TABLE approvals ADD COLUMN hwp_html TEXT DEFAULT ''");
+  } catch (error) {
+    if (!String(error.message || error).includes("duplicate column")) throw error;
+  }
+  try {
+    await db.execute("ALTER TABLE approvals ADD COLUMN attachments_json TEXT DEFAULT '[]'");
+  } catch (error) {
+    if (!String(error.message || error).includes("duplicate column")) throw error;
+  }
 
   // ── registrations (회원가입 신청) ──────────────────────────────
   await db.execute(`
@@ -177,35 +239,75 @@ export async function initDb() {
     )
   `);
 
-  // ── sys_admin 기본 계정 보장 ───────────────────────────────────────
-  // DB에 sys_admin이 없을 경우 자동으로 삽입합니다 (비밀번호: 1234)
-  const existing = await db.execute({
-    sql: "SELECT id FROM prosecutors WHERE id = 'sys_admin'",
-    args: [],
-  });
-  if (existing.rows.length === 0) {
-    // bcrypt hash of '1234' with salt rounds 12
-    const SYS_ADMIN_PW_HASH = '$2b$12$mBJRZVAYl/.SfSjxYvO7YOkUFNi66LbVfZu0EtUxiGH8Udm9CmWke';
-    await db.execute({
-      sql: `INSERT INTO prosecutors
-              (id, name, rank, position, title, role_level, dept,
-               password, active_cases, status, delegate_to, delegate_reason,
-               is_super_admin, is_auto_assign_excluded, note)
-            VALUES (?,?,?,?,?,?,?,?,0,'ACTIVE','','',1,1,?)`,
-      args: [
-        'sys_admin',
-        '최고 시스템 관리자',
-        '최고 총괄 관리자',
-        '시스템 총괄 관리자',
-        '최고 관리자 (All Permissions)',
-        'SUPER_ADMIN',
-        '검찰총장실',
-        SYS_ADMIN_PW_HASH,
-        '모든 퍼미션과 관리 권한을 보유한 슈퍼 관리자 계정',
-      ],
-    });
-    console.log('[DB] sys_admin 기본 계정 생성 완료');
+  // ── audit_logs ─────────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id          TEXT PRIMARY KEY,
+      action      TEXT NOT NULL,    -- CREATE | UPDATE | DELETE | APPROVE | REJECT | LOGIN | LOGOUT
+      entity_type TEXT NOT NULL,    -- case | report | appeal | booking | approval | prosecutor
+      entity_id   TEXT,
+      entity_label TEXT,            -- 사람이 읽을 수 있는 식별자 (형제번호, 문서번호 등)
+      actor_id    TEXT NOT NULL,
+      actor_name  TEXT NOT NULL,
+      detail      TEXT DEFAULT '',  -- 변경 상세 (JSON 문자열 또는 메모)
+      created_at  TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── case_history ────────────────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS case_history (
+      id           TEXT PRIMARY KEY,
+      case_id      TEXT NOT NULL,
+      hyeongje_no  TEXT NOT NULL,
+      actor_id     TEXT NOT NULL,
+      actor_name   TEXT NOT NULL,
+      field_name   TEXT NOT NULL,
+      old_value    TEXT DEFAULT '',
+      new_value    TEXT DEFAULT '',
+      created_at   TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── evidence (사건 증거자료 및 사건기록) ─────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS evidence (
+      id          TEXT PRIMARY KEY,
+      case_no     TEXT NOT NULL,
+      title       TEXT NOT NULL,
+      url         TEXT NOT NULL,
+      evidence_type TEXT NOT NULL DEFAULT 'DOCUMENT',
+      record      TEXT NOT NULL DEFAULT '',
+      created_by  TEXT NOT NULL,
+      created_at  TEXT DEFAULT (datetime('now')),
+      deleted_at  TEXT DEFAULT ''
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS warrants (
+      id TEXT PRIMARY KEY, warrant_no TEXT, warrant_type TEXT, warrant_type_name TEXT,
+      case_no TEXT, suspect_name TEXT, suspect_uuid TEXT, charge_name TEXT,
+      prosecutor_name TEXT, target_place TEXT, status TEXT, requested_at TEXT,
+      valid_until TEXT, judge_name TEXT, notes TEXT, deleted_at TEXT DEFAULT ''
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS office_documents (
+      id TEXT PRIMARY KEY,
+      document_type TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      deleted_at TEXT DEFAULT ''
+    )
+  `);
+  for (const table of ["cases", "reports", "appeals", "bookings", "approvals"]) {
+    try {
+      await db.execute(`ALTER TABLE ${table} ADD COLUMN deleted_at TEXT DEFAULT ''`);
+    } catch (error) {
+      if (!String(error.message || error).includes("duplicate column")) throw error;
+    }
   }
 
-  console.log('[DB] 테이블 초기화 완료');
+  console.log("[DB] 테이블 초기화 완료");
 }

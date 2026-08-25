@@ -1,11 +1,17 @@
-# React + Vite
+# 도스온라인 검찰청 사건관리시스템
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+## 실행 및 운영 설정
 
-Currently, two official plugins are available:
+```bash
+npm install
+npm run dev
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+API 서버는 별도 터미널에서 `npm start`로 실행합니다.
+
+운영 환경에서는 `NODE_ENV=production`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `JWT_SECRET`, `ALLOWED_ORIGINS`, `BOOTSTRAP_SECRET`을 설정해야 합니다. DB 또는 허용 origin이 누락되면 서버가 시작되지 않습니다. 계정이 하나도 없을 때 회원가입 화면에 `BOOTSTRAP_SECRET`과 일치하는 초기화 코드를 입력하면 최초 관리자 계정이 한 번 생성됩니다.
+
+개발 화면은 `http://127.0.0.1:5173/`, 서버 상태 확인은 `http://localhost:5000/api/health`에서 할 수 있습니다.
 
 ## React Compiler
 
