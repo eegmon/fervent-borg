@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Building2, UserPlus, RefreshCw, Database, History, CheckCircle2, Download, Upload, Award, Users, FilePen, Pencil, Save, X, FileBox, FileInput, Send, Archive, Plus, Trash2, Eye, FileSpreadsheet, AlertCircle, Scale, ShieldAlert, FileText } from 'lucide-react';
+import { Building2, UserPlus, RefreshCw, Database, History, CheckCircle2, Download, Upload, Award, Users, FilePen, Pencil, Save, X, FileBox, FileInput, Send, Archive, Plus, Trash2, Eye, FileSpreadsheet, AlertCircle, Scale, ShieldAlert, FileText, ClipboardList, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 import { PROSECUTORS, INITIAL_AUDIT_LOGS, ROLE_LABELS, ROLE_COLORS, ROLE_HIERARCHY } from '../data/prosecutionData';
+import { fetchRegistrations, approveRegistrationApi, rejectRegistrationApi } from '../services/api';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // [검찰사무국 전용] 기록 삭제 관리 패널
@@ -484,6 +485,7 @@ function ActingOrderPanel({
 
 
 const SUB_TABS = [
+  { id: 'registrations', label: '🆕 가입 신청 허가', icon: ClipboardList },
   { id: 'prosecutors', label: '검사 계정 관리', icon: Users },
   { id: 'acting',      label: '🏛️ 직무대리명령 발령', icon: Award },
   { id: 'depts',       label: '부서 & 부원 관리', icon: Building2 },
@@ -530,10 +532,76 @@ export default function SecretariatAdmin({
   onOpenLoginModal,
   onBulkImport,
 }) {
-  const [activeSubTab, setActiveSubTab] = useState('prosecutors');
+  const [activeSubTab, setActiveSubTab] = useState('registrations');
   const prosecutorsList = (propProsecutorsList || PROSECUTORS).filter(p => p.id !== 'sys_admin');
   const [auditLogs, setAuditLogs] = useState(INITIAL_AUDIT_LOGS);
   const [newP, setNewP] = useState({ id: '', name: '', title: '평검사', roleLevel: 'PROSECUTOR', dept: '첨단범죄수사부', password: '1234' });
+
+  // ── 가입 신청 허가 상태 ──────────────────────────────────────
+  const [registrations, setRegistrations] = useState([]);
+  const [regLoading, setRegLoading] = useState(false);
+  const [rejectModal, setRejectModal] = useState(null); // { id, name }
+  const [rejectReason, setRejectReason] = useState('');
+  const [regFilter, setRegFilter] = useState('PENDING'); // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
+
+  // 가입 신청 목록 로드
+  const loadRegistrations = async () => {
+    setRegLoading(true);
+    const data = await fetchRegistrations();
+    if (data) setRegistrations(data);
+    setRegLoading(false);
+  };
+
+  useEffect(() => {
+    if (activeSubTab === 'registrations') {
+      loadRegistrations();
+    }
+  }, [activeSubTab]);
+
+  const handleApproveRegistration = async (reg) => {
+    if (!window.confirm(`'${reg.name} (${reg.reqId})' 의 가입 신청을 허가하시겠습니까?\n\n허가 시 검찰 시스템에 계정이 즉시 등록됩니다.`)) return;
+    const res = await approveRegistrationApi(reg.id);
+    if (res?.success) {
+      // 로컬 목록 업데이트
+      setRegistrations(prev => prev.map(r => r.id === reg.id ? { ...r, status: 'APPROVED' } : r));
+      // App의 prosecutorsList에도 반영
+      if (onAddProsecutor) {
+        onAddProsecutor({
+          id: reg.reqId,
+          name: reg.name,
+          rank: reg.rank || reg.roleLevel,
+          position: reg.position || `${reg.dept} ${reg.title || ''}`.trim(),
+          title: reg.title || reg.roleLevel,
+          roleLevel: reg.roleLevel || 'PROSECUTOR',
+          dept: reg.dept || '',
+          password: '',
+          activeCases: 0,
+          status: 'ACTIVE',
+          delegateTo: '',
+          delegateReason: '',
+          note: reg.note || '',
+        });
+      }
+      addLog('가입 신청 허가', `'${reg.name} (${reg.reqId})' 계정 가입 신청 허가 완료`);
+      alert(`✅ [검찰사무국 허가] '${reg.name}' 계정이 성공적으로 등록되었습니다.`);
+    } else {
+      alert(`❌ 허가 실패: ${res?.message || '서버 오류'}`);
+    }
+  };
+
+  const handleRejectRegistration = async () => {
+    if (!rejectModal) return;
+    const res = await rejectRegistrationApi(rejectModal.id, rejectReason || '검찰사무국 심사 불허');
+    if (res?.success) {
+      setRegistrations(prev => prev.map(r => r.id === rejectModal.id ? { ...r, status: 'REJECTED' } : r));
+      addLog('가입 신청 거부', `'${rejectModal.name}' 가입 신청 거부 (사유: ${rejectReason || '검찰사무국 심사 불허'})`);
+      alert(`가입 신청이 거부되었습니다.`);
+    } else {
+      alert(`❌ 거부 실패: ${res?.message || '서버 오류'}`);
+    }
+    setRejectModal(null);
+    setRejectReason('');
+  };
 
   // 휴직/결재권한 위임 설정 모달 상태
   const [statusModalUser, setStatusModalUser] = useState(null);
@@ -736,11 +804,26 @@ export default function SecretariatAdmin({
         {visibleSubTabs.map(t => {
           const Icon = t.icon;
           const active = activeSubTab === t.id;
+          const pendingCount = t.id === 'registrations'
+            ? registrations.filter(r => r.status === 'PENDING').length
+            : 0;
           return (
             <button key={t.id} onClick={() => setActiveSubTab(t.id)}
               className={active ? 'btn btn-gold' : 'btn btn-secondary'}
-              style={{ fontSize: '0.82rem', padding: '7px 14px' }}>
+              style={{ fontSize: '0.82rem', padding: '7px 14px', position: 'relative' }}>
               <Icon size={14} />{t.label}
+              {pendingCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: -4, right: -4,
+                  minWidth: 16, height: 16, borderRadius: 8,
+                  background: '#ef4444', color: '#fff',
+                  fontSize: '0.65rem', fontWeight: 900,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 4px',
+                }}>
+                  {pendingCount}
+                </span>
+              )}
             </button>
           );
         })}
@@ -2137,6 +2220,186 @@ export default function SecretariatAdmin({
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.6 }}>기존 백업 파일을 업로드하여 과거 DB 상태로 복원합니다.</div>
               <button onClick={() => alert('복원 기능 준비 중입니다.')} className="btn btn-secondary" style={{ fontSize: '0.82rem' }}>
                 <Upload size={14} />백업 파일 복원
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 가입 신청 허가 탭 ─────────────────────────────────── */}
+      {activeSubTab === 'registrations' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* 안내 배너 */}
+          <div className="glass-panel gold-border" style={{ padding: '14px 20px', background: 'rgba(245,158,11,0.06)' }}>
+            <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--primary-amber)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <ClipboardList size={18} /> 검찰청 가입 신청 허가 관리
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              가입 신청자를 검토하고 허가 또는 거부를 처리합니다. 허가 시 검찰 시스템에 즉시 계정이 등록됩니다.
+            </div>
+          </div>
+
+          {/* 필터 + 새로고침 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map(f => (
+              <button
+                key={f}
+                onClick={() => setRegFilter(f)}
+                className={regFilter === f ? 'btn btn-gold' : 'btn btn-secondary'}
+                style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+              >
+                {f === 'ALL' ? '전체' : f === 'PENDING' ? '⏳ 대기중' : f === 'APPROVED' ? '✅ 허가됨' : '❌ 거부됨'}
+                <span style={{ marginLeft: 5, opacity: 0.7 }}>
+                  ({registrations.filter(r => f === 'ALL' || r.status === f).length})
+                </span>
+              </button>
+            ))}
+            <button
+              onClick={loadRegistrations}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.8rem', padding: '6px 12px', marginLeft: 'auto' }}
+              disabled={regLoading}
+            >
+              <RefreshCw size={13} /> {regLoading ? '로딩중...' : '새로고침'}
+            </button>
+          </div>
+
+          {/* 목록 테이블 */}
+          <div className="glass-panel" style={{ overflow: 'hidden' }}>
+            {regLoading ? (
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <Clock size={20} style={{ marginBottom: 8 }} /><br />신청 목록 로딩 중...
+              </div>
+            ) : registrations.filter(r => regFilter === 'ALL' || r.status === regFilter).length === 0 ? (
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                {regFilter === 'PENDING' ? '대기 중인 가입 신청이 없습니다.' : '해당 상태의 신청이 없습니다.'}
+              </div>
+            ) : (
+              <div className="ledger-table-container" style={{ border: 'none', borderRadius: 0 }}>
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>신청일시</th>
+                      <th>신청 아이디</th>
+                      <th>이름</th>
+                      <th>신청 직급</th>
+                      <th>희망 부서</th>
+                      <th>직위명</th>
+                      <th>신청 사유</th>
+                      <th style={{ textAlign: 'center' }}>상태</th>
+                      <th style={{ textAlign: 'center' }}>처리</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {registrations
+                      .filter(r => regFilter === 'ALL' || r.status === regFilter)
+                      .map(reg => (
+                        <tr key={reg.id}>
+                          <td style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                            {reg.createdAt?.substring(0, 16) || '-'}
+                          </td>
+                          <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#60a5fa' }}>{reg.reqId}</td>
+                          <td style={{ fontWeight: 700 }}>{reg.name}</td>
+                          <td>
+                            <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 10, background: 'var(--bg-elevated)', color: 'var(--text-main)' }}>
+                              {ROLE_LABELS[reg.roleLevel] || reg.roleLevel}
+                            </span>
+                          </td>
+                          <td>{reg.dept || '-'}</td>
+                          <td style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{reg.position || '-'}</td>
+                          <td style={{ maxWidth: 180 }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'normal', lineHeight: 1.4 }}>
+                              {reg.note || '-'}
+                              {reg.status === 'REJECTED' && reg.rejectReason && (
+                                <div style={{ color: '#f87171', marginTop: 2 }}>거부 사유: {reg.rejectReason}</div>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            {reg.status === 'PENDING' && (
+                              <span style={{ padding: '2px 10px', borderRadius: 10, fontSize: '0.72rem', fontWeight: 800, background: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}>
+                                ⏳ 심사대기
+                              </span>
+                            )}
+                            {reg.status === 'APPROVED' && (
+                              <span style={{ padding: '2px 10px', borderRadius: 10, fontSize: '0.72rem', fontWeight: 800, background: 'rgba(52,211,153,0.15)', color: '#34d399' }}>
+                                ✅ 허가
+                              </span>
+                            )}
+                            {reg.status === 'REJECTED' && (
+                              <span style={{ padding: '2px 10px', borderRadius: 10, fontSize: '0.72rem', fontWeight: 800, background: 'rgba(248,113,113,0.15)', color: '#f87171' }}>
+                                ❌ 거부
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            {reg.status === 'PENDING' && (
+                              <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                                <button
+                                  onClick={() => handleApproveRegistration(reg)}
+                                  className="btn btn-gold"
+                                  style={{ padding: '4px 10px', fontSize: '0.75rem', gap: 4 }}
+                                >
+                                  <CheckCircle size={12} /> 허가
+                                </button>
+                                <button
+                                  onClick={() => { setRejectModal({ id: reg.id, name: reg.name }); setRejectReason(''); }}
+                                  className="btn btn-secondary"
+                                  style={{ padding: '4px 10px', fontSize: '0.75rem', color: '#f87171', gap: 4 }}
+                                >
+                                  <XCircle size={12} /> 거부
+                                </button>
+                              </div>
+                            )}
+                            {reg.status !== 'PENDING' && (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                {reg.reviewedAt?.substring(0, 10) || '처리완료'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 거부 사유 입력 모달 ──────────────────────────────── */}
+      {rejectModal && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal-content" style={{ maxWidth: 420 }}>
+            <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-main)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <XCircle size={18} color="#f87171" /> 가입 신청 거부
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 14 }}>
+              <strong style={{ color: 'var(--text-main)' }}>{rejectModal.name}</strong>의 가입 신청을 거부합니다.
+            </div>
+            <Label>거부 사유 (선택)</Label>
+            <textarea
+              className="textarea-field"
+              rows={3}
+              placeholder="거부 사유를 입력하세요 (미입력 시 '검찰사무국 심사 불허'로 처리)"
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+              style={{ marginBottom: 16 }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={handleRejectRegistration}
+                className="btn btn-secondary"
+                style={{ flex: 1, justifyContent: 'center', color: '#f87171', fontWeight: 800 }}
+              >
+                <XCircle size={14} /> 거부 확정
+              </button>
+              <button
+                onClick={() => { setRejectModal(null); setRejectReason(''); }}
+                className="btn btn-secondary"
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                취소
               </button>
             </div>
           </div>

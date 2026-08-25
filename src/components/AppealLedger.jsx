@@ -193,7 +193,7 @@ export default function AppealLedger({
           <ShieldAlert size={20} color="var(--primary-amber)" />
           <div>
             <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-main)' }}>
-              대한민국 검찰청 항고·재항고 종합 관리 대장
+              도스온라인 검찰청 항고·재항고 종합 관리 대장
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
               지불항·고불항·재불항·대재불항 사건 추적 & 원처분·심리결정 통합 관리 포털

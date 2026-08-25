@@ -299,6 +299,216 @@ app.get('/api/prosecutors', requireAuth, async (req, res) => {
   }));
 });
 
+// ════════════════════════════════════════════════════════════════════
+// 8. Registrations — 회원가입 신청 / 검찰사무국 허가
+// ════════════════════════════════════════════════════════════════════
+
+// ── 8-1. 회원가입 신청 (공개 엔드포인트) ────────────────────────────
+app.post('/api/auth/register', async (req, res) => {
+  const { id, name, rank, position, title, roleLevel, dept, password, note } = req.body;
+
+  if (!id || !name || !password) {
+    return res.status(400).json({ success: false, message: '아이디, 이름, 비밀번호는 필수입니다.' });
+  }
+
+  // 아이디 형식 검증 (영숫자, 언더스코어, 하이픈, 2~30자)
+  if (!/^[a-zA-Z0-9_\-]{2,30}$/.test(id)) {
+    return res.status(400).json({ success: false, message: '아이디는 영문/숫자/언더스코어/하이픈 2~30자여야 합니다.' });
+  }
+
+  // 비밀번호 최소 길이
+  if (password.length < 4) {
+    return res.status(400).json({ success: false, message: '비밀번호는 4자 이상이어야 합니다.' });
+  }
+
+  try {
+    // 기존 검사 계정 중복 확인
+    const existPros = await db.execute({
+      sql: 'SELECT id FROM prosecutors WHERE id = ?',
+      args: [id],
+    });
+    if (existPros.rows.length > 0) {
+      return res.status(409).json({ success: false, message: '이미 사용 중인 아이디입니다.' });
+    }
+
+    // 대기 중인 신청 중 동일 아이디 중복 확인
+    const existReg = await db.execute({
+      sql: "SELECT id FROM registrations WHERE req_id = ? AND status = 'PENDING'",
+      args: [id],
+    });
+    if (existReg.rows.length > 0) {
+      return res.status(409).json({ success: false, message: '이미 가입 신청 중인 아이디입니다. 검찰사무국 허가를 기다려주세요.' });
+    }
+
+    const hashedPw = await bcrypt.hash(password, 10);
+    const regId = `REG-${Date.now()}`;
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    await db.execute({
+      sql: `INSERT INTO registrations
+              (id, req_id, name, rank, position, title, role_level, dept, password, note, status, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      args: [
+        regId, id, name,
+        rank || '', position || '', title || '',
+        roleLevel || 'PROSECUTOR',
+        dept || '',
+        hashedPw,
+        note || '',
+        'PENDING',
+        now,
+      ],
+    });
+
+    res.json({ success: true, message: '가입 신청이 접수되었습니다. 검찰사무국의 허가를 기다려주세요.' });
+  } catch (err) {
+    console.error('[register]', err);
+    res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// ── 8-2. 가입 신청 목록 조회 (검찰사무국 전용) ──────────────────────
+app.get('/api/registrations', requireAuth, async (req, res) => {
+  // 검찰사무국 접근 가능 직급 체크
+  const allowed = ['SUPER_ADMIN', 'PROSECUTOR_GENERAL', 'CHIEF_PROSECUTOR',
+                   'DEPUTY_CHIEF', 'CHIEF_ADMINISTRATOR'];
+  const isSecretariat = allowed.includes(req.user.roleLevel) ||
+    req.user.dept?.includes('사무국');
+
+  if (!isSecretariat) {
+    return res.status(403).json({ success: false, message: '검찰사무국 권한이 필요합니다.' });
+  }
+
+  try {
+    const result = await db.execute(
+      'SELECT * FROM registrations ORDER BY created_at DESC'
+    );
+    // 비밀번호 제외 후 반환
+    res.json(result.rows.map(row => {
+      const { password: _pw, ...safe } = toCamel(row);
+      return safe;
+    }));
+  } catch (err) {
+    console.error('[registrations GET]', err);
+    res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// ── 8-3. 가입 신청 허가 ─────────────────────────────────────────────
+app.put('/api/registrations/:id/approve', requireAuth, async (req, res) => {
+  const allowed = ['SUPER_ADMIN', 'PROSECUTOR_GENERAL', 'CHIEF_PROSECUTOR',
+                   'DEPUTY_CHIEF', 'CHIEF_ADMINISTRATOR'];
+  const isSecretariat = allowed.includes(req.user.roleLevel) ||
+    req.user.dept?.includes('사무국');
+
+  if (!isSecretariat) {
+    return res.status(403).json({ success: false, message: '검찰사무국 권한이 필요합니다.' });
+  }
+
+  try {
+    const regRes = await db.execute({
+      sql: 'SELECT * FROM registrations WHERE id = ?',
+      args: [req.params.id],
+    });
+    if (regRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '신청 건을 찾을 수 없습니다.' });
+    }
+
+    const reg = toCamel(regRes.rows[0]);
+    if (reg.status !== 'PENDING') {
+      return res.status(409).json({ success: false, message: '이미 처리된 신청입니다.' });
+    }
+
+    // 아이디 최종 중복 확인
+    const existPros = await db.execute({
+      sql: 'SELECT id FROM prosecutors WHERE id = ?',
+      args: [reg.reqId],
+    });
+    if (existPros.rows.length > 0) {
+      return res.status(409).json({ success: false, message: '이미 사용 중인 아이디입니다.' });
+    }
+
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    // prosecutors 테이블에 계정 생성
+    await db.execute({
+      sql: `INSERT INTO prosecutors
+              (id, name, rank, position, title, role_level, dept, password,
+               active_cases, status, delegate_to, delegate_reason,
+               is_super_admin, is_auto_assign_excluded, note)
+            VALUES (?,?,?,?,?,?,?,?,0,'ACTIVE','','',0,0,?)`,
+      args: [
+        reg.reqId, reg.name, reg.rank || '', reg.position || '',
+        reg.title || '', reg.roleLevel || 'PROSECUTOR',
+        reg.dept || '', reg.password,
+        reg.note || '',
+      ],
+    });
+
+    // 신청 상태 업데이트
+    await db.execute({
+      sql: `UPDATE registrations SET status='APPROVED', reviewed_at=?, reviewed_by=? WHERE id=?`,
+      args: [now, req.user.id, req.params.id],
+    });
+
+    res.json({
+      success: true,
+      message: `'${reg.name}' 계정이 승인되어 검찰 시스템에 등록되었습니다.`,
+      user: {
+        id: reg.reqId, name: reg.name, rank: reg.rank,
+        position: reg.position, title: reg.title,
+        roleLevel: reg.roleLevel, dept: reg.dept,
+      },
+    });
+  } catch (err) {
+    console.error('[registrations approve]', err);
+    res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// ── 8-4. 가입 신청 거부 ─────────────────────────────────────────────
+app.put('/api/registrations/:id/reject', requireAuth, async (req, res) => {
+  const allowed = ['SUPER_ADMIN', 'PROSECUTOR_GENERAL', 'CHIEF_PROSECUTOR',
+                   'DEPUTY_CHIEF', 'CHIEF_ADMINISTRATOR'];
+  const isSecretariat = allowed.includes(req.user.roleLevel) ||
+    req.user.dept?.includes('사무국');
+
+  if (!isSecretariat) {
+    return res.status(403).json({ success: false, message: '검찰사무국 권한이 필요합니다.' });
+  }
+
+  const { reason } = req.body;
+
+  try {
+    const regRes = await db.execute({
+      sql: 'SELECT * FROM registrations WHERE id = ?',
+      args: [req.params.id],
+    });
+    if (regRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '신청 건을 찾을 수 없습니다.' });
+    }
+
+    const reg = toCamel(regRes.rows[0]);
+    if (reg.status !== 'PENDING') {
+      return res.status(409).json({ success: false, message: '이미 처리된 신청입니다.' });
+    }
+
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    await db.execute({
+      sql: `UPDATE registrations
+              SET status='REJECTED', reject_reason=?, reviewed_at=?, reviewed_by=?
+            WHERE id=?`,
+      args: [reason || '검찰사무국 심사 불허', now, req.user.id, req.params.id],
+    });
+
+    res.json({ success: true, message: `'${reg.name}' 가입 신청이 거부되었습니다.` });
+  } catch (err) {
+    console.error('[registrations reject]', err);
+    res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+  }
+});
+
 // ── 서버 시작 ─────────────────────────────────────────────────────
 async function start() {
   await initDb();

@@ -156,5 +156,26 @@ export async function initDb() {
     )
   `);
 
+  // ── registrations (회원가입 신청) ──────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS registrations (
+      id           TEXT PRIMARY KEY,
+      req_id       TEXT NOT NULL UNIQUE,   -- 신청 아이디
+      name         TEXT NOT NULL,
+      rank         TEXT DEFAULT '',
+      position     TEXT DEFAULT '',
+      title        TEXT DEFAULT '',
+      role_level   TEXT NOT NULL DEFAULT 'PROSECUTOR',
+      dept         TEXT DEFAULT '',
+      password     TEXT NOT NULL,          -- bcrypt 해시
+      note         TEXT DEFAULT '',
+      status       TEXT NOT NULL DEFAULT 'PENDING',  -- PENDING | APPROVED | REJECTED
+      reject_reason TEXT DEFAULT '',
+      created_at   TEXT DEFAULT (datetime('now')),
+      reviewed_at  TEXT DEFAULT '',
+      reviewed_by  TEXT DEFAULT ''
+    )
+  `);
+
   console.log('[DB] 테이블 초기화 완료');
 }

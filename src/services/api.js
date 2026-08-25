@@ -163,3 +163,43 @@ export function approveDocApi(docId) {
 export function fetchProsecutors() {
   return apiFetch('/prosecutors');
 }
+
+// ════════════════════════════════════════════════════════════════════
+// Registrations — 회원가입 신청 & 검찰사무국 허가
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * 회원가입 신청 (비인증 공개 엔드포인트)
+ * @param {{ id, name, rank, position, title, roleLevel, dept, password, note }} data
+ */
+export async function registerApi(data) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (e) {
+    console.error('[API] 회원가입 신청 오류:', e.message);
+    return { success: false, message: '네트워크 오류가 발생했습니다.' };
+  }
+}
+
+/** 가입 신청 목록 조회 (검찰사무국 전용) */
+export function fetchRegistrations() {
+  return apiFetch('/registrations');
+}
+
+/** 가입 신청 허가 */
+export function approveRegistrationApi(regId) {
+  return apiFetch(`/registrations/${regId}/approve`, { method: 'PUT' });
+}
+
+/** 가입 신청 거부 */
+export function rejectRegistrationApi(regId, reason) {
+  return apiFetch(`/registrations/${regId}/reject`, {
+    method: 'PUT',
+    body: JSON.stringify({ reason }),
+  });
+}

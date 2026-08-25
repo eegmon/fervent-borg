@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Scale, Lock, CheckCircle, User, KeyRound, AlertCircle, HelpCircle } from 'lucide-react';
+import { Scale, Lock, CheckCircle, User, KeyRound, AlertCircle, HelpCircle, UserPlus } from 'lucide-react';
 
 import Header from './components/Header';
 import MainLedger from './components/MainLedger';
@@ -20,6 +20,7 @@ import LoginModal from './components/LoginModal';
 import PasswordChangeModal from './components/PasswordChangeModal';
 import DeadlineAlertModal from './components/DeadlineAlertModal';
 import OfficialTemplateModal from './components/OfficialTemplateModal';
+import RegisterModal from './components/RegisterModal';
 
 import Toast from './components/Toast';
 
@@ -107,6 +108,7 @@ export default function App() {
   const [inlinePassword, setInlinePassword] = useState('');
   const [inlineError, setInlineError] = useState('');
   const [showInlineHint, setShowInlineHint] = useState(false);
+  const [showInlineRegister, setShowInlineRegister] = useState(false);
 
   /**
    * 공통 로그인 검증 로직 — LoginModal과 인라인 폼 양쪽에서 사용
@@ -861,6 +863,31 @@ export default function App() {
                 <Lock size={16} /> 로그인 인증 및 시스템 접속
               </button>
             </form>
+
+            {/* 가입 신청 버튼 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0 4px' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>계정이 없으신가요?</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowInlineRegister(true)}
+              className="btn btn-secondary"
+              style={{ width: '100%', padding: '11px', fontWeight: 700, justifyContent: 'center', fontSize: '0.88rem' }}
+            >
+              <UserPlus size={15} /> 검찰청 가입 신청
+            </button>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: 6 }}>
+              가입 신청 후 <strong style={{ color: 'var(--primary-amber)' }}>검찰사무국</strong>의 허가가 완료되면 로그인 가능합니다
+            </div>
+
+            {/* 인라인 화면 가입 신청 모달 */}
+            <RegisterModal
+              isOpen={showInlineRegister}
+              onClose={() => setShowInlineRegister(false)}
+              departmentsData={departmentsData}
+            />
           </div>
         ) : (
           <>
@@ -1022,6 +1049,8 @@ export default function App() {
         isOpen={isLoginModalOpen}
         onLoginSuccess={handleLoginSuccess}
         onClose={() => setIsLoginModalOpen(false)}
+        prosecutorsList={prosecutorsList}
+        departmentsData={departmentsData}
       />
 
       <PasswordChangeModal 

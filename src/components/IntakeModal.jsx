@@ -5,15 +5,27 @@ import { fetchMojangUuid } from '../services/mojangApi';
 
 export default function IntakeModal({ isOpen, onClose, onSubmitIntake }) {
   const todayStr = new Date().toISOString().split('T')[0];
+  const generateCaseNumber = () => `2026수제${Math.floor(280 + Math.random() * 50)}`;
+  const generateEconomyNumber = () => `2026경제${Math.floor(180 + Math.random() * 50)}`;
   const [formData, setFormData] = useState({
-    hyeongjeNo: `2026수제${Math.floor(280 + Math.random() * 50)}`,
-    gyeongjeNo: `2026경제${Math.floor(180 + Math.random() * 50)}`,
+    hyeongjeNo: generateCaseNumber(),
+    gyeongjeNo: generateEconomyNumber(),
     chargeName: '자본시장법 위반 및 사기',
     bookingStatus: '입건:불구속', prosecutorId: 'AUTO_ASSIGN',
     bookingBasis: 'https://cafe.naver.com/doseonline/', content: '', confiscation: '0 원',
     incidentDate: todayStr,
     bookingDate: todayStr,
   });
+  // Reset case numbers each time the modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setFormData(prev => ({
+        ...prev,
+        hyeongjeNo: generateCaseNumber(),
+        gyeongjeNo: generateEconomyNumber(),
+      }));
+    }
+  }, [isOpen]);
 
   // Multiple Suspects State
   const [suspectsList, setSuspectsList] = useState([
