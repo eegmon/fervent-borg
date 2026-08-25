@@ -391,6 +391,43 @@ body {
 
 /* 담당 사건 화면은 휴대폰에서도 검색과 처리 버튼을 우선 노출한다. */
 @media (max-width: 640px) {
+  .site-header-topbar {
+    padding: 10px 12px !important;
+    flex-wrap: wrap;
+    gap: 10px !important;
+  }
+
+  .site-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px !important;
+  }
+
+  .site-header-actions > .btn,
+  .site-header-user {
+    min-height: 38px;
+  }
+
+  .site-header-actions > .btn {
+    padding: 7px 9px !important;
+    font-size: 0.74rem !important;
+  }
+
+  .site-header-user {
+    padding: 5px 8px !important;
+  }
+
+  .site-header-tabs {
+    padding: 0 10px !important;
+    gap: 2px !important;
+  }
+
+  .site-header-tab {
+    padding: 10px 12px !important;
+    font-size: 0.76rem !important;
+  }
+
   .main-content {
     padding: 12px;
   }

@@ -414,6 +414,56 @@ app.put(
   },
 );
 
+app.get("/api/charges", requireAuth, async (_req, res) => {
+  const result = await db.execute(
+    "SELECT id, name, created_at, created_by FROM charges ORDER BY name COLLATE NOCASE",
+  );
+  res.json(result.rows.map(toCamel));
+});
+
+app.post("/api/charges", requireAuth, requireSecretariat, async (req, res) => {
+  const name = String(req.body?.name || "").trim();
+  if (!name || name.length > 120) {
+    return res
+      .status(400)
+      .json({ success: false, message: "죄명은 1~120자로 입력해주세요." });
+  }
+  try {
+    const result = await db.execute({
+      sql: "INSERT INTO charges (name, created_by) VALUES (?, ?)",
+      args: [name, req.user.id],
+    });
+    res.json({
+      success: true,
+      charge: { id: Number(result.lastInsertRowid), name },
+    });
+  } catch (error) {
+    if (
+      String(error.message || error)
+        .toLowerCase()
+        .includes("unique")
+    ) {
+      return res
+        .status(409)
+        .json({ success: false, message: "이미 등록된 죄명입니다." });
+    }
+    throw error;
+  }
+});
+
+app.delete(
+  "/api/charges/:id",
+  requireAuth,
+  requireSecretariat,
+  async (req, res) => {
+    await db.execute({
+      sql: "DELETE FROM charges WHERE id = ?",
+      args: [req.params.id],
+    });
+    res.json({ success: true });
+  },
+);
+
 app.post("/api/cases", requireAuth, async (req, res) => {
   const c = req.body;
   const assignedId = hasGlobalDataAccess(req.user)

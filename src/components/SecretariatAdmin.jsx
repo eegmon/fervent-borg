@@ -4,7 +4,6 @@ import {
   Building2,
   UserPlus,
   RefreshCw,
-  Database,
   History,
   CheckCircle2,
   Download,
@@ -50,6 +49,8 @@ import {
   createOfficeDocumentApi,
   deleteOfficeDocumentApi,
   updateOfficeDocumentApi,
+  createChargeApi,
+  deleteChargeApi,
 } from "../services/api";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1621,7 +1622,7 @@ const SUB_TABS = [
   { id: "docnos", label: "문서번호 관리", icon: FilePen },
   { id: "designate", label: "🔒 결재 필수 지정", icon: ShieldAlert },
   { id: "docmgmt", label: "문서 관리", icon: FileBox },
-  { id: "backup", label: "DB 백업·복원", icon: Database },
+  { id: "charges", label: "죄명 관리", icon: Scale },
   { id: "audit", label: "감사 로그", icon: History },
 ];
 
@@ -1677,6 +1678,8 @@ export default function SecretariatAdmin({
     apjeStart: 1,
   },
   onUpdateCaseNumberSettings,
+  chargesData = [],
+  onUpdateCharges,
 }) {
   const [activeSubTab, setActiveSubTab] = useState("registrations");
   const prosecutorsList = (propProsecutorsList || PROSECUTORS).filter(
@@ -1698,6 +1701,8 @@ export default function SecretariatAdmin({
   const [rejectModal, setRejectModal] = useState(null); // { id, name }
   const [rejectReason, setRejectReason] = useState("");
   const [regFilter, setRegFilter] = useState("PENDING"); // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  const [newCharge, setNewCharge] = useState("");
+  const [chargeMessage, setChargeMessage] = useState("");
 
   // 가입 신청 목록 로드
   const loadRegistrations = async () => {
@@ -2027,22 +2032,35 @@ export default function SecretariatAdmin({
     );
   };
 
-  const handleDbBackup = () => {
-    const data =
-      "data:text/json;charset=utf-8," +
-      encodeURIComponent(
-        JSON.stringify({ ledgerData, prosecutorsList, auditLogs }, null, 2),
-      );
-    const a = document.createElement("a");
-    a.setAttribute("href", data);
-    a.setAttribute(
-      "download",
-      `DosePROS_Backup_${new Date().toISOString().split("T")[0]}.json`,
+  const handleCreateCharge = async (e) => {
+    e.preventDefault();
+    const name = newCharge.trim();
+    if (!name) return;
+    const result = await createChargeApi(name);
+    if (!result?.success) {
+      setChargeMessage(result?.message || "죄명 등록에 실패했습니다.");
+      return;
+    }
+    onUpdateCharges?.(
+      [...chargesData, result.charge].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
     );
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    addLog("DB 영구 백업 다운로드", "JSON 백업본 파일 생성 및 다운로드 완료");
+    setNewCharge("");
+    setChargeMessage("죄명이 등록되었습니다.");
+    addLog("죄명 등록", name);
+  };
+
+  const handleDeleteCharge = async (charge) => {
+    if (!window.confirm(`'${charge.name}' 죄명을 삭제하시겠습니까?`)) return;
+    const result = await deleteChargeApi(charge.id);
+    if (!result?.success) {
+      setChargeMessage(result?.message || "죄명 삭제에 실패했습니다.");
+      return;
+    }
+    onUpdateCharges?.(chargesData.filter((item) => item.id !== charge.id));
+    setChargeMessage("죄명이 삭제되었습니다.");
+    addLog("죄명 삭제", charge.name);
   };
 
   const hasSecretariatAccess =
@@ -2191,7 +2209,7 @@ export default function SecretariatAdmin({
               검찰사무국 총괄 시스템 관리
             </div>
             <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-              계정 관리 · 사건 재배당 · DB 백업 · 보안 감사로그
+              계정 관리 · 사건 재배당 · 죄명 관리 · 보안 감사로그
             </div>
           </div>
         </div>
@@ -5215,100 +5233,90 @@ export default function SecretariatAdmin({
         </div>
       )}
 
-      {activeSubTab === "backup" && (
+      {activeSubTab === "charges" && (
         <div className="glass-panel" style={{ padding: 24 }}>
           <div
             style={{
               fontWeight: 800,
               fontSize: "0.9rem",
               color: "var(--text-main)",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              marginBottom: 20,
+              marginBottom: 6,
             }}
           >
-            <Database size={15} color="var(--primary-amber)" />
-            DB 영구 백업 & 복원
+            죄명 관리
           </div>
           <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
+            style={{
+              fontSize: "0.78rem",
+              color: "var(--text-muted)",
+              marginBottom: 18,
+            }}
           >
+            등록한 죄명은 신규 사건 접수 화면에서 선택할 수 있습니다.
+          </div>
+          <form
+            onSubmit={handleCreateCharge}
+            style={{ display: "flex", gap: 8, marginBottom: 16 }}
+          >
+            <input
+              className="input-field"
+              value={newCharge}
+              onChange={(e) => {
+                setNewCharge(e.target.value);
+                setChargeMessage("");
+              }}
+              placeholder="추가할 죄명 입력"
+              maxLength={120}
+            />
+            <button
+              type="submit"
+              className="btn btn-gold"
+              style={{ flexShrink: 0 }}
+            >
+              <Plus size={15} /> 추가
+            </button>
+          </form>
+          {chargeMessage && (
             <div
               style={{
-                padding: 18,
-                borderRadius: 10,
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-subtle)",
+                color: "var(--primary-amber)",
+                fontSize: "0.78rem",
+                marginBottom: 12,
               }}
             >
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: "0.85rem",
-                  color: "var(--text-main)",
-                  marginBottom: 8,
-                }}
-              >
-                DB 덤프 다운로드
-              </div>
-              <div
-                style={{
-                  fontSize: "0.78rem",
-                  color: "var(--text-muted)",
-                  marginBottom: 14,
-                  lineHeight: 1.6,
-                }}
-              >
-                현재 DB의 전 사건·결재·계정 데이터를 JSON 백업 파일로
-                내보냅니다.
-              </div>
-              <button
-                onClick={handleDbBackup}
-                className="btn btn-gold"
-                style={{ fontSize: "0.82rem" }}
-              >
-                <Download size={14} />
-                JSON 백업 다운로드
-              </button>
+              {chargeMessage}
             </div>
-            <div
-              style={{
-                padding: 18,
-                borderRadius: 10,
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-subtle)",
-              }}
-            >
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {chargesData.map((charge) => (
               <div
+                key={charge.id}
                 style={{
-                  fontWeight: 700,
-                  fontSize: "0.85rem",
-                  color: "var(--text-main)",
-                  marginBottom: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  padding: "10px 12px",
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 8,
                 }}
               >
-                백업본 복원
+                <span
+                  style={{ fontSize: "0.85rem", color: "var(--text-main)" }}
+                >
+                  {charge.name || charge}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCharge(charge)}
+                  className="btn btn-outline"
+                  style={{ padding: "4px 8px", color: "#f87171" }}
+                >
+                  <Trash2 size={13} />
+                </button>
               </div>
-              <div
-                style={{
-                  fontSize: "0.78rem",
-                  color: "var(--text-muted)",
-                  marginBottom: 14,
-                  lineHeight: 1.6,
-                }}
-              >
-                기존 백업 파일을 업로드하여 과거 DB 상태로 복원합니다.
-              </div>
-              <button
-                onClick={() => alert("복원 기능 준비 중입니다.")}
-                className="btn btn-secondary"
-                style={{ fontSize: "0.82rem" }}
-              >
-                <Upload size={14} />
-                백업 파일 복원
-              </button>
-            </div>
+            ))}
           </div>
         </div>
       )}

@@ -141,6 +141,21 @@ export function saveDepartmentsApi(departments) {
   });
 }
 
+export function fetchCharges() {
+  return apiFetch("/charges");
+}
+
+export function createChargeApi(name) {
+  return apiFetch("/charges", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function deleteChargeApi(id) {
+  return apiFetch(`/charges/${id}`, { method: "DELETE" });
+}
+
 // ════════════════════════════════════════════════════════════════════
 // Reports
 // ════════════════════════════════════════════════════════════════════

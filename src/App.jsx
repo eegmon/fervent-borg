@@ -78,6 +78,7 @@ import {
   updateProsecutorApi,
   fetchDepartments,
   saveDepartmentsApi,
+  fetchCharges,
 } from "./services/api";
 
 export default function App() {
@@ -102,6 +103,7 @@ export default function App() {
   const [bookingsData, setBookingsData] = useState(INITIAL_BOOKINGS);
   const [approvalsData, setApprovalsData] = useState(INITIAL_APPROVALS);
   const [departmentsData, setDepartmentsData] = useState(INITIAL_DEPARTMENTS);
+  const [chargesData, setChargesData] = useState([]);
   const [prosecutorsList, setProsecutorsList] = useState([]);
 
   // 문서번호 자동 순번 카운터 (INITIAL_APPROVALS 길이 기준 시작, 서버 동기화)
@@ -200,6 +202,7 @@ export default function App() {
         serverProsecutors,
         serverCaseNumberSettings,
         serverDepartments,
+        serverCharges,
       ] = await Promise.all([
         fetchCases(),
         fetchApprovals(),
@@ -211,6 +214,7 @@ export default function App() {
         fetchProsecutors(),
         fetchCaseNumberSettings(),
         fetchDepartments(),
+        fetchCharges(),
       ]);
 
       if (Array.isArray(serverCases)) setLedgerData(serverCases);
@@ -224,6 +228,7 @@ export default function App() {
         setCaseNumberSettings(serverCaseNumberSettings);
       if (Array.isArray(serverDepartments) && serverDepartments.length > 0)
         setDepartmentsData(serverDepartments);
+      if (Array.isArray(serverCharges)) setChargesData(serverCharges);
 
       // 문서번호 카운터 서버 동기화
       if (nextDocNoRes && nextDocNoRes.seq) {
@@ -1588,6 +1593,8 @@ export default function App() {
                 onBulkImport={handleBulkImport}
                 caseNumberSettings={caseNumberSettings}
                 onUpdateCaseNumberSettings={setCaseNumberSettings}
+                chargesData={chargesData}
+                onUpdateCharges={setChargesData}
               />
             )}
 
@@ -1678,6 +1685,7 @@ export default function App() {
         prosecutorsList={prosecutorsList}
         ledgerData={ledgerData}
         caseNumberSettings={caseNumberSettings}
+        chargesData={chargesData}
       />
 
       <EvidenceModal

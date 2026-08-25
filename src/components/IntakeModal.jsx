@@ -19,6 +19,7 @@ export default function IntakeModal({
   prosecutorsList = [],
   ledgerData = [],
   caseNumberSettings = { hyeongjeStart: 280 },
+  chargesData = [],
 }) {
   const todayStr = new Date().toISOString().split("T")[0];
   const currentYear = new Date().getFullYear();
@@ -46,6 +47,9 @@ export default function IntakeModal({
     incidentDate: todayStr,
     bookingDate: todayStr,
   });
+  const [chargeRows, setChargeRows] = useState([
+    { id: 1, name: "자본시장법 위반 및 사기", type: "주위적" },
+  ]);
   // Reset case numbers each time the modal opens
   React.useEffect(() => {
     if (isOpen) {
@@ -73,6 +77,24 @@ export default function IntakeModal({
     !prosecutor.dept?.includes("사무국") &&
     prosecutor.roleLevel !== "CHIEF_ADMINISTRATOR";
   const set = (k, v) => setFormData((p) => ({ ...p, [k]: v }));
+
+  const updateChargeRow = (id, field, value) => {
+    setChargeRows((prev) =>
+      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row)),
+    );
+  };
+
+  const addChargeRow = () => {
+    setChargeRows((prev) => [
+      ...prev,
+      { id: Date.now(), name: "", type: "예비적" },
+    ]);
+  };
+
+  const removeChargeRow = (id) => {
+    if (chargeRows.length <= 1) return;
+    setChargeRows((prev) => prev.filter((row) => row.id !== id));
+  };
 
   // Suspect Array Actions
   const handleAddSuspect = () => {
@@ -135,6 +157,14 @@ export default function IntakeModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const validCharges = chargeRows.filter((row) => row.name.trim());
+    if (validCharges.length === 0) {
+      alert("죄명을 한 개 이상 입력해주세요.");
+      return;
+    }
+    const formattedChargeName = validCharges
+      .map((row) => `${row.type}: ${row.name.trim()}`)
+      .join(" / ");
     const validSuspects = suspectsList.filter((s) => s.name.trim() !== "");
     if (validSuspects.length === 0) {
       alert("최소 1명 이상의 피의자 닉네임을 입력해주세요.");
@@ -165,6 +195,7 @@ export default function IntakeModal({
     onSubmitIntake({
       id: Date.now(),
       ...formData,
+      chargeName: formattedChargeName,
       prosecutorId: assignedProsecutor?.id || "",
       prosecutorName: assignedProsecutor?.name || "",
       sujeNo: formData.hyeongjeNo,
@@ -593,11 +624,89 @@ export default function IntakeModal({
           >
             <div>
               <Label>적용 죄명</Label>
-              <input
-                className="input-field"
-                value={formData.chargeName}
-                onChange={(e) => set("chargeName", e.target.value)}
-              />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {chargeRows.map((row, index) => (
+                  <div
+                    key={row.id}
+                    style={{ display: "flex", gap: 6, alignItems: "center" }}
+                  >
+                    <div
+                      style={{ display: "flex", gap: 3, flexShrink: 0 }}
+                      role="group"
+                      aria-label={`${index + 1}번째 죄명 구분`}
+                    >
+                      {["주위적", "예비적"].map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => updateChargeRow(row.id, "type", type)}
+                          className="btn"
+                          style={{
+                            minHeight: 38,
+                            padding: "5px 7px",
+                            fontSize: "0.7rem",
+                            background:
+                              row.type === type
+                                ? type === "주위적"
+                                  ? "var(--primary-amber)"
+                                  : "#60a5fa"
+                                : "var(--bg-elevated)",
+                            color:
+                              row.type === type ? "#000" : "var(--text-muted)",
+                            border:
+                              row.type === type
+                                ? "1px solid transparent"
+                                : "1px solid var(--border-subtle)",
+                          }}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      className="input-field"
+                      value={row.name}
+                      onChange={(e) =>
+                        updateChargeRow(row.id, "name", e.target.value)
+                      }
+                      list="charge-options"
+                      placeholder="죄명 직접 입력 또는 목록 선택"
+                    />
+                    {chargeRows.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeChargeRow(row.id)}
+                        className="btn btn-outline"
+                        style={{ padding: "8px 9px", color: "#f87171" }}
+                        aria-label="죄명 삭제"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addChargeRow}
+                  className="btn btn-outline"
+                  style={{
+                    alignSelf: "flex-start",
+                    padding: "6px 10px",
+                    fontSize: "0.75rem",
+                    color: "var(--primary-amber)",
+                  }}
+                >
+                  <Plus size={14} /> 죄명 추가
+                </button>
+              </div>
+              <datalist id="charge-options">
+                {chargesData.map((charge) => (
+                  <option
+                    key={charge.id || charge}
+                    value={charge.name || charge}
+                  />
+                ))}
+              </datalist>
             </div>
             <div>
               <Label>담당 검사 배당</Label>

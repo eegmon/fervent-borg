@@ -143,6 +143,19 @@ export async function initDb() {
     args: [],
   });
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS charges (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL UNIQUE,
+      created_at TEXT DEFAULT (datetime('now')),
+      created_by TEXT DEFAULT ''
+    )
+  `);
+  await db.execute({
+    sql: "INSERT OR IGNORE INTO charges (name) VALUES (?)",
+    args: ["자본시장법 위반 및 사기"],
+  });
+
   // ── reports ────────────────────────────────────────────────────
   await db.execute(`
     CREATE TABLE IF NOT EXISTS reports (
