@@ -1567,15 +1567,6 @@ app.put(
       "CHIEF_ADMINISTRATOR",
     ];
     const isSecretariat = allowed.includes(req.user.roleLevel);
-    await writeAuditLog({
-      action: "UPDATE",
-      entityType: "approval",
-      entityId: req.params.id,
-      entityLabel: doc.docNo || req.params.id,
-      actorId: req.user.id,
-      actorName: req.user.name,
-      detail: "결재 문서 내용 및 첨부서류 수정",
-    });
 
     if (!isSecretariat) {
       return res
@@ -1638,6 +1629,16 @@ app.put(
       await db.execute({
         sql: `UPDATE registrations SET status='APPROVED', reviewed_at=?, reviewed_by=? WHERE id=?`,
         args: [now, req.user.id, req.params.id],
+      });
+
+      await writeAuditLog({
+        action: "CREATE",
+        entityType: "prosecutor",
+        entityId: reg.reqId,
+        entityLabel: `${reg.name} (${reg.reqId})`,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        detail: "가입 신청 허가 및 검사 계정 등록",
       });
 
       res.json({
