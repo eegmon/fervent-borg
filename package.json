@@ -9,7 +9,6 @@
     "preview": "vite preview",
     "lint": "oxlint",
     "start": "node server/index.js",
-    "server": "node server/index.js",
     "server:dev": "node --watch server/index.js",
     "hash-passwords": "node server/hash-passwords.js",
     "migrate": "node server/migrate.js"

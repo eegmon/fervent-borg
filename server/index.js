@@ -7,8 +7,13 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import 'dotenv/config';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 import { db, initDb } from './db.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -507,6 +512,15 @@ app.put('/api/registrations/:id/reject', requireAuth, async (req, res) => {
     console.error('[registrations reject]', err);
     res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
   }
+});
+
+// ── 정적 파일 서빙 (프로덕션) ────────────────────────────────────────
+const distPath = join(__dirname, '..', 'dist');
+app.use(express.static(distPath));
+
+// API 라우트가 아닌 모든 요청은 index.html로 (SPA 라우팅)
+app.get('*', (req, res) => {
+  res.sendFile(join(distPath, 'index.html'));
 });
 
 // ── 서버 시작 ─────────────────────────────────────────────────────
