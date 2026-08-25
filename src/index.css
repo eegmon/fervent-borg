@@ -1,0 +1,321 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;700;900&family=Nanum+Myeongjo:wght@700;800&display=swap');
+
+:root {
+  --bg-dark: #060b18;
+  --bg-card: #0e1829;
+  --bg-elevated: #162032;
+  --bg-input: #0a1220;
+  --primary-blue: #3b82f6;
+  --primary-amber: #f59e0b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-subtle: rgba(255,255,255,0.06);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Noto Sans KR', 'Inter', sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Layout Utilities */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.main-content {
+  flex: 1;
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Glass Panels & Cards */
+.glass-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+.glass-panel:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+.gold-border {
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Inputs */
+.input-field, .select-field, .textarea-field {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  outline: none;
+  width: 100%;
+}
+.input-field:focus, .select-field:focus, .textarea-field:focus {
+  border-color: var(--primary-amber);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.badge-danger { background-color: rgba(220, 38, 38, 0.15); color: #fca5a5; }
+.badge-success { background-color: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+.badge-warning { background-color: rgba(245, 158, 11, 0.15); color: #fcd34d; }
+.badge-info { background-color: rgba(59, 130, 246, 0.15); color: #93c5fd; }
+.badge-gold { background-color: var(--primary-amber); color: #000; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  text-decoration: none;
+}
+.btn-gold {
+  background-color: var(--primary-amber);
+  color: #060b18;
+}
+.btn-gold:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+.btn-secondary {
+  background-color: var(--bg-elevated);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+}
+.btn-secondary:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+.btn-outline {
+  background-color: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+.btn-outline:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+}
+
+/* Modals */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(6, 11, 24, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal-content {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  max-width: 800px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+  padding: 24px;
+}
+
+/* Approval Paper - Real Korean Gov Doc Style */
+.approval-paper {
+  background-color: #ffffff;
+  color: #000000;
+  padding: 50px 60px;
+  font-family: 'Noto Sans KR', sans-serif;
+  border: 1px solid #ccc;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  position: relative;
+  min-height: 800px;
+  border-radius: 4px;
+}
+.approval-top-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 4px;
+  background-color: var(--bg-dark);
+}
+.approval-title {
+  text-align: center;
+  font-size: 2.2rem;
+  font-family: 'Nanum Myeongjo', serif;
+  font-weight: 800;
+  letter-spacing: 1.5rem;
+  margin-left: 1.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid #000;
+  padding-bottom: 1rem;
+}
+.approval-meta {
+  text-align: right;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.8;
+}
+.approval-grid {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 10px;
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+}
+.approval-grid-label {
+  font-weight: bold;
+}
+.approval-body {
+  font-size: 1.1rem;
+  line-height: 2;
+  margin-top: 2rem;
+  margin-bottom: 4rem;
+  text-align: justify;
+}
+.approval-body-indent {
+  padding-left: 2rem;
+}
+.approval-sign-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 3rem;
+  text-align: center;
+}
+.approval-sign-table th, .approval-sign-table td {
+  border: 1px solid #000;
+  padding: 10px;
+}
+.approval-sign-box {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.prosecution-seal-stamp {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  border: 3px solid #dc2626;
+  border-radius: 50%;
+  color: #dc2626;
+  font-weight: 900;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+  text-align: center;
+}
+.approval-footer {
+  margin-top: 3rem;
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border-top: 2px solid #000;
+  padding-top: 1rem;
+}
+
+/* Table Utilities */
+.ledger-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+}
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  text-align: left;
+}
+.ledger-table th {
+  background-color: var(--bg-elevated);
+  color: var(--text-muted);
+  font-weight: 700;
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--border-subtle);
+}
+.ledger-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  white-space: normal;
+  word-wrap: break-word;
+}
+.ledger-table tbody tr:hover {
+  background-color: rgba(255,255,255,0.02);
+}
+
+/* Lists and Cards */
+.card-row {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.card-row:hover {
+  background-color: rgba(255,255,255,0.02);
+  border-color: rgba(255,255,255,0.1);
+}
+
+/* Misc Utilities for easy styling without tailwind */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.gap-1 { gap: 0.25rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+.w-full { width: 100%; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-4 { margin-top: 1rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.p-4 { padding: 1rem; }
+.text-xs { font-size: 0.75rem; }
+.text-sm { font-size: 0.875rem; }
+.text-lg { font-size: 1.125rem; }
+.font-bold { font-weight: 700; }
+.text-amber { color: var(--primary-amber); }
+.text-blue { color: var(--primary-blue); }
+.text-muted { color: var(--text-muted); }
+.text-white { color: var(--text-main); }
