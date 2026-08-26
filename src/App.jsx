@@ -30,6 +30,7 @@ import DeadlineAlertModal from "./components/DeadlineAlertModal";
 import OfficialTemplateModal from "./components/OfficialTemplateModal";
 import RegisterModal from "./components/RegisterModal";
 import CaseTimelineModal from "./components/CaseTimelineModal";
+import CaseMemoModal from "./components/CaseMemoModal";
 
 import AuditLogViewer from "./components/AuditLogViewer";
 import Toast from "./components/Toast";
@@ -177,6 +178,7 @@ export default function App() {
   const [evidenceModalInfo, setEvidenceModalInfo] = useState(null);
   const [suspectHistoryName, setSuspectHistoryName] = useState(null);
   const [timelineCaseItem, setTimelineCaseItem] = useState(null);
+  const [memoCaseItem, setMemoCaseItem] = useState(null);
   const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [intakeNoticeData, setIntakeNoticeData] = useState(null);
@@ -1584,6 +1586,7 @@ export default function App() {
                   setSuspectHistoryName(suspectName)
                 }
                 onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
+                onOpenMemo={(caseItem) => setMemoCaseItem(caseItem)}
                 onOpenApprovalForCase={handleCreateApprovalForCase}
                 onUpdateCase={handleUpdateCase}
                 onOpenLoginModal={() => setIsLoginModalOpen(true)}

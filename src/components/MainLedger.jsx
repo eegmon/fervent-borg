@@ -11,6 +11,7 @@ import {
   Pencil,
   Lock,
   Clock,
+  MessageSquare,
 } from "lucide-react";
 import EditCaseModal from "./EditCaseModal";
 

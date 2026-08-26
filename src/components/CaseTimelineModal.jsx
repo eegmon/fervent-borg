@@ -140,7 +140,7 @@ export default function CaseTimelineModal({
       url: e.url,
       details: [
         { label: "증거 분류", val: e.category || "일반 증거" },
-        { label: "증거 링크", val: e.url || "-" },
+        { label: "증거 링크", val: e.url?.startsWith("data:") ? "[파일 첨부]" : (e.url || "-"), isFile: e.url?.startsWith("data:") },
       ],
     });
   });
@@ -615,7 +615,12 @@ export default function CaseTimelineModal({
                         </span>
                         {evt.details.map((d, i) => (
                           <span key={i} style={{ color: "var(--text-muted)" }}>
-                            <strong>{d.label}:</strong> {d.val}
+                            <strong>{d.label}:</strong>{" "}
+                            {d.val?.startsWith?.("data:")
+                              ? <span style={{ color: "#60a5fa", fontStyle: "italic" }}>[파일 첨부됨]</span>
+                              : d.val?.length > 120
+                              ? <span title={d.val}>{d.val.slice(0, 80)}…</span>
+                              : d.val}
                           </span>
                         ))}
                         {evt.url && (

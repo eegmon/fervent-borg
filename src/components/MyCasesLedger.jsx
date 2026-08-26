@@ -16,6 +16,7 @@ import {
   ChevronRight,
   ClipboardList,
   Clock,
+  MessageSquare,
 } from "lucide-react";
 import EditCaseModal from "./EditCaseModal";
 import {
