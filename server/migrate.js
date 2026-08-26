@@ -87,7 +87,7 @@ async function run() {
   await migrateTable('cases', data.cases, async c => {
     await db.execute({
       sql: `INSERT INTO cases (
-              id, hyeongje_no, gyeongje_no, latest_hyeongje_no,
+              id, suje_no, hyeongje_no, latest_hyeongje_no,
               prosecutor_name, prosecutor_id, suspect_name, suspect_uuid,
               booking_status, booking_date, booking_basis, disposition,
               re_appeal, court1_no, court1_result, court1_doc,
@@ -97,7 +97,7 @@ async function run() {
               notes, content, confiscation, charge_name
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
-        str(c.id), str(c.hyeongjeNo), str(c.gyeongjeNo), str(c.latestHyeongjeNo),
+        str(c.id), str(c.sujeNo || c.hyeongjeNo), str(c.hyeongjeNo || '-'), str(c.latestHyeongjeNo),
         str(c.prosecutorName), str(c.prosecutorId), str(c.suspectName), str(c.suspectUuid),
         str(c.bookingStatus), str(c.bookingDate), str(c.bookingBasis), str(c.disposition),
         str(c.reAppeal || '-'),
@@ -128,12 +128,12 @@ async function run() {
   // ── appeals ──────────────────────────────────────────────────────
   await migrateTable('appeals', data.appeals, async a => {
     await db.execute({
-      sql: `INSERT INTO appeals (id, appeal_no, hyeongje_no, gyeongje_no, status,
+      sql: `INSERT INTO appeals (id, appeal_no, hyeongje_no, suje_no, status,
               prosecutor_name, suspect_name, suspect_uuid, disposition, disposition_date,
               basis_url, charge_name)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
-        str(a.id), str(a.appealNo), str(a.hyeongjeNo), str(a.gyeongjeNo || '-'),
+        str(a.id), str(a.appealNo), str(a.hyeongjeNo), str(a.sujeNo || '-'),
         str(a.status), str(a.prosecutorName), str(a.suspectName), str(a.suspectUuid || ''),
         str(a.disposition), str(a.dispositionDate), str(a.basisUrl), str(a.chargeName || ''),
       ],

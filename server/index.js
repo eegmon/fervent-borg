@@ -273,10 +273,10 @@ async function requireCaseScope(req, res, next) {
 async function findCaseForEvidence(caseNo, user) {
   const result = await db.execute({
     sql: hasGlobalDataAccess(user)
-      ? "SELECT id, hyeongje_no, gyeongje_no, prosecutor_id FROM cases WHERE deleted_at = '' AND (hyeongje_no = ? OR gyeongje_no = ?) LIMIT 1"
-      : `SELECT c.id, c.hyeongje_no, c.gyeongje_no, c.prosecutor_id
+      ? "SELECT id, suje_no, hyeongje_no, prosecutor_id FROM cases WHERE deleted_at = '' AND (hyeongje_no = ? OR suje_no = ?) LIMIT 1"
+      : `SELECT c.id, c.suje_no, c.hyeongje_no, c.prosecutor_id
          FROM cases c JOIN prosecutors p ON c.prosecutor_id = p.id
-         WHERE c.deleted_at = '' AND (c.hyeongje_no = ? OR c.gyeongje_no = ?)
+         WHERE c.deleted_at = '' AND (c.hyeongje_no = ? OR c.suje_no = ?)
            AND p.dept = (SELECT dept FROM prosecutors WHERE id = ?) LIMIT 1`,
     args: hasGlobalDataAccess(user)
       ? [caseNo, caseNo]
@@ -572,7 +572,7 @@ app.post("/api/cases", requireAuth, async (req, res) => {
   const id = String(c.id || Date.now());
   await db.execute({
     sql: `INSERT INTO cases (
-            id, hyeongje_no, gyeongje_no, latest_hyeongje_no,
+            id, suje_no, hyeongje_no, latest_hyeongje_no,
             prosecutor_name, prosecutor_id, suspect_name, suspect_uuid,
             booking_status, booking_date, booking_basis, disposition,
             re_appeal, court1_no, court1_result, court1_doc,
@@ -585,8 +585,8 @@ app.post("/api/cases", requireAuth, async (req, res) => {
           )`,
     args: [
       id,
-      c.hyeongjeNo || "",
-      c.gyeongjeNo || "",
+      c.sujeNo || (c.hyeongjeNo && c.hyeongjeNo.includes("수제") ? c.hyeongjeNo : ""),
+      c.hyeongjeNo && !c.hyeongjeNo.includes("수제") ? c.hyeongjeNo : "-",
       c.latestHyeongjeNo || "",
       assignedName,
       assignedId,
@@ -705,8 +705,8 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
   }
   const caseArgs = [
     id,
-    intakeCaseNo,
-    c.gyeongjeNo || "",
+    intakeCaseNo, // suje_no (e.g. 2026수제280)
+    c.hyeongjeNo && !c.hyeongjeNo.includes("수제") ? c.hyeongjeNo : "-", // hyeongje_no
     c.latestHyeongjeNo || "",
     assignedName,
     assignedId,
@@ -744,7 +744,7 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
     await db.batch(
       [
         {
-          sql: `INSERT INTO cases (id,hyeongje_no,gyeongje_no,latest_hyeongje_no,prosecutor_name,prosecutor_id,suspect_name,suspect_uuid,booking_status,booking_date,booking_basis,disposition,re_appeal,court1_no,court1_result,court1_doc,court1_appealed,court1_appellant,court2_no,court2_dismissed,court2_result,court2_doc,court3_appealed,court3_appellant,court3_no,court3_remanded,court3_result,court3_doc,notes,content,confiscation,charge_name,visibility,created_by,private_viewer_ids) VALUES (${Array(35).fill("?").join(",")})`,
+          sql: `INSERT INTO cases (id,suje_no,hyeongje_no,latest_hyeongje_no,prosecutor_name,prosecutor_id,suspect_name,suspect_uuid,booking_status,booking_date,booking_basis,disposition,re_appeal,court1_no,court1_result,court1_doc,court1_appealed,court1_appellant,court2_no,court2_dismissed,court2_result,court2_doc,court3_appealed,court3_appellant,court3_no,court3_remanded,court3_result,court3_doc,notes,content,confiscation,charge_name,visibility,created_by,private_viewer_ids) VALUES (${Array(35).fill("?").join(",")})`,
           args: caseArgs,
         },
         {
@@ -901,13 +901,14 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, async (req, res) => {
 
   await db.execute({
     sql: `UPDATE cases SET
-            hyeongje_no=?, prosecutor_name=?, prosecutor_id=?,
+            suje_no=?, hyeongje_no=?, prosecutor_name=?, prosecutor_id=?,
             suspect_name=?, booking_status=?, disposition=?,
             charge_name=?, notes=?, content=?, confiscation=?,
             supervisor_designated=?, supervisor_id=?, supervisor_name=?
           WHERE id=?`,
     args: [
-      c.hyeongjeNo || "",
+      c.sujeNo || (c.hyeongjeNo && c.hyeongjeNo.includes("수제") ? c.hyeongjeNo : ""),
+      c.hyeongjeNo || "-",
       assignedName,
       assignedId,
       c.suspectName || "",
@@ -1026,7 +1027,7 @@ app.post("/api/appeals", requireAuth, async (req, res) => {
     : req.user.name;
   const id = String(a.id || Date.now());
   await db.execute({
-    sql: `INSERT INTO appeals (id, appeal_no, hyeongje_no, gyeongje_no, status,
+    sql: `INSERT INTO appeals (id, appeal_no, hyeongje_no, suje_no, status,
             prosecutor_name, suspect_name, suspect_uuid, disposition, disposition_date,
             basis_url, charge_name)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -1034,7 +1035,7 @@ app.post("/api/appeals", requireAuth, async (req, res) => {
       id,
       a.appealNo || "",
       a.hyeongjeNo || "",
-      a.gyeongjeNo || "",
+      a.sujeNo || "",
       a.status || "",
       assignedName,
       a.suspectName || "",
@@ -1056,7 +1057,7 @@ app.patch(
     const fields = {
       appealNo: "appeal_no",
       hyeongjeNo: "hyeongje_no",
-      gyeongjeNo: "gyeongje_no",
+      sujeNo: "suje_no",
       status: "status",
       prosecutorName: "prosecutor_name",
       suspectName: "suspect_name",
@@ -1353,7 +1354,7 @@ app.put(
     if (req.body?.mode === "ARBITRARY") {
       const caseRes = await db.execute({
         sql: `SELECT supervisor_designated FROM cases
-              WHERE (hyeongje_no = ? OR gyeongje_no = ?) AND deleted_at = ''
+              WHERE (hyeongje_no = ? OR suje_no = ?) AND deleted_at = ''
               LIMIT 1`,
         args: [doc.hyeongjeNo || "", doc.hyeongjeNo || ""],
       });
@@ -2473,7 +2474,7 @@ app.delete("/api/evidence/:id", requireAuth, async (req, res) => {
     const result = await db.execute({
       sql: hasGlobalDataAccess(req.user)
         ? "SELECT case_no FROM evidence WHERE id = ? AND deleted_at = ''"
-        : `SELECT e.case_no FROM evidence e JOIN cases c ON c.hyeongje_no = e.case_no OR c.gyeongje_no = e.case_no
+        : `SELECT e.case_no FROM evidence e JOIN cases c ON c.hyeongje_no = e.case_no OR c.suje_no = e.case_no
            JOIN prosecutors p ON c.prosecutor_id = p.id
            WHERE e.id = ? AND e.deleted_at = '' AND p.dept = (SELECT dept FROM prosecutors WHERE id = ?)`,
       args: hasGlobalDataAccess(req.user)
@@ -2516,7 +2517,7 @@ app.patch("/api/evidence/:id", requireAuth, async (req, res) => {
     const result = await db.execute({
       sql: hasGlobalDataAccess(req.user)
         ? "SELECT case_no FROM evidence WHERE id = ? AND deleted_at = ''"
-        : `SELECT e.case_no FROM evidence e JOIN cases c ON c.hyeongje_no = e.case_no OR c.gyeongje_no = e.case_no
+        : `SELECT e.case_no FROM evidence e JOIN cases c ON c.hyeongje_no = e.case_no OR c.suje_no = e.case_no
            JOIN prosecutors p ON c.prosecutor_id = p.id WHERE e.id = ? AND e.deleted_at = ''
            AND p.dept = (SELECT dept FROM prosecutors WHERE id = ?)`,
       args: hasGlobalDataAccess(req.user)

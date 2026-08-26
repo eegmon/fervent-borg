@@ -1998,7 +1998,7 @@ export default function SecretariatAdmin({
       const regex = new RegExp(`^${currentYear}${prefix}(\\d+)$`);
       const nums = ledgerData
         .map((c) => {
-          const m = (c.hyeongjeNo || "").match(regex);
+          const m = (c.hyeongjeNo || "").match(regex) || (c.sujeNo || "").match(regex);
           return m ? parseInt(m[1], 10) : 0;
         })
         .filter((n) => n > 0);

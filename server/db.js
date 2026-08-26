@@ -74,8 +74,8 @@ export async function initDb() {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS cases (
       id                  TEXT PRIMARY KEY,
+      suje_no             TEXT,
       hyeongje_no         TEXT,
-      gyeongje_no         TEXT,
       latest_hyeongje_no  TEXT,
       prosecutor_name     TEXT,
       prosecutor_id       TEXT,
@@ -112,6 +112,7 @@ export async function initDb() {
     )
   `);
   for (const column of [
+    "suje_no TEXT DEFAULT ''",
     "supervisor_designated INTEGER DEFAULT 0",
     "supervisor_id TEXT DEFAULT ''",
     "supervisor_name TEXT DEFAULT ''",
@@ -187,8 +188,8 @@ export async function initDb() {
     CREATE TABLE IF NOT EXISTS appeals (
       id               TEXT PRIMARY KEY,
       appeal_no        TEXT,
+      suje_no          TEXT,
       hyeongje_no      TEXT,
-      gyeongje_no      TEXT,
       status           TEXT,
       prosecutor_name  TEXT,
       suspect_name     TEXT,

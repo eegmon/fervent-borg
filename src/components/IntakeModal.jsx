@@ -28,7 +28,7 @@ export default function IntakeModal({
     const regex = new RegExp(`^${currentYear}${prefix}(\\d+)$`);
     const maxExisting = ledgerData.reduce(
       (max, item) => {
-        const match = (item.hyeongjeNo || "").match(regex);
+        const match = (item.sujeNo || "").match(regex) || (item.hyeongjeNo || "").match(regex);
         return match ? Math.max(max, Number(match[1])) : max;
       },
       Number(start) - 1,

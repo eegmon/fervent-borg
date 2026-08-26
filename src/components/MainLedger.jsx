@@ -364,7 +364,7 @@ export default function MainLedger({
                         }}
                       >
                         ⚖️{" "}
-                        {item.hyeongjeNo && item.hyeongjeNo !== "-"
+                        {item.hyeongjeNo && item.hyeongjeNo !== "-" && item.hyeongjeNo !== "00"
                           ? item.hyeongjeNo
                           : (item.sujeNo || item.hyeongjeNo).replace(
                               "수제",
@@ -648,7 +648,7 @@ export default function MainLedger({
                             item.bookingBasis,
                             item.hyeongjeNo && item.hyeongjeNo !== "-"
                               ? item.hyeongjeNo
-                              : item.sujeNo || item.gyeongjeNo,
+                              : item.sujeNo || item.hyeongjeNo,
                             item.suspectName,
                           );
                         }}

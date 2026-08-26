@@ -1209,7 +1209,7 @@ export default function MyCasesLedger({
                           }}
                         >
                           ⚖️{" "}
-                          {item.hyeongjeNo && item.hyeongjeNo !== "-"
+                          {item.hyeongjeNo && item.hyeongjeNo !== "-" && item.hyeongjeNo !== "00"
                             ? item.hyeongjeNo
                             : (item.sujeNo || item.hyeongjeNo).replace(
                                 "수제",
