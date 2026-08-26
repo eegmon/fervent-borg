@@ -604,7 +604,7 @@ export default function MainLedger({
                     }}
                   >
                     {/* 결재 필수 / 완료 배지 */}
-                    {item.supervisorDesignated &&
+                    {!!item.supervisorDesignated &&
                       !isCaseApprovalComplete(item) && (
                         <span
                           style={{
@@ -623,7 +623,7 @@ export default function MainLedger({
                           <Lock size={10} /> 결재 필수
                         </span>
                       )}
-                    {item.supervisorDesignated &&
+                    {!!item.supervisorDesignated &&
                       isCaseApprovalComplete(item) && (
                         <span
                           style={{

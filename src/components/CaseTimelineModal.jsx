@@ -31,21 +31,29 @@ export default function CaseTimelineModal({
   const [evidence, setEvidence] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const hyeongjeNo = caseItem?.hyeongjeNo || caseItem?.sujeNo || "";
+  const targetCaseNo =
+    (caseItem?.sujeNo && caseItem.sujeNo !== "-" ? caseItem.sujeNo : null) ||
+    (caseItem?.hyeongjeNo && caseItem.hyeongjeNo !== "-" ? caseItem.hyeongjeNo : null) ||
+    caseItem?.hyeongjeNo ||
+    "";
 
   useEffect(() => {
-    if (!isOpen || !hyeongjeNo) return;
+    if (!isOpen || !targetCaseNo) return;
     setLoading(true);
 
+    const caseNos = [targetCaseNo, caseItem?.hyeongjeNo, caseItem?.sujeNo].filter(
+      (n) => n && n !== "-",
+    );
+
     Promise.all([
-      fetchWarrants(hyeongjeNo).catch(() => []),
-      fetchEvidence(hyeongjeNo).catch(() => []),
+      fetchWarrants(targetCaseNo).catch(() => []),
+      fetchEvidence(targetCaseNo).catch(() => []),
     ]).then(([wData, eData]) => {
       setWarrants(Array.isArray(wData) ? wData : []);
       setEvidence(Array.isArray(eData) ? eData : []);
       setLoading(false);
     });
-  }, [isOpen, hyeongjeNo]);
+  }, [isOpen, targetCaseNo, caseItem?.hyeongjeNo, caseItem?.sujeNo]);
 
   if (!isOpen || !caseItem) return null;
 
@@ -54,10 +62,18 @@ export default function CaseTimelineModal({
 
   // 1. 입건 / 접수 이벤트
   const bookingMatch = bookingsData.find(
-    (b) => b.hyeongjeNo === hyeongjeNo || b.sujeNo === hyeongjeNo,
+    (b) =>
+      (b.hyeongjeNo && b.hyeongjeNo === targetCaseNo) ||
+      (b.sujeNo && b.sujeNo === targetCaseNo) ||
+      (b.hyeongjeNo && b.hyeongjeNo === caseItem.hyeongjeNo) ||
+      (b.sujeNo && b.sujeNo === caseItem.sujeNo),
   );
   const reportMatch = reportsData.find(
-    (r) => r.hyeongjeNo === hyeongjeNo || r.sujeNo === hyeongjeNo,
+    (r) =>
+      (r.hyeongjeNo && r.hyeongjeNo === targetCaseNo) ||
+      (r.sujeNo && r.sujeNo === targetCaseNo) ||
+      (r.hyeongjeNo && r.hyeongjeNo === caseItem.hyeongjeNo) ||
+      (r.sujeNo && r.sujeNo === caseItem.sujeNo),
   );
 
   const bookingDate =
@@ -125,7 +141,9 @@ export default function CaseTimelineModal({
 
   // 4. 전자 결재 문서 이벤트들
   const matchingApprovals = approvalsData.filter(
-    (app) => app.hyeongjeNo === hyeongjeNo || app.hyeongjeNo === caseItem.sujeNo,
+    (app) =>
+      (app.hyeongjeNo && (app.hyeongjeNo === targetCaseNo || app.hyeongjeNo === caseItem.hyeongjeNo || app.hyeongjeNo === caseItem.sujeNo)) ||
+      (app.sujeNo && (app.sujeNo === targetCaseNo || app.sujeNo === caseItem.sujeNo)),
   );
 
   matchingApprovals.forEach((app, idx) => {
@@ -239,7 +257,10 @@ export default function CaseTimelineModal({
   }
 
   const matchingAppeals = appealsData.filter(
-    (a) => a.hyeongjeNo === hyeongjeNo || a.caseNo === hyeongjeNo,
+    (a) =>
+      (a.hyeongjeNo && (a.hyeongjeNo === targetCaseNo || a.hyeongjeNo === caseItem.hyeongjeNo)) ||
+      (a.sujeNo && (a.sujeNo === targetCaseNo || a.sujeNo === caseItem.sujeNo)) ||
+      (a.caseNo && (a.caseNo === targetCaseNo || a.caseNo === caseItem.hyeongjeNo)),
   );
   matchingAppeals.forEach((app, idx) => {
     events.push({

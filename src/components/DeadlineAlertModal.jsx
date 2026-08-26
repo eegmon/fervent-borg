@@ -21,7 +21,14 @@ export default function DeadlineAlertModal({
 
     // 1. 구속 기간 만료 (도스온라인 소송법 제14조제6항: 48시간 이내 기소 제한)
     ledgerData.forEach(c => {
-      if ((c.bookingStatus || c.disposition || '').includes('구속')) {
+      const statusStr = (c.bookingStatus || '').trim();
+      // '불구속' / '미구속' 제외, 체포·구속영장 발부 포함
+      const isArrested =
+        (statusStr.includes('구속') && !statusStr.includes('불구속') && !statusStr.includes('미구속')) ||
+        statusStr.includes('체포영장') ||
+        statusStr.includes('구속영장');
+
+      if (isArrested) {
         const baseDate = c.bookingDate ? new Date(c.bookingDate.replace(/\./g, '-')) : new Date();
         const expireDate = new Date(baseDate.getTime() + 48 * 60 * 60 * 1000);
         const diffHours = Math.ceil((expireDate - today) / (1000 * 60 * 60));
@@ -30,17 +37,19 @@ export default function DeadlineAlertModal({
         if (diffHours <= 12) urgency = 'CRITICAL';
         else if (diffHours <= 24) urgency = 'WARNING';
 
+        const displayNo = c.sujeNo && c.sujeNo !== '-' ? c.sujeNo : c.hyeongjeNo;
+
         list.push({
           id: `ARREST-${c.id}`,
           category: 'ARREST',
           categoryLabel: '🚨 구속 48시간 기한 (소송법 제14조)',
-          title: `${c.hyeongjeNo}호 | 피의자 ${c.suspectName} 구속 48시간 기한 임박`,
+          title: `${displayNo} | 피의자 ${c.suspectName} 구속 48시간 기한 임박`,
           desc: `소송법 제14조제6항: 구속 피의자 48시간 이내 미기소 시 즉시 석방 (담당: ${c.prosecutorName || '미지정'})`,
           dDay: diffHours <= 0 ? '석방 대상 (만료)' : `${diffHours}시간 남음`,
           dDayVal: diffHours,
           urgency,
           targetTab: 'mycases',
-          caseNo: c.hyeongjeNo,
+          caseNo: displayNo,
         });
       }
     });

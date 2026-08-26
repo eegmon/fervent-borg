@@ -1217,7 +1217,7 @@ export default function MyCasesLedger({
                               )}
                         </span>
                       )}
-                    {item.supervisorDesignated &&
+                    {!!item.supervisorDesignated &&
                       !isCaseApprovalComplete(item) && (
                         <span
                           className="badge"
@@ -1235,7 +1235,7 @@ export default function MyCasesLedger({
                           🔒 결재 필수
                         </span>
                       )}
-                    {item.supervisorDesignated &&
+                    {!!item.supervisorDesignated &&
                       isCaseApprovalComplete(item) && (
                         <span
                           className="badge"
@@ -1601,7 +1601,7 @@ export default function MyCasesLedger({
               {statusChangeCase.hyeongjeNo}호 | 피의자:{" "}
               {statusChangeCase.suspectName}
             </div>
-            {statusChangeCase.supervisorDesignated &&
+            {!!statusChangeCase.supervisorDesignated &&
               !isCaseApprovalComplete(statusChangeCase) && (
                 <div
                   style={{
