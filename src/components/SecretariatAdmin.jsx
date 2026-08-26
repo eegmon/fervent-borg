@@ -1620,15 +1620,50 @@ const CATEGORIES = [
 ];
 
 const SUB_TABS = [
-  { id: "registrations", label: "🆕 가입 신청 허가", icon: ClipboardList, category: "USERS" },
-  { id: "prosecutors", label: "검사 계정 관리", icon: Users, category: "USERS" },
-  { id: "acting", label: "🏛️ 직무대리명령 발령", icon: Award, category: "USERS" },
-  { id: "depts", label: "부서 & 부원 관리", icon: Building2, category: "USERS" },
+  {
+    id: "registrations",
+    label: "🆕 가입 신청 허가",
+    icon: ClipboardList,
+    category: "USERS",
+  },
+  {
+    id: "prosecutors",
+    label: "검사 계정 관리",
+    icon: Users,
+    category: "USERS",
+  },
+  {
+    id: "acting",
+    label: "🏛️ 직무대리명령 발령",
+    icon: Award,
+    category: "USERS",
+  },
+  {
+    id: "depts",
+    label: "부서 & 부원 관리",
+    icon: Building2,
+    category: "USERS",
+  },
 
-  { id: "casenos", label: "사건번호 공식 배정", icon: Scale, category: "CASES" },
+  {
+    id: "casenos",
+    label: "사건번호 공식 배정",
+    icon: Scale,
+    category: "CASES",
+  },
   { id: "reassign", label: "사건 재배당", icon: RefreshCw, category: "CASES" },
-  { id: "designate", label: "🔒 결재 필수 지정", icon: ShieldAlert, category: "CASES" },
-  { id: "import", label: "엑셀 일괄 등록", icon: FileSpreadsheet, category: "CASES" },
+  {
+    id: "designate",
+    label: "🔒 결재 필수 지정",
+    icon: ShieldAlert,
+    category: "CASES",
+  },
+  {
+    id: "import",
+    label: "엑셀 일괄 등록",
+    icon: FileSpreadsheet,
+    category: "CASES",
+  },
 
   { id: "docmgmt", label: "문서 관리", icon: FileBox, category: "DOCS" },
   { id: "docnos", label: "문서번호 관리", icon: FilePen, category: "DOCS" },
@@ -1661,13 +1696,18 @@ function DiscordIdCell({ prosecutor: p, onUpdateProsecutorStatus, addLog }) {
     if (onUpdateProsecutorStatus) {
       onUpdateProsecutorStatus(p.id, { discordId: val.trim() });
     }
-    addLog("디스코드 ID 변경", `'${p.name}' 검사 디스코드 ID: ${val.trim() || "(삭제)"}`);
+    addLog(
+      "디스코드 ID 변경",
+      `'${p.name}' 검사 디스코드 ID: ${val.trim() || "(삭제)"}`,
+    );
     setEditing(false);
   };
 
   if (editing) {
     return (
-      <div style={{ display: "flex", gap: 4, alignItems: "center", minWidth: 160 }}>
+      <div
+        style={{ display: "flex", gap: 4, alignItems: "center", minWidth: 160 }}
+      >
         <input
           className="input-field"
           style={{ padding: "3px 7px", fontSize: "0.75rem", height: 28 }}
@@ -1676,30 +1716,69 @@ function DiscordIdCell({ prosecutor: p, onUpdateProsecutorStatus, addLog }) {
           onChange={(e) => setVal(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSave();
-            if (e.key === "Escape") { setVal(p.discordId || ""); setEditing(false); }
+            if (e.key === "Escape") {
+              setVal(p.discordId || "");
+              setEditing(false);
+            }
           }}
           autoFocus
         />
-        <button onClick={handleSave} className="btn btn-gold" style={{ padding: "3px 8px", fontSize: "0.68rem" }}>저장</button>
-        <button onClick={() => { setVal(p.discordId || ""); setEditing(false); }} className="btn btn-secondary" style={{ padding: "3px 6px", fontSize: "0.68rem" }}>✕</button>
+        <button
+          onClick={handleSave}
+          className="btn btn-gold"
+          style={{ padding: "3px 8px", fontSize: "0.68rem" }}
+        >
+          저장
+        </button>
+        <button
+          onClick={() => {
+            setVal(p.discordId || "");
+            setEditing(false);
+          }}
+          className="btn btn-secondary"
+          style={{ padding: "3px 6px", fontSize: "0.68rem" }}
+        >
+          ✕
+        </button>
       </div>
     );
   }
 
   return (
     <div
-      style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        cursor: "pointer",
+      }}
       onClick={() => setEditing(true)}
       title="클릭하여 편집"
     >
       {p.discordId ? (
-        <span style={{ fontSize: "0.75rem", color: "#818cf8", fontFamily: "monospace" }}>
+        <span
+          style={{
+            fontSize: "0.75rem",
+            color: "#818cf8",
+            fontFamily: "monospace",
+          }}
+        >
           @{p.discordId}
         </span>
       ) : (
-        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>—</span>
+        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+          —
+        </span>
       )}
-      <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", opacity: 0.6 }}>✏️</span>
+      <span
+        style={{
+          fontSize: "0.65rem",
+          color: "var(--text-muted)",
+          opacity: 0.6,
+        }}
+      >
+        ✏️
+      </span>
     </div>
   );
 }
@@ -1884,7 +1963,7 @@ export default function SecretariatAdmin({
   );
 
   const [selectedCaseNo, setSelectedCaseNo] = useState(
-    ledgerData[0]?.hyeongjeNo || "",
+    ledgerData[0]?.sujeNo || "",
   );
   const [targetPId, setTargetPId] = useState("");
   const [bulkSourcePName, setBulkSourcePName] = useState("");
@@ -1998,7 +2077,8 @@ export default function SecretariatAdmin({
       const regex = new RegExp(`^${currentYear}${prefix}(\\d+)$`);
       const nums = ledgerData
         .map((c) => {
-          const m = (c.hyeongjeNo || "").match(regex) || (c.sujeNo || "").match(regex);
+          const m =
+            (c.hyeongjeNo || "").match(regex) || (c.sujeNo || "").match(regex);
           return m ? parseInt(m[1], 10) : 0;
         })
         .filter((n) => n > 0);
@@ -2326,7 +2406,14 @@ export default function SecretariatAdmin({
           border: "1px solid var(--border-subtle)",
         }}
       >
-        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 700, marginRight: 4 }}>
+        <span
+          style={{
+            fontSize: "0.72rem",
+            color: "var(--text-muted)",
+            fontWeight: 700,
+            marginRight: 4,
+          }}
+        >
           📂 카테고리 분류:
         </span>
         {CATEGORIES.map((cat) => {
@@ -2337,8 +2424,13 @@ export default function SecretariatAdmin({
               onClick={() => {
                 setSelectedCategory(cat.id);
                 // Switch subtab to first subtab in category if activeSubTab is filtered out
-                const catTabs = SUB_TABS.filter((t) => cat.id === "ALL" || t.category === cat.id);
-                if (catTabs.length > 0 && !catTabs.some((t) => t.id === activeSubTab)) {
+                const catTabs = SUB_TABS.filter(
+                  (t) => cat.id === "ALL" || t.category === cat.id,
+                );
+                if (
+                  catTabs.length > 0 &&
+                  !catTabs.some((t) => t.id === activeSubTab)
+                ) {
                   setActiveSubTab(catTabs[0].id);
                 }
               }}
@@ -2349,9 +2441,13 @@ export default function SecretariatAdmin({
                 borderRadius: 20,
                 cursor: "pointer",
                 transition: "all 0.15s",
-                background: active ? "var(--primary-amber)" : "var(--bg-elevated)",
+                background: active
+                  ? "var(--primary-amber)"
+                  : "var(--bg-elevated)",
                 color: active ? "#000" : "var(--text-muted)",
-                border: active ? "1px solid var(--primary-amber)" : "1px solid var(--border-subtle)",
+                border: active
+                  ? "1px solid var(--primary-amber)"
+                  : "1px solid var(--border-subtle)",
               }}
             >
               {cat.label}
@@ -2966,7 +3062,13 @@ export default function SecretariatAdmin({
                     setNewP({ ...newP, discordId: e.target.value })
                   }
                 />
-                <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginTop: 4 }}>
+                <div
+                  style={{
+                    fontSize: "0.68rem",
+                    color: "var(--text-muted)",
+                    marginTop: 4,
+                  }}
+                >
                   입력 시 사건 접수 알림 메시지에 멘션이 포함됩니다.
                 </div>
               </div>
@@ -4379,7 +4481,9 @@ export default function SecretariatAdmin({
       )}
 
       {activeSubTab === "reassign" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
+        >
           {/* 좌측: 단건 직권 재배당 */}
           <div className="glass-panel" style={{ padding: 24 }}>
             <div
@@ -4476,13 +4580,20 @@ export default function SecretariatAdmin({
                   }}
                 >
                   <option value="">검사 선택...</option>
-                  {Array.from(new Set(ledgerData.map((c) => c.prosecutorName).filter(Boolean))).map(
-                    (name) => (
-                      <option key={name} value={name}>
-                        {name} (현재 사건 {ledgerData.filter((c) => c.prosecutorName === name).length}건)
-                      </option>
+                  {Array.from(
+                    new Set(
+                      ledgerData.map((c) => c.prosecutorName).filter(Boolean),
                     ),
-                  )}
+                  ).map((name) => (
+                    <option key={name} value={name}>
+                      {name} (현재 사건{" "}
+                      {
+                        ledgerData.filter((c) => c.prosecutorName === name)
+                          .length
+                      }
+                      건)
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -4496,7 +4607,10 @@ export default function SecretariatAdmin({
                       marginBottom: 6,
                     }}
                   >
-                    <Label>이전 대상 사건 선택 ({selectedBulkCaseIds.length}건 선택됨)</Label>
+                    <Label>
+                      이전 대상 사건 선택 ({selectedBulkCaseIds.length}건
+                      선택됨)
+                    </Label>
                     <button
                       type="button"
                       onClick={() => {
@@ -4504,7 +4618,9 @@ export default function SecretariatAdmin({
                           .filter((c) => c.prosecutorName === bulkSourcePName)
                           .map((c) => c.id);
                         setSelectedBulkCaseIds(
-                          selectedBulkCaseIds.length === allIds.length ? [] : allIds,
+                          selectedBulkCaseIds.length === allIds.length
+                            ? []
+                            : allIds,
                         );
                       }}
                       style={{
@@ -4516,7 +4632,9 @@ export default function SecretariatAdmin({
                       }}
                     >
                       {selectedBulkCaseIds.length ===
-                      ledgerData.filter((c) => c.prosecutorName === bulkSourcePName).length
+                      ledgerData.filter(
+                        (c) => c.prosecutorName === bulkSourcePName,
+                      ).length
                         ? "전체 해제"
                         : "전체 선택"}
                     </button>
@@ -4549,7 +4667,9 @@ export default function SecretariatAdmin({
                               cursor: "pointer",
                               padding: "4px 6px",
                               borderRadius: 4,
-                              background: isChecked ? "rgba(129,140,248,0.1)" : "transparent",
+                              background: isChecked
+                                ? "rgba(129,140,248,0.1)"
+                                : "transparent",
                             }}
                           >
                             <input
@@ -4557,18 +4677,30 @@ export default function SecretariatAdmin({
                               checked={isChecked}
                               onChange={(e) => {
                                 if (e.target.checked) {
-                                  setSelectedBulkCaseIds([...selectedBulkCaseIds, c.id]);
+                                  setSelectedBulkCaseIds([
+                                    ...selectedBulkCaseIds,
+                                    c.id,
+                                  ]);
                                 } else {
                                   setSelectedBulkCaseIds(
-                                    selectedBulkCaseIds.filter((id) => id !== c.id),
+                                    selectedBulkCaseIds.filter(
+                                      (id) => id !== c.id,
+                                    ),
                                   );
                                 }
                               }}
                             />
-                            <span style={{ fontFamily: "monospace", color: "var(--primary-amber)" }}>
+                            <span
+                              style={{
+                                fontFamily: "monospace",
+                                color: "var(--primary-amber)",
+                              }}
+                            >
                               {c.hyeongjeNo}
                             </span>
-                            <span>| {c.suspectName} ({c.chargeName})</span>
+                            <span>
+                              | {c.suspectName} ({c.chargeName})
+                            </span>
                           </label>
                         );
                       })}
@@ -4585,7 +4717,11 @@ export default function SecretariatAdmin({
                 >
                   <option value="">신임 검사 선택...</option>
                   {prosecutorsList
-                    .filter((p) => p.name !== bulkSourcePName && ["ACTIVE", "ON_LEAVE"].includes(p.status))
+                    .filter(
+                      (p) =>
+                        p.name !== bulkSourcePName &&
+                        ["ACTIVE", "ON_LEAVE"].includes(p.status),
+                    )
                     .map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} ({p.title} / {p.dept})
@@ -4607,9 +4743,15 @@ export default function SecretariatAdmin({
               <button
                 type="button"
                 className="btn btn-gold"
-                disabled={!bulkSourcePName || selectedBulkCaseIds.length === 0 || !bulkTargetPId}
+                disabled={
+                  !bulkSourcePName ||
+                  selectedBulkCaseIds.length === 0 ||
+                  !bulkTargetPId
+                }
                 onClick={async () => {
-                  const targetP = prosecutorsList.find((p) => p.id === bulkTargetPId);
+                  const targetP = prosecutorsList.find(
+                    (p) => p.id === bulkTargetPId,
+                  );
                   if (!targetP) return;
                   if (
                     !window.confirm(
