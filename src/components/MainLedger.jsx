@@ -18,8 +18,8 @@ import EditCaseModal from "./EditCaseModal";
 const STATUS_COLOR = (s) => {
   if (!s) return "#94a3b8";
   if (s.includes("구속")) return "#f87171";
+  if (s.includes("불기소") || s.includes("무혐의") || s.includes("유예") || s.includes("공소권없음") || s.includes("기소중지")) return "#34d399";
   if (s.includes("기소")) return "#fb923c";
-  if (s.includes("불기소") || s.includes("무혐의")) return "#34d399";
   return "#93c5fd";
 };
 
@@ -199,18 +199,24 @@ export default function MainLedger({
             {[
               { label: "전체", value: ledgerData.length, color: "#93c5fd" },
               {
-                label: "구속·기소",
+                label: "기소",
                 value: ledgerData.filter(
                   (d) =>
-                    d.disposition.includes("구속") ||
-                    d.bookingStatus.includes("구속"),
+                    (d.disposition || "").includes("기소") &&
+                    !(d.disposition || "").includes("불기소") &&
+                    !(d.disposition || "").includes("유예"),
                 ).length,
-                color: "#f87171",
+                color: "#fb923c",
               },
               {
                 label: "수사중",
-                value: ledgerData.filter((d) =>
-                  d.disposition.includes("수사중"),
+                value: ledgerData.filter(
+                  (d) =>
+                    !(d.disposition || "").includes("기소") &&
+                    !(d.disposition || "").includes("불기소") &&
+                    !(d.disposition || "").includes("유예") &&
+                    !(d.disposition || "").includes("종국") &&
+                    !(d.disposition || "").includes("이송"),
                 ).length,
                 color: "#fcd34d",
               },
