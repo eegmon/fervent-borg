@@ -14,6 +14,24 @@ import { HWP_TEMPLATES } from "../data/hwpTemplates";
 const NAVER_CAFE_MENU_URL =
   "https://cafe.naver.com/f-e/cafes/29669442/menus/262";
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escapeScriptJson(value) {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
 // ─────────────────────────────────────────────
 // 카테고리
 // ─────────────────────────────────────────────
@@ -77,19 +95,25 @@ function buildIframeDoc(template, caseItem, currentUser, today) {
   const year = today.slice(0, 4);
   const dateHan = today.replace(/-/g, ". ") + ".";
 
+  const safeCaseNo = escapeHtml(caseNo);
+  const safeSuspectName = escapeHtml(suspectName);
+  const safeChargeName = escapeHtml(chargeName);
+  const safeProsName = escapeHtml(prosName);
+  const safeDateHan = escapeHtml(dateHan);
+
   // HTML 치환 (정규식 기반 – 가능한 패턴 최대한 커버)
   let body = template.html;
 
   // 사건번호: "2025  0000호" 패턴
   body = body.replace(
     /20\d{2}(\s|&nbsp;){1,12}0+(\s|&nbsp;)*호/gi,
-    `<strong style="color:#1e3a8a">${year}${caseNo}호</strong>`,
+    `<strong style="color:#1e3a8a">${escapeHtml(year)}${safeCaseNo}호</strong>`,
   );
 
   // 날짜: ". . ." 패턴 (nbsp 사이에 점)
   body = body.replace(
     /((&nbsp;|\s){2,}\.\s*){3}/g,
-    `<strong style="color:#1e3a8a">${dateHan}</strong>`,
+    `<strong style="color:#1e3a8a">${safeDateHan}</strong>`,
   );
 
   return `<!DOCTYPE html>
@@ -119,11 +143,11 @@ ${
     ? `
 <div class="auto-fill-bar">
   ✨ 자동입력 적용됨:
-  <span class="fill-chip">사건번호: ${caseNo || "(미지정)"}</span>
-  <span class="fill-chip">피의자: ${suspectName || "(미지정)"}</span>
-  <span class="fill-chip">죄명: ${chargeName || "(미지정)"}</span>
-  <span class="fill-chip">담당검사: ${prosName || "(미지정)"}</span>
-  <span class="fill-chip">날짜: ${dateHan}</span>
+  <span class="fill-chip">사건번호: ${safeCaseNo || "(미지정)"}</span>
+  <span class="fill-chip">피의자: ${safeSuspectName || "(미지정)"}</span>
+  <span class="fill-chip">죄명: ${safeChargeName || "(미지정)"}</span>
+  <span class="fill-chip">담당검사: ${safeProsName || "(미지정)"}</span>
+  <span class="fill-chip">날짜: ${safeDateHan}</span>
 </div>`
     : ""
 }
@@ -131,12 +155,12 @@ ${body}
 <script>
 // 추가 DOM 기반 자동입력
 (function() {
-  const caseNo = ${JSON.stringify(caseNo)};
-  const suspectName = ${JSON.stringify(suspectName)};
-  const chargeName = ${JSON.stringify(chargeName)};
-  const prosName = ${JSON.stringify(prosName)};
-  const dateHan = ${JSON.stringify(dateHan)};
-  const year = ${JSON.stringify(year)};
+  const caseNo = ${escapeScriptJson(caseNo)};
+  const suspectName = ${escapeScriptJson(suspectName)};
+  const chargeName = ${escapeScriptJson(chargeName)};
+  const prosName = ${escapeScriptJson(prosName)};
+  const dateHan = ${escapeScriptJson(dateHan)};
+  const year = ${escapeScriptJson(year)};
 
   // 모든 텍스트 노드 순회하여 패턴 치환
   function replaceTextNode(node) {
@@ -182,9 +206,9 @@ function buildCopyHtml(template, caseItem, currentUser, today) {
   let body = template.html;
   body = body.replace(
     /20\d{2}(\s|&nbsp;){1,12}0+(\s|&nbsp;)*호/gi,
-    `${year}${caseNo}호`,
+    `${escapeHtml(year)}${escapeHtml(caseNo)}호`,
   );
-  body = body.replace(/((&nbsp;|\s){2,}\.\s*){3}/g, dateHan);
+  body = body.replace(/((&nbsp;|\s){2,}\.\s*){3}/g, escapeHtml(dateHan));
 
   return `<style>${template.style}</style>${body}`;
 }

@@ -53,6 +53,39 @@ const GLOBAL_DATA_ROLES = new Set([
   "CHIEF_ADMINISTRATOR",
 ]);
 const APPROVAL_ROLES = new Set([...GLOBAL_DATA_ROLES, "SENIOR_PROSECUTOR"]);
+const MANAGEMENT_ROLE_LEVELS = new Set([
+  "CHIEF_ADMINISTRATOR",
+  "ADMINISTRATOR",
+  "ADMIN_PROBATIONARY",
+]);
+const SECRETARIAT_ROLES = new Set([
+  "SUPER_ADMIN",
+  "PROSECUTOR_GENERAL",
+  "CHIEF_PROSECUTOR",
+  "DEPUTY_CHIEF",
+  "CHIEF_ADMINISTRATOR",
+]);
+const SELF_ROLE_CHANGE_ROLES = new Set([
+  "PROSECUTOR_GENERAL",
+  "CHIEF_PROSECUTOR",
+  "CHIEF_ADMINISTRATOR",
+]);
+const TOP_ROLE_MANAGERS = new Set(["PROSECUTOR_GENERAL", "CHIEF_PROSECUTOR"]);
+const ROLE_AUTHORITY = {
+  PROBATIONARY: 10,
+  PROSECUTOR: 20,
+  ADMIN_PROBATIONARY: 30,
+  ADMINISTRATOR: 40,
+  SENIOR_PROSECUTOR: 50,
+  DEPUTY_CHIEF: 60,
+  CHIEF_ADMINISTRATOR: 60,
+  CHIEF_PROSECUTOR: 70,
+  PROSECUTOR_GENERAL: 80,
+  SUPER_ADMIN: 100,
+};
+const ACCOUNT_ROLE_LEVELS = Object.keys(ROLE_AUTHORITY).filter(
+  (roleLevel) => roleLevel !== "SUPER_ADMIN",
+);
 
 function authRateLimit(req, res, next) {
   const identity = String(req.body?.id || "anonymous").toLowerCase();
@@ -90,7 +123,7 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json({ limit: "256kb" }));
+app.use(express.json({ limit: "10mb" }));
 app.disable("x-powered-by");
 app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -143,11 +176,24 @@ function hasSecretariatWorkAccess(user) {
   );
 }
 
+function isProsecutorGeneral(user) {
+  return Boolean(
+    user?.isSuperAdmin || user?.roleLevel === "PROSECUTOR_GENERAL",
+  );
+}
+
+function normalizePrivateViewerIds(value) {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(value.filter((id) => typeof id === "string" && id.trim())),
+  ].slice(0, 50);
+}
+
 function isAssignableProsecutor(account) {
   return Boolean(
     account &&
     !String(account.dept || "").includes("사무국") &&
-    account.roleLevel !== "CHIEF_ADMINISTRATOR" &&
+    !MANAGEMENT_ROLE_LEVELS.has(account.roleLevel) &&
     account.status === "ACTIVE",
   );
 }
@@ -164,10 +210,15 @@ async function validateCaseAssignee(prosecutorId) {
 async function validateForcedCaseAssignee(prosecutorId) {
   if (!prosecutorId) return false;
   const result = await db.execute({
-    sql: "SELECT status FROM prosecutors WHERE id = ?",
+    sql: "SELECT role_level, dept, status FROM prosecutors WHERE id = ?",
     args: [prosecutorId],
   });
-  return ["ACTIVE", "ON_LEAVE"].includes(result.rows[0]?.status);
+  const account = result.rows[0] && toCamel(result.rows[0]);
+  return (
+    !MANAGEMENT_ROLE_LEVELS.has(account?.roleLevel) &&
+    !String(account?.dept || "").includes("사무국") &&
+    ["ACTIVE", "ON_LEAVE"].includes(account?.status)
+  );
 }
 
 function requireApprovalAuthority(req, res, next) {
@@ -185,11 +236,16 @@ function requireApprovalScope(req, res, next) {
 }
 
 async function requireCaseScope(req, res, next) {
-  if (hasGlobalDataAccess(req.user)) return next();
+  if (isProsecutorGeneral(req.user) || hasSecretariatWorkAccess(req.user)) {
+    return next();
+  }
   const result = await db.execute({
     sql: `SELECT 1 FROM cases c JOIN prosecutors p ON c.prosecutor_id = p.id
-          WHERE c.id = ? AND p.dept = (SELECT dept FROM prosecutors WHERE id = ?)`,
-    args: [req.params.id, req.user.id],
+          WHERE c.id = ? AND ((c.visibility = 'PUBLIC' AND p.dept =
+            (SELECT dept FROM prosecutors WHERE id = ?))
+            OR c.created_by = ? OR c.prosecutor_id = ?
+            OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0)`,
+    args: [req.params.id, req.user.id, req.user.id, req.user.id, req.user.id],
   });
   if (result.rows.length === 0) {
     return res
@@ -215,10 +271,21 @@ async function findCaseForEvidence(caseNo, user) {
 }
 
 function scopedQuery(table, user, orderBy = "rowid DESC") {
-  if (hasGlobalDataAccess(user)) {
+  if (isProsecutorGeneral(user) || hasSecretariatWorkAccess(user)) {
     return {
       sql: `SELECT * FROM ${table} WHERE deleted_at = '' ORDER BY ${orderBy}`,
       args: [],
+    };
+  }
+  if (table === "cases") {
+    return {
+      sql: `SELECT c.* FROM cases c
+            JOIN prosecutors p ON c.prosecutor_id = p.id
+            WHERE c.deleted_at = '' AND
+              ((c.visibility = 'PUBLIC' AND p.dept = (SELECT dept FROM prosecutors WHERE id = ?))
+                OR c.created_by = ? OR c.prosecutor_id = ?)
+            ORDER BY c.${orderBy}`,
+      args: [user.id, user.id, user.id],
     };
   }
   const usesId = table === "cases" || table === "approvals";
@@ -308,6 +375,16 @@ app.post("/api/auth/login", authRateLimit, async (req, res) => {
     JWT_SECRET,
     { expiresIn: "8h" },
   );
+
+  await writeAuditLog({
+    action: "LOGIN",
+    entityType: "system",
+    entityId: safeUser.id,
+    entityLabel: safeUser.name,
+    actorId: safeUser.id,
+    actorName: safeUser.name,
+    detail: "로그인 성공",
+  });
 
   res.json({ success: true, token, user: safeUser });
 });
@@ -466,6 +543,8 @@ app.delete(
 
 app.post("/api/cases", requireAuth, async (req, res) => {
   const c = req.body;
+  const visibility = c.visibility === "PRIVATE" ? "PRIVATE" : "PUBLIC";
+  const privateViewerIds = normalizePrivateViewerIds(c.privateViewerIds);
   const assignedId = hasGlobalDataAccess(req.user)
     ? c.prosecutorId || ""
     : req.user.id;
@@ -482,9 +561,9 @@ app.post("/api/cases", requireAuth, async (req, res) => {
             court1_appealed, court1_appellant, court2_no, court2_dismissed,
             court2_result, court2_doc, court3_appealed, court3_appellant,
             court3_no, court3_remanded, court3_result, court3_doc,
-            notes, content, confiscation, charge_name
+            notes, content, confiscation, charge_name, visibility, created_by, private_viewer_ids
           ) VALUES (
-            ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+            ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
           )`,
     args: [
       id,
@@ -519,6 +598,9 @@ app.post("/api/cases", requireAuth, async (req, res) => {
       c.content || "",
       c.confiscation || "",
       c.chargeName || "",
+      visibility,
+      req.user.id,
+      JSON.stringify(privateViewerIds),
     ],
   });
   await writeAuditLog({
@@ -535,17 +617,42 @@ app.post("/api/cases", requireAuth, async (req, res) => {
 
 app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
   const c = req.body || {};
+  const visibility = c.visibility === "PRIVATE" ? "PRIVATE" : "PUBLIC";
+  const privateViewerIds = normalizePrivateViewerIds(c.privateViewerIds);
   const assignedId = hasGlobalDataAccess(req.user)
     ? String(c.prosecutorId || "")
     : req.user.id;
   const assignedName = hasGlobalDataAccess(req.user)
     ? String(c.prosecutorName || "")
     : req.user.name;
+  if (
+    visibility === "PRIVATE" &&
+    !isProsecutorGeneral(req.user) &&
+    req.user.id !== assignedId
+  ) {
+    return res.status(403).json({
+      success: false,
+      message:
+        "비공개 사건 공개대상은 검찰총장 또는 담당검사만 지정할 수 있습니다.",
+    });
+  }
   const id = String(
     c.id || `CASE-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
   );
   const reportId = `REP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const bookingId = `BKG-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const intakeCaseNo = c.sujeNo || c.hyeongjeNo || "";
+  const evidenceAttachments = Array.isArray(c.evidenceAttachments)
+    ? c.evidenceAttachments
+        .filter(
+          (item) =>
+            item &&
+            typeof item.url === "string" &&
+            item.url.startsWith("data:") &&
+            item.url.length <= 3 * 1024 * 1024,
+        )
+        .slice(0, 10)
+    : [];
   const createdAt = new Date().toISOString().replace("T", " ").substring(0, 16);
   if (assignedId && !(await validateCaseAssignee(assignedId))) {
     return res.status(400).json({
@@ -555,7 +662,7 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
   }
   const caseArgs = [
     id,
-    c.hyeongjeNo || "",
+    intakeCaseNo,
     c.gyeongjeNo || "",
     c.latestHyeongjeNo || "",
     assignedName,
@@ -586,12 +693,15 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
     c.content || "",
     c.confiscation || "",
     c.chargeName || "",
+    visibility,
+    req.user.id,
+    JSON.stringify(privateViewerIds),
   ];
   try {
     await db.batch(
       [
         {
-          sql: `INSERT INTO cases (id,hyeongje_no,gyeongje_no,latest_hyeongje_no,prosecutor_name,prosecutor_id,suspect_name,suspect_uuid,booking_status,booking_date,booking_basis,disposition,re_appeal,court1_no,court1_result,court1_doc,court1_appealed,court1_appellant,court2_no,court2_dismissed,court2_result,court2_doc,court3_appealed,court3_appellant,court3_no,court3_remanded,court3_result,court3_doc,notes,content,confiscation,charge_name) VALUES (${Array(32).fill("?").join(",")})`,
+          sql: `INSERT INTO cases (id,hyeongje_no,gyeongje_no,latest_hyeongje_no,prosecutor_name,prosecutor_id,suspect_name,suspect_uuid,booking_status,booking_date,booking_basis,disposition,re_appeal,court1_no,court1_result,court1_doc,court1_appealed,court1_appellant,court2_no,court2_dismissed,court2_result,court2_doc,court3_appealed,court3_appellant,court3_no,court3_remanded,court3_result,court3_doc,notes,content,confiscation,charge_name,visibility,created_by,private_viewer_ids) VALUES (${Array(35).fill("?").join(",")})`,
           args: caseArgs,
         },
         {
@@ -599,7 +709,7 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
           args: [
             reportId,
             `접수-${Date.now()}`,
-            c.hyeongjeNo || "",
+            intakeCaseNo,
             `${c.chargeName || ""} 사건 접수 건`,
             assignedName,
             c.suspectName || "",
@@ -615,7 +725,7 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
           sql: `INSERT INTO bookings (id,hyeongje_no,prosecutor_name,suspect_name,suspect_uuid,disposition_status,booking_date,basis_url,days_elapsed,indictment_decision) VALUES (?,?,?,?,?,?,?,?,?,?)`,
           args: [
             bookingId,
-            c.hyeongjeNo || "",
+            intakeCaseNo,
             assignedName,
             c.suspectName || "",
             c.suspectUuid || "",
@@ -626,6 +736,20 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
             "수사 진행 중",
           ],
         },
+        ...evidenceAttachments.map((item, index) => ({
+          sql: `INSERT INTO evidence (id, case_no, title, url, evidence_type, record, created_by, created_at, deleted_at)
+                VALUES (?,?,?,?,?,?,?,?,'')`,
+          args: [
+            `EVD-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+            intakeCaseNo,
+            String(item.title || "첨부 증거자료").slice(0, 200),
+            item.url,
+            item.type === "IMAGE" ? "IMAGE" : "DOCUMENT",
+            String(item.record || ""),
+            req.user.id,
+            new Date().toISOString(),
+          ],
+        })),
       ],
       "write",
     );
@@ -1237,13 +1361,17 @@ app.post(
       password,
       note = "",
     } = req.body;
-    const allowedRoles = [
-      "PROSECUTOR",
-      "PROBATIONARY",
-      "SENIOR_PROSECUTOR",
-      "ADMINISTRATOR",
-      "ADMIN_PROBATIONARY",
-    ];
+    const canIssueAllRoles =
+      req.user.isSuperAdmin || req.user.roleLevel === "CHIEF_ADMINISTRATOR";
+    const allowedRoles = canIssueAllRoles
+      ? ACCOUNT_ROLE_LEVELS
+      : [
+          "PROSECUTOR",
+          "PROBATIONARY",
+          "SENIOR_PROSECUTOR",
+          "ADMINISTRATOR",
+          "ADMIN_PROBATIONARY",
+        ];
     if (!id || !name || !password || !allowedRoles.includes(roleLevel)) {
       return res.status(400).json({
         success: false,
@@ -1376,19 +1504,50 @@ app.patch(
         .status(400)
         .json({ success: false, message: "허용되지 않는 직급입니다." });
     }
+    const canManageAnyRole =
+      req.user.isSuperAdmin ||
+      hasSecretariatWorkAccess(req.user) ||
+      TOP_ROLE_MANAGERS.has(req.user.roleLevel);
     if (
       (req.body.roleLevel !== undefined || req.body.rank !== undefined) &&
-      ![
-        "SUPER_ADMIN",
-        "PROSECUTOR_GENERAL",
-        "CHIEF_PROSECUTOR",
-        "DEPUTY_CHIEF",
-        "CHIEF_ADMINISTRATOR",
-      ].includes(req.user.roleLevel)
+      !canManageAnyRole &&
+      !(
+        req.params.id === req.user.id &&
+        SELF_ROLE_CHANGE_ROLES.has(req.user.roleLevel)
+      )
     ) {
       return res
         .status(403)
         .json({ success: false, message: "승진·직급 변경 권한이 필요합니다." });
+    }
+    const canChangeOwnRole =
+      req.user.isSuperAdmin || SELF_ROLE_CHANGE_ROLES.has(req.user.roleLevel);
+    if (
+      (req.body.roleLevel !== undefined || req.body.rank !== undefined) &&
+      req.params.id === req.user.id &&
+      !canChangeOwnRole
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "본인 계정의 직급은 변경할 수 없습니다.",
+      });
+    }
+    if (req.body.roleLevel !== undefined) {
+      const actorAuthority = req.user.isSuperAdmin
+        ? ROLE_AUTHORITY.SUPER_ADMIN
+        : ROLE_AUTHORITY[req.user.roleLevel] || 0;
+      const targetAuthority = ROLE_AUTHORITY[req.body.roleLevel] || 0;
+      if (
+        !targetAuthority ||
+        (!canManageAnyRole &&
+          !(req.params.id === req.user.id && canChangeOwnRole) &&
+          targetAuthority > actorAuthority)
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "본인보다 높은 권한으로 계정을 승격할 수 없습니다.",
+        });
+      }
     }
     if (updates.length === 0)
       return res
@@ -1554,14 +1713,7 @@ app.post("/api/auth/register", authRateLimit, async (req, res) => {
 // ── 8-2. 가입 신청 목록 조회 (검찰사무국 전용) ──────────────────────
 app.get("/api/registrations", requireAuth, async (req, res) => {
   // 검찰사무국 접근 가능 직급 체크
-  const allowed = [
-    "SUPER_ADMIN",
-    "PROSECUTOR_GENERAL",
-    "CHIEF_PROSECUTOR",
-    "DEPUTY_CHIEF",
-    "CHIEF_ADMINISTRATOR",
-  ];
-  const isSecretariat = allowed.includes(req.user.roleLevel);
+  const isSecretariat = SECRETARIAT_ROLES.has(req.user.roleLevel);
 
   if (!isSecretariat) {
     return res
@@ -1594,14 +1746,7 @@ app.put(
   requireAuth,
   requireSecretariat,
   async (req, res) => {
-    const allowed = [
-      "SUPER_ADMIN",
-      "PROSECUTOR_GENERAL",
-      "CHIEF_PROSECUTOR",
-      "DEPUTY_CHIEF",
-      "CHIEF_ADMINISTRATOR",
-    ];
-    const isSecretariat = allowed.includes(req.user.roleLevel);
+    const isSecretariat = SECRETARIAT_ROLES.has(req.user.roleLevel);
 
     if (!isSecretariat) {
       return res
@@ -1700,14 +1845,7 @@ app.put(
 
 // ── 8-4. 가입 신청 거부 ─────────────────────────────────────────────
 app.put("/api/registrations/:id/reject", requireAuth, async (req, res) => {
-  const allowed = [
-    "SUPER_ADMIN",
-    "PROSECUTOR_GENERAL",
-    "CHIEF_PROSECUTOR",
-    "DEPUTY_CHIEF",
-    "CHIEF_ADMINISTRATOR",
-  ];
-  const isSecretariat = allowed.includes(req.user.roleLevel);
+  const isSecretariat = SECRETARIAT_ROLES.has(req.user.roleLevel);
 
   if (!isSecretariat) {
     return res
@@ -1762,19 +1900,27 @@ app.put("/api/registrations/:id/reject", requireAuth, async (req, res) => {
 
 // 공통: 사무국 권한 체크 헬퍼
 function requireSecretariat(req, res, next) {
-  const allowed = [
-    "SUPER_ADMIN",
-    "PROSECUTOR_GENERAL",
-    "CHIEF_PROSECUTOR",
-    "DEPUTY_CHIEF",
-    "CHIEF_ADMINISTRATOR",
-  ];
   const ok =
-    allowed.includes(req.user.roleLevel) || hasSecretariatWorkAccess(req.user);
+    SECRETARIAT_ROLES.has(req.user.roleLevel) ||
+    hasSecretariatWorkAccess(req.user);
   if (!ok) {
     return res
       .status(403)
       .json({ success: false, message: "검찰사무국 권한이 필요합니다." });
+  }
+  next();
+}
+
+function requireLoginRecordAccess(req, res, next) {
+  const allowed =
+    req.user.isSuperAdmin ||
+    MANAGEMENT_ROLE_LEVELS.has(req.user.roleLevel) ||
+    hasSecretariatWorkAccess(req.user);
+  if (!allowed) {
+    return res.status(403).json({
+      success: false,
+      message: "관리용 계정만 로그인 기록을 조회할 수 있습니다.",
+    });
   }
   next();
 }
@@ -1974,14 +2120,7 @@ app.patch("/api/prosecutors/:id/password", requireAuth, async (req, res) => {
   }
 
   // 본인 또는 사무국 관리자만 변경 가능
-  const allowed = [
-    "SUPER_ADMIN",
-    "PROSECUTOR_GENERAL",
-    "CHIEF_PROSECUTOR",
-    "DEPUTY_CHIEF",
-    "CHIEF_ADMINISTRATOR",
-  ];
-  const isAdmin = allowed.includes(req.user.roleLevel);
+  const isAdmin = SECRETARIAT_ROLES.has(req.user.roleLevel);
   const isSelf = req.user.id === id;
 
   if (!isSelf && !isAdmin) {
@@ -2073,7 +2212,7 @@ async function writeAuditLog({
 app.get(
   "/api/audit-logs",
   requireAuth,
-  requireSecretariat,
+  requireLoginRecordAccess,
   async (req, res) => {
     try {
       const result = await db.execute(

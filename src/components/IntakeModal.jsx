@@ -16,6 +16,7 @@ export default function IntakeModal({
   isOpen,
   onClose,
   onSubmitIntake,
+  currentUser,
   prosecutorsList = [],
   ledgerData = [],
   caseNumberSettings = { hyeongjeStart: 280 },
@@ -40,6 +41,7 @@ export default function IntakeModal({
     hyeongjeNo: generateCaseNumber(),
     chargeName: "자본시장법 위반 및 사기",
     bookingStatus: "입건:불구속",
+    visibility: "PUBLIC",
     prosecutorId: "AUTO_ASSIGN",
     bookingBasis: "https://cafe.naver.com/doseonline/",
     content: "",
@@ -64,6 +66,8 @@ export default function IntakeModal({
   const [suspectsList, setSuspectsList] = useState([
     { id: 1, name: "", uuid: "", role: "주범", bookingStatus: "입건:불구속" },
   ]);
+  const [evidenceAttachments, setEvidenceAttachments] = useState([]);
+  const [privateViewerIds, setPrivateViewerIds] = useState([]);
 
   const [mojangLoadingMap, setMojangLoadingMap] = useState({});
   const [mojangStatusMsg, setMojangStatusMsg] = useState(null);
@@ -122,6 +126,35 @@ export default function IntakeModal({
     setSuspectsList((prev) =>
       prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)),
     );
+  };
+
+  const handleEvidenceFiles = (e) => {
+    const files = Array.from(e.target.files || []);
+    const oversized = files.find((file) => file.size > 2 * 1024 * 1024);
+    if (oversized) {
+      alert("첨부 파일은 파일당 2MB 이하만 등록할 수 있습니다.");
+      e.target.value = "";
+      return;
+    }
+    Promise.all(
+      files.map(
+        (file) =>
+          new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () =>
+              resolve({
+                title: file.name,
+                url: reader.result,
+                type: file.type.startsWith("image/") ? "IMAGE" : "DOCUMENT",
+                record: "",
+              });
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          }),
+      ),
+    )
+      .then((attachments) => setEvidenceAttachments(attachments))
+      .catch(() => alert("첨부 파일을 읽지 못했습니다."));
   };
 
   const handleLookupMojangForSuspect = async (suspectId, name) => {
@@ -203,6 +236,8 @@ export default function IntakeModal({
       suspectName: displaySuspectName,
       suspectUuid: primarySuspect.uuid || "",
       suspects: validSuspects,
+      evidenceAttachments,
+      privateViewerIds,
       latestHyeongjeNo: "-",
       bookingDate: new Date().toISOString().split("T")[0],
       disposition: "수사중",
@@ -729,14 +764,100 @@ export default function IntakeModal({
             </div>
           </div>
 
-          {/* Evidence Link */}
           <div>
-            <Label>증거 자료 링크 (네이버 카페 게시글)</Label>
+            <Label>사건 상태</Label>
+            <select
+              className="select-field"
+              value={formData.bookingStatus}
+              onChange={(e) => set("bookingStatus", e.target.value)}
+            >
+              <option value="입건:불구속">입건:불구속</option>
+              <option value="입건:구속">입건:구속</option>
+              <option value="입건 전 조사">입건 전 조사</option>
+            </select>
+          </div>
+
+          <div>
+            <Label>사건 공개 범위</Label>
+            <select
+              className="select-field"
+              value={formData.visibility}
+              onChange={(e) => set("visibility", e.target.value)}
+            >
+              <option value="PUBLIC">공개 사건</option>
+              <option value="PRIVATE">
+                비공개 사건 (담당자·생성자·관리용 계정·검찰총장만 열람)
+              </option>
+            </select>
+          </div>
+
+          {formData.visibility === "PRIVATE" && (
+            <div>
+              <Label>비공개 공개대상 (검찰총장은 자동 공개)</Label>
+              <select
+                className="select-field"
+                multiple
+                value={privateViewerIds}
+                onChange={(e) =>
+                  setPrivateViewerIds(
+                    Array.from(
+                      e.target.selectedOptions,
+                      (option) => option.value,
+                    ),
+                  )
+                }
+                style={{ minHeight: 100 }}
+              >
+                {sortedP.filter(isAssignableProsecutor).map((prosecutor) => (
+                  <option key={prosecutor.id} value={prosecutor.id}>
+                    {prosecutor.name} ({prosecutor.position || prosecutor.title}
+                    )
+                  </option>
+                ))}
+              </select>
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: "0.7rem",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Ctrl 또는 Shift를 사용해 여러 명을 선택할 수 있습니다.
+                담당검사와 사건 생성자는 자동으로 열람합니다.
+              </div>
+            </div>
+          )}
+
+          {/* Intake Basis Link */}
+          <div>
+            <Label>접수근거 (네이버 카페 게시글)</Label>
             <input
               className="input-field"
               value={formData.bookingBasis}
               onChange={(e) => set("bookingBasis", e.target.value)}
             />
+          </div>
+
+          <div>
+            <Label>증거자료 첨부 (파일당 최대 2MB)</Label>
+            <input
+              className="input-field"
+              type="file"
+              multiple
+              accept="image/*,.pdf,.txt,.doc,.docx,.xls,.xlsx"
+              onChange={handleEvidenceFiles}
+            />
+            {evidenceAttachments.length > 0 && (
+              <div
+                style={{
+                  marginTop: 6,
+                  fontSize: "0.72rem",
+                  color: "var(--text-muted)",
+                }}
+              >
+                {evidenceAttachments.map((file) => file.title).join(", ")}
+              </div>
+            )}
           </div>
 
           {/* Submit buttons */}

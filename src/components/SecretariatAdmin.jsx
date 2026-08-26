@@ -5887,6 +5887,8 @@ const PREVIEW_COLS = [
   { key: "접수일시", label: "접수일시" },
   { key: "처분내용", label: "처분내용" },
 ];
+const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_IMPORT_ROWS = 5000;
 
 function ExcelImportTab({ onBulkImport }) {
   const [rows, setRows] = useState([]);
@@ -5905,15 +5907,25 @@ function ExcelImportTab({ onBulkImport }) {
       setError(".xlsx 또는 .xls 파일만 지원합니다.");
       return;
     }
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      setError("엑셀 파일은 10MB 이하만 업로드할 수 있습니다.");
+      return;
+    }
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const wb = XLSX.read(new Uint8Array(e.target.result), {
           type: "array",
+          cellFormula: false,
+          cellHTML: false,
+          sheetRows: MAX_IMPORT_ROWS + 1,
         });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws, { defval: "" });
+        const data = XLSX.utils.sheet_to_json(ws, {
+          defval: "",
+          raw: false,
+        });
         // 헤더 행(예시 행)과 빈 행 필터링
         const filtered = data.filter((r) => {
           const key = r["형제번호"] || r["수제번호"] || "";

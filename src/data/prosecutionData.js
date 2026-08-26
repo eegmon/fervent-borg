@@ -52,6 +52,15 @@ export const ROLE_LABELS = {
   ADMIN_PROBATIONARY: "검찰사무관시보",
 };
 
+export function isManagementAccount(account) {
+  return Boolean(
+    account?.dept?.includes("사무국") ||
+    ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY"].includes(
+      account?.roleLevel,
+    ),
+  );
+}
+
 export const ROLE_COLORS = {
   SUPER_ADMIN: "#f59e0b", // 최고 관리자 — 골드
   PROSECUTOR_GENERAL: "#dc2626", // 최고 — 빨강

@@ -33,6 +33,44 @@ import RegisterModal from "./components/RegisterModal";
 import AuditLogViewer from "./components/AuditLogViewer";
 import Toast from "./components/Toast";
 
+function formatIntakeNotice(data) {
+  const chargeName = (data.chargeName || "-")
+    .replace(/(?:주위적|예비적):\s*/g, "")
+    .replace(/\s*\/\s*/g, ", ");
+  const date = data.bookingDate
+    ? new Date(`${data.bookingDate}T00:00:00`).toLocaleDateString("ko-KR", {
+        year: "2-digit",
+        month: "2-digit",
+        day: "2-digit",
+      })
+    : "-";
+  const prosecutorContact = data.prosecutorDiscordId
+    ? ` (@${data.prosecutorDiscordId})`
+    : "";
+
+  return `**[신건 접수 통지]**
+> 사건번호 | ${data.caseNo} 호
+아래와 같이 배당합니다.
+사건내용 ${data.caseNo} ${chargeName}
+피의자명 ${data.suspectName || "-"} ( UUID: ${data.suspectUuid || "-"} )
+접수일시 ${date}
+접수근거 [관련 게시물](${data.bookingBasis || ""})
+담당검사 ${data.prosecutorName || "-"}${prosecutorContact}
+--- 이 하 여 백 ---`;
+}
+
+function formatLegacyIntakeNotice(data, registrantName, registrantTitle) {
+  return `[도스온라인 검찰사무국]
+[사건접수배당 알림]
+
+${data.caseNo}
+담당검사 ${data.prosecutorName || "-"}
+
+검찰청에서는 사건접수배당 외에도 사건처분 결과, 구공판 되는 경우 공판개시 및 재판결과를 귀하에게 통지해드릴 예정입니다.
+
+도스온라인 검찰청 검찰사무국 ${registrantTitle || ""} ${registrantName || ""}`;
+}
+
 import {
   INITIAL_MAIN_LEDGER,
   INITIAL_REPORTS,
@@ -41,6 +79,7 @@ import {
   INITIAL_APPROVALS,
   INITIAL_DEPARTMENTS,
   calculateStatuteOfLimitations,
+  isManagementAccount,
 } from "./data/prosecutionData";
 
 import {
@@ -209,7 +248,13 @@ export default function App() {
         fetchReports(),
         fetchAppeals(),
         fetchBookings(),
-        fetchAuditLogs(),
+        currentUser.isSuperAdmin ||
+        currentUser.dept?.includes("사무국") ||
+        ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY"].includes(
+          currentUser.roleLevel,
+        )
+          ? fetchAuditLogs()
+          : Promise.resolve([]),
         fetchNextDocNo(),
         fetchProsecutors(),
         fetchCaseNumberSettings(),
@@ -238,6 +283,10 @@ export default function App() {
     loadDbData();
   }, [currentUser]);
 
+  const operationalProsecutorsList = prosecutorsList.filter(
+    (prosecutor) => !isManagementAccount(prosecutor),
+  );
+
   const pendingApprovalsCount = approvalsData.filter((a) =>
     a.status.includes("대기"),
   ).length;
@@ -253,6 +302,15 @@ export default function App() {
       currentUser.roleLevel === "CHIEF_ADMINISTRATOR" ||
       (currentUser.dept && currentUser.dept.includes("사무국")));
 
+  const canViewLoginRecords = Boolean(
+    currentUser &&
+    (currentUser.isSuperAdmin ||
+      currentUser.dept?.includes("사무국") ||
+      ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY"].includes(
+        currentUser.roleLevel,
+      )),
+  );
+
   const isProsecutorInUserDept = (prosecutorNameOrId) => {
     if (isGlobalAdmin || !currentUser) return true;
     const pUser = prosecutorsList.find(
@@ -265,35 +323,20 @@ export default function App() {
     return pUser ? pUser.dept === currentUser.dept : true;
   };
 
-  const scopedLedgerData = isGlobalAdmin
-    ? ledgerData
-    : ledgerData.filter(
-        (item) =>
-          isProsecutorInUserDept(item.prosecutorName) ||
-          item.prosecutorId === currentUser?.id,
-      );
+  const scopeRecords = (records, includeOwnRecord = false) => {
+    if (isGlobalAdmin) return records;
+    return records.filter(
+      (item) =>
+        isProsecutorInUserDept(item.prosecutorName) ||
+        (includeOwnRecord && item.prosecutorId === currentUser?.id),
+    );
+  };
 
-  const scopedApprovalsData = isGlobalAdmin
-    ? approvalsData
-    : approvalsData.filter(
-        (item) =>
-          isProsecutorInUserDept(item.prosecutorName) ||
-          item.prosecutorId === currentUser?.id,
-      );
-
-  const scopedReportsData = isGlobalAdmin
-    ? reportsData
-    : reportsData.filter((item) => isProsecutorInUserDept(item.prosecutorName));
-
-  const scopedAppealsData = isGlobalAdmin
-    ? appealsData
-    : appealsData.filter((item) => isProsecutorInUserDept(item.prosecutorName));
-
-  const scopedBookingsData = isGlobalAdmin
-    ? bookingsData
-    : bookingsData.filter((item) =>
-        isProsecutorInUserDept(item.prosecutorName),
-      );
+  const scopedLedgerData = scopeRecords(ledgerData, true);
+  const scopedApprovalsData = scopeRecords(approvalsData, true);
+  const scopedReportsData = scopeRecords(reportsData);
+  const scopedAppealsData = scopeRecords(appealsData);
+  const scopedBookingsData = scopeRecords(bookingsData);
 
   // Handler: Login Success (Persists Session — password 필드 제외)
   const handleLoginSuccess = async (user, authResult = null) => {
@@ -871,9 +914,18 @@ export default function App() {
 
     const assignedCaseNo = persistedCase.sujeNo || persistedCase.hyeongjeNo;
     setIntakeNoticeData({
-      sujeNo: assignedCaseNo,
-      prosecutorName: persistedCase.prosecutorName,
+      caseNo: assignedCaseNo,
+      chargeName: persistedCase.chargeName || newCase.chargeName,
+      suspectName: persistedCase.suspectName || newCase.suspectName,
+      suspectUuid: persistedCase.suspectUuid || newCase.suspectUuid,
+      bookingDate: persistedCase.bookingDate || newCase.bookingDate,
+      bookingBasis: persistedCase.bookingBasis || newCase.bookingBasis,
+      prosecutorName: persistedCase.prosecutorName || newCase.prosecutorName,
+      prosecutorDiscordId:
+        persistedCase.prosecutorDiscordId || newCase.prosecutorDiscordId,
       registrantName: currentUser?.name || "",
+      registrantTitle:
+        currentUser?.title || currentUser?.position || "검찰사무원",
     });
 
     showToast(
@@ -1148,6 +1200,7 @@ export default function App() {
         onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
         totalAlertsCount={totalDeadlineAlertsCount}
         isGlobalAdmin={isGlobalAdmin}
+        canViewLoginRecords={canViewLoginRecords}
       />
 
       {/* Main Container */}
@@ -1487,7 +1540,7 @@ export default function App() {
               <MyCasesLedger
                 ledgerData={ledgerData}
                 currentUser={currentUser}
-                prosecutorsList={prosecutorsList}
+                prosecutorsList={operationalProsecutorsList}
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
@@ -1509,7 +1562,7 @@ export default function App() {
             {activeTab === "warrants" && (
               <WarrantLedger
                 currentUser={currentUser}
-                prosecutorsList={prosecutorsList}
+                prosecutorsList={operationalProsecutorsList}
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
@@ -1523,7 +1576,7 @@ export default function App() {
               <MainLedger
                 ledgerData={scopedLedgerData}
                 departmentsData={departmentsData}
-                prosecutorsList={prosecutorsList}
+                prosecutorsList={operationalProsecutorsList}
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
@@ -1553,7 +1606,7 @@ export default function App() {
                 ledgerData={scopedLedgerData}
                 nextDocNo={nextDocNo}
                 onToast={showToast}
-                prosecutorsList={prosecutorsList}
+                prosecutorsList={operationalProsecutorsList}
                 onUpdateProsecutorStatus={handleUpdateProsecutorStatus}
               />
             )}
@@ -1615,7 +1668,7 @@ export default function App() {
               <AppealLedger
                 appeals={scopedAppealsData}
                 ledgerData={scopedLedgerData}
-                prosecutorsList={prosecutorsList}
+                prosecutorsList={operationalProsecutorsList}
                 currentUser={currentUser}
                 onAddAppeal={handleAddAppeal}
                 onUpdateAppeal={handleUpdateAppeal}
@@ -1656,7 +1709,7 @@ export default function App() {
               <AnalyticsDashboard ledgerData={scopedLedgerData} />
             )}
 
-            {activeTab === "auditlog" && isGlobalAdmin && (
+            {activeTab === "auditlog" && canViewLoginRecords && (
               <AuditLogViewer auditLogs={auditLogs} />
             )}
           </>
@@ -1683,7 +1736,8 @@ export default function App() {
         isOpen={isIntakeModalOpen}
         onClose={() => setIsIntakeModalOpen(false)}
         onSubmitIntake={handleAddIntake}
-        prosecutorsList={prosecutorsList}
+        currentUser={currentUser}
+        prosecutorsList={operationalProsecutorsList}
         ledgerData={ledgerData}
         caseNumberSettings={caseNumberSettings}
         chargesData={chargesData}
@@ -1777,46 +1831,81 @@ export default function App() {
                 border: "1px solid #cbd5e1",
               }}
             >
-              {`[도스온라인 검찰사무국]
-[사건접수배당 알림]
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>
+                기존 사건접수배당 알림
+              </div>
+              <div style={{ whiteSpace: "pre-wrap" }}>
+                {formatLegacyIntakeNotice(
+                  intakeNoticeData,
+                  intakeNoticeData.registrantName || currentUser?.name,
+                  intakeNoticeData.registrantTitle ||
+                    currentUser?.title ||
+                    currentUser?.position,
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    formatLegacyIntakeNotice(
+                      intakeNoticeData,
+                      intakeNoticeData.registrantName || currentUser?.name,
+                      intakeNoticeData.registrantTitle ||
+                        currentUser?.title ||
+                        currentUser?.position,
+                    ),
+                  );
+                  showToast("기존 알림 문구가 복사되었습니다.", "success");
+                }}
+                className="btn btn-secondary"
+                style={{
+                  marginTop: 12,
+                  padding: "8px 14px",
+                  fontSize: "0.8rem",
+                }}
+              >
+                기존 알림 문구 복사
+              </button>
+            </div>
 
-${intakeNoticeData.sujeNo}
-담당검사 ${intakeNoticeData.prosecutorName}
-
-검찰청에서는 사건접수배당 외에도 사건처분 결과, 구공판 되는 경우 공판개시 및 재판결과를 귀하에게 통지해드릴 예정입니다.
-
-도스온라인 검찰청 검찰사무국 검찰사무원 ${intakeNoticeData.registrantName || currentUser?.name || ""}`}
+            <div
+              style={{
+                background: "#fff",
+                color: "#000",
+                padding: 20,
+                borderRadius: 8,
+                fontSize: "0.88rem",
+                lineHeight: 1.7,
+                fontFamily: "'Noto Sans KR', sans-serif",
+                whiteSpace: "pre-wrap",
+                marginBottom: 16,
+                border: "1px solid #cbd5e1",
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>
+                신규 신건 접수 통지
+              </div>
+              {formatIntakeNotice(intakeNoticeData)}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    formatIntakeNotice(intakeNoticeData),
+                  );
+                  showToast("신건 접수 통지 문구가 복사되었습니다.", "success");
+                }}
+                className="btn btn-gold"
+                style={{
+                  marginTop: 12,
+                  padding: "8px 14px",
+                  fontSize: "0.8rem",
+                }}
+              >
+                신건 접수 통지 복사
+              </button>
             </div>
 
             <div
               style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}
             >
-              <button
-                onClick={() => {
-                  const textToCopy = `[도스온라인 검찰사무국]
-[사건접수배당 알림]
-
-${intakeNoticeData.sujeNo}
-담당검사 ${intakeNoticeData.prosecutorName}
-
-검찰청에서는 사건접수배당 외에도 사건처분 결과, 구공판 되는 경우 공판개시 및 재판결과를 귀하에게 통지해드릴 예정입니다.
-
-도스온라인 검찰청 검찰사무국 검찰사무원 ${intakeNoticeData.registrantName || currentUser?.name || ""}`;
-                  navigator.clipboard.writeText(textToCopy);
-                  showToast(
-                    "📋 사건접수배당 알림 문구가 클립보드에 복사되었습니다!",
-                    "success",
-                  );
-                }}
-                className="btn btn-gold"
-                style={{
-                  padding: "10px 18px",
-                  fontWeight: 800,
-                  fontSize: "0.85rem",
-                }}
-              >
-                📋 알림 문구 전체 복사
-              </button>
               <button
                 onClick={() => setIntakeNoticeData(null)}
                 className="btn btn-secondary"

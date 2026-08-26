@@ -7,12 +7,12 @@
  *   TURSO_AUTH_TOKEN    — Turso 인증 토큰
  *
  * 로컬 개발 시 TURSO_DATABASE_URL을 설정하지 않으면
- * 인메모리 SQLite(:memory:)로 자동 폴백합니다.
+ * database/dose-pros.db 파일형 SQLite로 자동 폴백합니다.
  */
 import { createClient } from "@libsql/client";
 import "dotenv/config";
 
-const url = process.env.TURSO_DATABASE_URL || ":memory:";
+const url = process.env.TURSO_DATABASE_URL || "file:./database/dose-pros.db";
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
 if (
@@ -24,9 +24,7 @@ if (
   );
 }
 
-export const db = createClient(
-  url === ":memory:" ? { url } : { url, authToken },
-);
+export const db = createClient({ url, authToken });
 
 /** 테이블 생성 및 초기 시드 (최초 1회) */
 export async function initDb() {
@@ -104,6 +102,9 @@ export async function initDb() {
       content             TEXT,
       confiscation        TEXT,
       charge_name         TEXT,
+      visibility          TEXT DEFAULT 'PUBLIC',
+      created_by          TEXT DEFAULT '',
+      private_viewer_ids  TEXT DEFAULT '[]',
       created_at          TEXT DEFAULT (datetime('now'))
     )
   `);
@@ -111,6 +112,9 @@ export async function initDb() {
     "supervisor_designated INTEGER DEFAULT 0",
     "supervisor_id TEXT DEFAULT ''",
     "supervisor_name TEXT DEFAULT ''",
+    "visibility TEXT DEFAULT 'PUBLIC'",
+    "created_by TEXT DEFAULT ''",
+    "private_viewer_ids TEXT DEFAULT '[]'",
   ]) {
     try {
       await db.execute(`ALTER TABLE cases ADD COLUMN ${column}`);

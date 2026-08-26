@@ -278,6 +278,7 @@ export default function MainLedger({
             <option value="ALL">전체 입건 상태</option>
             <option value="구속">구속</option>
             <option value="불구속">불구속</option>
+            <option value="입건 전 조사">입건 전 조사</option>
           </select>
           <select
             className="select-field"
@@ -642,7 +643,9 @@ export default function MainLedger({
                           e.stopPropagation();
                           onSelectEvidence(
                             item.bookingBasis,
-                            item.hyeongjeNo && item.hyeongjeNo !== "-" ? item.hyeongjeNo : item.sujeNo || item.gyeongjeNo,
+                            item.hyeongjeNo && item.hyeongjeNo !== "-"
+                              ? item.hyeongjeNo
+                              : item.sujeNo || item.gyeongjeNo,
                             item.suspectName,
                           );
                         }}

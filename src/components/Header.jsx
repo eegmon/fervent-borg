@@ -45,6 +45,7 @@ export default function Header({
   onOpenTemplateModal,
   totalAlertsCount = 0,
   isGlobalAdmin = false,
+  canViewLoginRecords = false,
 }) {
   return (
     <header
@@ -297,8 +298,8 @@ export default function Header({
         }}
       >
         {TABS.map((tab) => {
-          // adminOnly 탭은 전역 관리자만 표시
-          if (tab.adminOnly && !isGlobalAdmin) return null;
+          // 감사 로그는 관리용 계정만 표시
+          if (tab.adminOnly && !canViewLoginRecords) return null;
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
