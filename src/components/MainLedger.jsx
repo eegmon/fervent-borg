@@ -75,6 +75,7 @@ export default function MainLedger({
   onDesignateCase,
   onUndesignateCase,
   onOpenTimeline,
+  onOpenMemo,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -711,6 +712,23 @@ export default function MainLedger({
                     >
                       <Clock size={12} />
                       타임라인
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenMemo && onOpenMemo(item);
+                      }}
+                      className="btn btn-outline"
+                      style={{
+                        padding: "5px 10px",
+                        fontSize: "0.75rem",
+                        color: "#34d399",
+                        border: "1px solid rgba(52,211,153,0.35)",
+                      }}
+                    >
+                      <MessageSquare size={12} />
+                      메모
                     </button>
 
                     <button

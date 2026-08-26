@@ -1625,6 +1625,7 @@ export default function App() {
                   setSuspectHistoryName(suspectName)
                 }
                 onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
+                onOpenMemo={(caseItem) => setMemoCaseItem(caseItem)}
                 onCreateApproval={handleCreateApprovalForCase}
                 onUpdateCase={handleUpdateCase}
                 currentRole={currentUser?.id || ""}
@@ -1810,6 +1811,14 @@ export default function App() {
         approvalsData={approvalsData}
         appealsData={appealsData}
         onSelectEvidence={(url, caseNo, suspectName) => setEvidenceModalInfo({ url, caseNo, suspectName })}
+      />
+
+      <CaseMemoModal
+        isOpen={!!memoCaseItem}
+        onClose={() => setMemoCaseItem(null)}
+        caseItem={memoCaseItem}
+        currentUser={currentUser}
+        onToast={showToast}
       />
 
       <DeadlineAlertModal

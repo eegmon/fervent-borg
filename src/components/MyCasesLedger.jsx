@@ -704,6 +704,7 @@ export default function MyCasesLedger({
   onDesignateCase,
   onUndesignateCase,
   onOpenTimeline,
+  onOpenMemo,
 }) {
   const [selectedProsecutorFilter, setSelectedProsecutorFilter] = useState(
     currentUser?.name || "",
@@ -1508,6 +1509,20 @@ export default function MyCasesLedger({
                       }}
                     >
                       <Clock size={13} /> 사건 타임라인
+                    </button>
+
+                    <button
+                      onClick={() => onOpenMemo && onOpenMemo(item)}
+                      className="btn btn-outline"
+                      style={{
+                        fontSize: "0.78rem",
+                        padding: "5px 12px",
+                        color: "#34d399",
+                        border: "1px solid rgba(52,211,153,0.35)",
+                        gap: 5,
+                      }}
+                    >
+                      <MessageSquare size={13} /> 수사 메모
                     </button>
 
                     <button
