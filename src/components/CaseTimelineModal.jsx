@@ -46,10 +46,16 @@ export default function CaseTimelineModal({
     );
 
     Promise.all([
-      fetchWarrants(targetCaseNo).catch(() => []),
+      fetchWarrants().catch(() => []),
       fetchEvidence(targetCaseNo).catch(() => []),
     ]).then(([wData, eData]) => {
-      setWarrants(Array.isArray(wData) ? wData : []);
+      // fetchWarrants는 전체 목록을 반환하므로 해당 사건 번호로 클라이언트 필터링
+      const filteredWarrants = Array.isArray(wData)
+        ? wData.filter((w) =>
+            caseNos.includes(w.hyeongjeNo) || caseNos.includes(w.sujeNo),
+          )
+        : [];
+      setWarrants(filteredWarrants);
       setEvidence(Array.isArray(eData) ? eData : []);
       setLoading(false);
     });
@@ -284,6 +290,12 @@ export default function CaseTimelineModal({
   events.sort((a, b) => new Date(a.date) - new Date(b.date));
 
   // Determine current active stage index
+  const hasIntake = events.some((e) => e.stage === "INTAKE");
+  const hasWarrant = events.some((e) => e.stage === "WARRANT");
+  const hasApproval =
+    events.some((e) => e.stage === "APPROVAL") ||
+    events.some((e) => e.stage === "EVIDENCE");
+  const hasDisposition = events.some((e) => e.stage === "DISPOSITION");
   const hasCourt = Boolean(
     (caseItem.court1No && caseItem.court1No !== "-") ||
     (caseItem.court2No && caseItem.court2No !== "-") ||
@@ -608,7 +620,7 @@ export default function CaseTimelineModal({
                         ))}
                         {evt.url && (
                           <button
-                            onClick={() => onSelectEvidence?.(evt.url, hyeongjeNo, caseItem.suspectName)}
+                            onClick={() => onSelectEvidence?.(evt.url, caseItem.hyeongjeNo, caseItem.suspectName)}
                             style={{
                               background: "none",
                               border: "none",

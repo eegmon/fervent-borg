@@ -640,12 +640,11 @@ export default function MainLedger({
                         </span>
                       )}
 
-                    {item.bookingBasis?.includes("http") && (
-                      <button
+                    <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onSelectEvidence(
-                            item.bookingBasis,
+                            item.bookingBasis || "",
                             item.hyeongjeNo && item.hyeongjeNo !== "-"
                               ? item.hyeongjeNo
                               : item.sujeNo || item.hyeongjeNo,
@@ -663,7 +662,6 @@ export default function MainLedger({
                         <ExternalLink size={12} />
                         증거
                       </button>
-                    )}
 
                     {/* 수정 버튼 — 결재 필수 사건은 잠금 표시 */}
                     <button

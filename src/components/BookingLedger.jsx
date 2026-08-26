@@ -53,12 +53,10 @@ export default function BookingLedger({ bookings, onSelectEvidence, onSelectSusp
                   </td>
                   <td style={{ maxWidth: 160 }}><div style={{ whiteSpace: 'normal', lineHeight: 1.4 }}>{b.indictmentDecision}</div></td>
                   <td>
-                    {b.basisUrl?.includes('http') && (
-                      <button onClick={() => onSelectEvidence(b.basisUrl, b.hyeongjeNo, b.suspectName)}
-                        className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.72rem', color: 'var(--primary-amber)', border: '1px solid rgba(245,158,11,0.3)' }}>
-                        <ExternalLink size={12} />카페
-                      </button>
-                    )}
+                    <button onClick={() => onSelectEvidence(b.basisUrl || "", b.hyeongjeNo, b.suspectName)}
+                      className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.72rem', color: 'var(--primary-amber)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                      <ExternalLink size={12} />증거
+                    </button>
                   </td>
                 </tr>
               ))}

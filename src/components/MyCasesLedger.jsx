@@ -1509,13 +1509,14 @@ export default function MyCasesLedger({
                       <Clock size={13} /> 사건 타임라인
                     </button>
 
-                    {item.bookingBasis?.includes("http") && (
-                      <button
+                    <button
                         onClick={() =>
                           onSelectEvidence &&
                           onSelectEvidence(
-                            item.bookingBasis,
-                            item.hyeongjeNo,
+                            item.bookingBasis || "",
+                            item.hyeongjeNo && item.hyeongjeNo !== "-"
+                              ? item.hyeongjeNo
+                              : item.sujeNo || item.hyeongjeNo,
                             item.suspectName,
                           )
                         }
@@ -1530,7 +1531,6 @@ export default function MyCasesLedger({
                       >
                         <ExternalLink size={13} /> 증거 보관함
                       </button>
-                    )}
                   </div>
                   <button
                     onClick={() => setEditingCase(item)}
