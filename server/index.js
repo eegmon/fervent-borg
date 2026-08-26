@@ -143,7 +143,7 @@ async function requireAuth(req, res, next) {
   try {
     const claims = jwt.verify(header.slice(7), JWT_SECRET);
     const result = await db.execute({
-      sql: "SELECT id, name, role_level, dept, status, is_super_admin, dual_dept, dual_role_level, dual_secretariat_work FROM prosecutors WHERE id = ?",
+      sql: "SELECT id, name, role_level, dept, status, is_super_admin, dual_dept, dual_role_level, dual_secretariat_work, can_arbitrary_approve FROM prosecutors WHERE id = ?",
       args: [claims.id],
     });
     if (result.rows.length === 0 || result.rows[0].status !== "ACTIVE") {
@@ -156,6 +156,7 @@ async function requireAuth(req, res, next) {
       ...claims,
       ...account,
       isSuperAdmin: Boolean(account.isSuperAdmin),
+      canArbitraryApprove: Boolean(account.canArbitraryApprove),
     };
     next();
   } catch {
@@ -176,6 +177,16 @@ function hasSecretariatWorkAccess(user) {
   );
 }
 
+function isManagementAccount(account) {
+  return Boolean(
+    account?.isSuperAdmin ||
+    String(account?.dept || "").includes("사무국") ||
+    ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY"].includes(
+      account?.roleLevel,
+    ),
+  );
+}
+
 function isProsecutorGeneral(user) {
   return Boolean(
     user?.isSuperAdmin || user?.roleLevel === "PROSECUTOR_GENERAL",
@@ -187,6 +198,10 @@ function normalizePrivateViewerIds(value) {
   return [
     ...new Set(value.filter((id) => typeof id === "string" && id.trim())),
   ].slice(0, 50);
+}
+
+function isPreBookingInvestigation(status) {
+  return String(status || "").trim() === "입건 전 조사";
 }
 
 function isAssignableProsecutor(account) {
@@ -413,6 +428,7 @@ app.get("/api/settings/case-number", requireAuth, async (req, res) => {
     teughyeongStart: getStart("case_number_teughyeong_start"),
     teugapjeStart: getStart("case_number_teugapje_start"),
     apjeStart: getStart("case_number_apje_start"),
+    naesaStart: getStart("case_number_naesa_start"),
   });
 });
 
@@ -428,6 +444,7 @@ app.patch(
       teughyeong: Number(req.body.teughyeongStart),
       teugapje: Number(req.body.teugapjeStart),
       apje: Number(req.body.apjeStart),
+      naesa: Number(req.body.naesaStart),
     };
     if (
       Object.values(starts).some(
@@ -454,6 +471,7 @@ app.patch(
       teughyeongStart: starts.teughyeong,
       teugapjeStart: starts.teugapje,
       apjeStart: starts.apje,
+      naesaStart: starts.naesa,
     });
   },
 );
@@ -641,7 +659,32 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
   );
   const reportId = `REP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const bookingId = `BKG-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const intakeCaseNo = c.sujeNo || c.hyeongjeNo || "";
+  const isPreInvestigation = isPreBookingInvestigation(c.bookingStatus);
+  let intakeCaseNo = c.sujeNo || c.hyeongjeNo || "";
+  if (isPreInvestigation) {
+    const year = new Date().getFullYear();
+    const [settingResult, existingCases] = await Promise.all([
+      db.execute({
+        sql: "SELECT value FROM system_settings WHERE key='case_number_naesa_start'",
+        args: [],
+      }),
+      db.execute({
+        sql: "SELECT hyeongje_no FROM cases WHERE hyeongje_no LIKE ?",
+        args: [`${year}내사%`],
+      }),
+    ]);
+    const configuredStart = Math.max(
+      1,
+      Number(settingResult.rows[0]?.value) || 1,
+    );
+    const maxExisting = existingCases.rows.reduce((max, row) => {
+      const match = String(row.hyeongje_no || "").match(
+        new RegExp(`^${year}내사(\\d+)$`),
+      );
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, configuredStart - 1);
+    intakeCaseNo = `${year}내사${Math.max(configuredStart, maxExisting + 1)}`;
+  }
   const evidenceAttachments = Array.isArray(c.evidenceAttachments)
     ? c.evidenceAttachments
         .filter(
@@ -767,6 +810,8 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
       case: {
         ...c,
         id,
+        sujeNo: intakeCaseNo,
+        hyeongjeNo: isPreInvestigation ? "-" : c.hyeongjeNo,
         prosecutorId: assignedId,
         prosecutorName: assignedName,
       },
@@ -1288,6 +1333,12 @@ app.put(
   requireApprovalAuthority,
   requireApprovalScope,
   async (req, res) => {
+    if (req.body?.mode === "ARBITRARY" && !req.user.canArbitraryApprove) {
+      return res.status(403).json({
+        success: false,
+        message: "전결 권한이 설정되지 않은 계정입니다.",
+      });
+    }
     const docId = req.params.id;
     const docRes = await db.execute({
       sql: "SELECT * FROM approvals WHERE id = ?",
@@ -1299,6 +1350,20 @@ app.put(
     }
 
     const doc = toCamel(docRes.rows[0]);
+    if (req.body?.mode === "ARBITRARY") {
+      const caseRes = await db.execute({
+        sql: `SELECT supervisor_designated FROM cases
+              WHERE (hyeongje_no = ? OR gyeongje_no = ?) AND deleted_at = ''
+              LIMIT 1`,
+        args: [doc.hyeongjeNo || "", doc.hyeongjeNo || ""],
+      });
+      if (Number(caseRes.rows[0]?.supervisor_designated) === 1) {
+        return res.status(403).json({
+          success: false,
+          message: "결재 필수 지정 사건은 전결 승인할 수 없습니다.",
+        });
+      }
+    }
     const now = new Date().toISOString().replace("T", " ").substring(0, 16);
     const updatedApprovals = JSON.parse(doc.approvalsJson || "[]").map((a) => ({
       ...a,
@@ -1336,9 +1401,14 @@ app.put(
 // ════════════════════════════════════════════════════════════════════
 app.get("/api/prosecutors", requireAuth, async (req, res) => {
   const result = await db.execute("SELECT * FROM prosecutors");
+  const canViewManagementAccounts =
+    req.user.isSuperAdmin || SECRETARIAT_ROLES.has(req.user.roleLevel);
+  const visibleRows = canViewManagementAccounts
+    ? result.rows
+    : result.rows.filter((row) => !isManagementAccount(toCamel(row)));
   // 비밀번호 필드 제외 후 반환
   res.json(
-    result.rows.map((row) => {
+    visibleRows.map((row) => {
       const { password: _pw, ...safe } = toCamel(row);
       return safe;
     }),
@@ -1479,6 +1549,7 @@ app.patch(
       dualRoleLevel: "dual_role_level",
       dualSecretariatWork: "dual_secretariat_work",
       isAutoAssignExcluded: "is_auto_assign_excluded",
+      canArbitraryApprove: "can_arbitrary_approve",
       position: "position",
       title: "title",
     };

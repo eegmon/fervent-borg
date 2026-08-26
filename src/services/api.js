@@ -226,8 +226,11 @@ export function updateApprovalApi(id, approvalData) {
   });
 }
 
-export function approveDocApi(docId) {
-  return apiFetch(`/approvals/${docId}/approve`, { method: "PUT" });
+export function approveDocApi(docId, mode = "STANDARD") {
+  return apiFetch(`/approvals/${docId}/approve`, {
+    method: "PUT",
+    body: JSON.stringify({ mode }),
+  });
 }
 
 // ════════════════════════════════════════════════════════════════════

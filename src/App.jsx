@@ -155,6 +155,7 @@ export default function App() {
     teughyeongStart: 1,
     teugapjeStart: 1,
     apjeStart: 1,
+    naesaStart: 1,
   });
 
   // 감사 로그
@@ -951,7 +952,14 @@ export default function App() {
 
   // Handler: Approve E-Approval Document (Persists to DB)
   const handleApproveDoc = async (docId, userId, mode, customDoc) => {
-    await approveDocApi(docId);
+    const result = await approveDocApi(docId, mode);
+    if (!result?.success) {
+      showToast(
+        `❌ 결재 처리 실패: ${result?.message || "서버 오류"}`,
+        "error",
+      );
+      return;
+    }
 
     setApprovalsData((prev) =>
       prev.map((doc) => {
@@ -1721,7 +1729,7 @@ export default function App() {
         isOpen={isLoginModalOpen}
         onLoginSuccess={handleLoginSuccess}
         onClose={() => setIsLoginModalOpen(false)}
-        prosecutorsList={prosecutorsList}
+        prosecutorsList={operationalProsecutorsList}
         departmentsData={departmentsData}
       />
 

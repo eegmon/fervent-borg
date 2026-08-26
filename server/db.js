@@ -49,6 +49,7 @@ export async function initDb() {
       dual_secretariat_work INTEGER DEFAULT 0,
       is_super_admin  INTEGER DEFAULT 0,
       is_auto_assign_excluded INTEGER DEFAULT 0,
+      can_arbitrary_approve INTEGER DEFAULT 0,
       note         TEXT DEFAULT ''
     )
   `);
@@ -57,6 +58,7 @@ export async function initDb() {
     "dual_dept TEXT DEFAULT ''",
     "dual_role_level TEXT DEFAULT ''",
     "dual_secretariat_work INTEGER DEFAULT 0",
+    "can_arbitrary_approve INTEGER DEFAULT 0",
     "note TEXT DEFAULT ''",
   ]) {
     try {
@@ -139,7 +141,8 @@ export async function initDb() {
             ('case_number_teuggong_start', '1'),
             ('case_number_teughyeong_start', '1'),
             ('case_number_teugapje_start', '1'),
-            ('case_number_apje_start', '1')`,
+            ('case_number_apje_start', '1'),
+            ('case_number_naesa_start', '1')`,
     args: [],
   });
   await db.execute({

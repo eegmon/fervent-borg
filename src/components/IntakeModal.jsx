@@ -37,6 +37,8 @@ export default function IntakeModal({
   };
   const generateCaseNumber = () =>
     getNextNumber("수제", caseNumberSettings.hyeongjeStart);
+  const generateInvestigationNumber = () =>
+    getNextNumber("내사", caseNumberSettings.naesaStart || 1);
   const [formData, setFormData] = useState({
     hyeongjeNo: generateCaseNumber(),
     chargeName: "자본시장법 위반 및 사기",
@@ -81,6 +83,19 @@ export default function IntakeModal({
     !prosecutor.dept?.includes("사무국") &&
     prosecutor.roleLevel !== "CHIEF_ADMINISTRATOR";
   const set = (k, v) => setFormData((p) => ({ ...p, [k]: v }));
+  const isPreBookingInvestigation = formData.bookingStatus === "입건 전 조사";
+  const handleBookingStatusChange = (bookingStatus) => {
+    setFormData((previous) => ({
+      ...previous,
+      bookingStatus,
+      hyeongjeNo:
+        bookingStatus === "입건 전 조사"
+          ? generateInvestigationNumber()
+          : (previous.hyeongjeNo || "").startsWith(`${currentYear}내사`)
+            ? generateCaseNumber()
+            : previous.hyeongjeNo,
+    }));
+  };
 
   const updateChargeRow = (id, field, value) => {
     setChargeRows((prev) =>
@@ -231,7 +246,7 @@ export default function IntakeModal({
       chargeName: formattedChargeName,
       prosecutorId: assignedProsecutor?.id || "",
       prosecutorName: assignedProsecutor?.name || "",
-      sujeNo: formData.hyeongjeNo,
+      sujeNo: isPreBookingInvestigation ? "내사" : formData.hyeongjeNo,
       hyeongjeNo: "-", // 기소 결정 시 형제번호 부여
       suspectName: displaySuspectName,
       suspectUuid: primarySuspect.uuid || "",
@@ -360,7 +375,8 @@ export default function IntakeModal({
                 color: "var(--primary-amber)",
                 fontWeight: 700,
               }}
-              value={formData.hyeongjeNo}
+              value={isPreBookingInvestigation ? "내사" : formData.hyeongjeNo}
+              disabled={isPreBookingInvestigation}
               onChange={(e) => set("hyeongjeNo", e.target.value)}
             />
           </div>
@@ -769,7 +785,7 @@ export default function IntakeModal({
             <select
               className="select-field"
               value={formData.bookingStatus}
-              onChange={(e) => set("bookingStatus", e.target.value)}
+              onChange={(e) => handleBookingStatusChange(e.target.value)}
             >
               <option value="입건:불구속">입건:불구속</option>
               <option value="입건:구속">입건:구속</option>
@@ -786,7 +802,7 @@ export default function IntakeModal({
             >
               <option value="PUBLIC">공개 사건</option>
               <option value="PRIVATE">
-                비공개 사건 (담당자·생성자·관리용 계정·검찰총장만 열람)
+                비공개 사건 (담당자·생성자·검찰총장만 열람)
               </option>
             </select>
           </div>

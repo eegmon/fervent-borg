@@ -665,6 +665,15 @@ export default function ApprovalSystem({
     setRejectReason("보완수사요구");
   };
 
+  const canArbitraryApprove = Boolean(currentUser?.canArbitraryApprove);
+  const isApprovalRequired = Boolean(
+    ledgerData?.some(
+      (caseItem) =>
+        caseItem.hyeongjeNo === selectedDoc?.hyeongjeNo &&
+        caseItem.supervisorDesignated,
+    ),
+  );
+
   const handleApproveStandard = (docId) => {
     if (!selectedDoc) return;
     const now = new Date().toISOString().replace("T", " ").substring(0, 16);
@@ -728,7 +737,10 @@ export default function ApprovalSystem({
   const handleApprove = handleApproveStandard;
 
   const handleApproveArbitrary = (docId) => {
-    if (!selectedDoc) return;
+    if (!selectedDoc || isApprovalRequired) {
+      onToast?.("결재 필수 지정 사건은 전결 승인할 수 없습니다.", "error");
+      return;
+    }
     const now = new Date().toISOString().replace("T", " ").substring(0, 16);
     const approverTitle =
       currentUser?.position || currentUser?.title || "결재자";
@@ -1670,19 +1682,23 @@ export default function ApprovalSystem({
                         >
                           <CheckCircle size={14} /> 일반 결재 승인
                         </button>
-                        <button
-                          onClick={() => handleApproveArbitrary(selectedDoc.id)}
-                          className="btn btn-secondary"
-                          style={{
-                            fontSize: "0.78rem",
-                            padding: "6px 12px",
-                            color: "#f59e0b",
-                            borderColor: "rgba(245,158,11,0.4)",
-                          }}
-                          title="사무관리규정 제10조 전결(專決) 승인"
-                        >
-                          ⚡ 전결 (專決) 승인
-                        </button>
+                        {canArbitraryApprove && !isApprovalRequired && (
+                          <button
+                            onClick={() =>
+                              handleApproveArbitrary(selectedDoc.id)
+                            }
+                            className="btn btn-secondary"
+                            style={{
+                              fontSize: "0.78rem",
+                              padding: "6px 12px",
+                              color: "#f59e0b",
+                              borderColor: "rgba(245,158,11,0.4)",
+                            }}
+                            title="사무관리규정 제10조 전결(專決) 승인"
+                          >
+                            ⚡ 전결 (專決) 승인
+                          </button>
+                        )}
                         <button
                           onClick={() =>
                             handleApproveSubstitute(selectedDoc.id)

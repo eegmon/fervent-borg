@@ -1677,6 +1677,7 @@ export default function SecretariatAdmin({
     teughyeongStart: 1,
     teugapjeStart: 1,
     apjeStart: 1,
+    naesaStart: 1,
   },
   onUpdateCaseNumberSettings,
   chargesData = [],
@@ -1795,6 +1796,7 @@ export default function SecretariatAdmin({
   const [statusModalUser, setStatusModalUser] = useState(null);
   const [statusForm, setStatusForm] = useState({
     status: "ACTIVE",
+    canArbitraryApprove: false,
     delegateTo: "",
     delegateReason: "",
     dualPosition: "",
@@ -1884,6 +1886,7 @@ export default function SecretariatAdmin({
       teughyeongStart: Number(caseNumberForm.teughyeongStart),
       teugapjeStart: Number(caseNumberForm.teugapjeStart),
       apjeStart: Number(caseNumberForm.apjeStart),
+      naesaStart: Number(caseNumberForm.naesaStart),
     };
     if (
       Object.values(settings).some(
@@ -1903,7 +1906,7 @@ export default function SecretariatAdmin({
     onUpdateCaseNumberSettings?.(settings);
     addLog(
       "사건번호 자동계산 시작값 변경",
-      `형제 ${settings.hyeongjeStart} / 특공 ${settings.teuggongStart} / 특형 ${settings.teughyeongStart}`,
+      `형제 ${settings.hyeongjeStart} / 내사 ${settings.naesaStart} / 특공 ${settings.teuggongStart}`,
     );
     alert("사건번호 자동계산 시작값이 저장되었습니다.");
   };
@@ -2363,6 +2366,7 @@ export default function SecretariatAdmin({
                   ["teughyeongStart", "특형"],
                   ["teugapjeStart", "특압제"],
                   ["apjeStart", "압제"],
+                  ["naesaStart", "내사"],
                 ].map(([key, label]) => (
                   <div key={key}>
                     <Label>{label} 시작 일련번호</Label>
@@ -2986,7 +2990,7 @@ export default function SecretariatAdmin({
                                 🟢 정상 (재직)
                               </span>
                             )}
-                            {p.isAutoAssignExcluded && (
+                            {Boolean(p.isAutoAssignExcluded) && (
                               <span
                                 style={{
                                   fontSize: "0.65rem",
@@ -3053,6 +3057,8 @@ export default function SecretariatAdmin({
                                     setStatusModalUser(p);
                                     setStatusForm({
                                       status: p.status || "ACTIVE",
+                                      canArbitraryApprove:
+                                        !!p.canArbitraryApprove,
                                       roleLevel: p.roleLevel || "PROSECUTOR",
                                       rank: p.rank || "",
                                       position: p.position || p.title || "",
@@ -3395,6 +3401,40 @@ export default function SecretariatAdmin({
                       >
                         🚫 신규 사건 자동 배정 대상에서 제외하기 (고위 관리자 /
                         전담 제외)
+                      </label>
+                    </div>
+
+                    <div
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 8,
+                        background: "var(--bg-elevated)",
+                        border: "1px solid var(--border-subtle)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        id="arbitraryApproveCheck"
+                        checked={!!statusForm.canArbitraryApprove}
+                        onChange={(e) =>
+                          setStatusForm({
+                            ...statusForm,
+                            canArbitraryApprove: e.target.checked,
+                          })
+                        }
+                      />
+                      <label
+                        htmlFor="arbitraryApproveCheck"
+                        style={{
+                          fontSize: "0.78rem",
+                          color: "var(--text-main)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        ⚡ 전결 승인 권한 허용
                       </label>
                     </div>
 
