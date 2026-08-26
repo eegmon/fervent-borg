@@ -15,6 +15,7 @@ import {
   Trash2,
   ChevronRight,
   ClipboardList,
+  Clock,
 } from "lucide-react";
 import EditCaseModal from "./EditCaseModal";
 import {
@@ -691,6 +692,7 @@ export default function MyCasesLedger({
   ledgerData = [],
   currentUser,
   prosecutorsList = [],
+  chargesData = [],
   onSelectEvidence,
   onSelectSuspect,
   onOpenApprovalForCase,
@@ -700,6 +702,7 @@ export default function MyCasesLedger({
   approvalsData = [],
   onDesignateCase,
   onUndesignateCase,
+  onOpenTimeline,
 }) {
   const [selectedProsecutorFilter, setSelectedProsecutorFilter] = useState(
     currentUser?.name || "",
@@ -1324,7 +1327,7 @@ export default function MyCasesLedger({
                         {item.suspectName}
                       </strong>
                     </button>
-                    {item.suspectUuid && (
+                    {item.suspectUuid && item.suspectUuid !== "-" && item.suspectUuid !== "00" && (
                       <div
                         style={{
                           fontSize: "0.68rem",
@@ -1490,6 +1493,20 @@ export default function MyCasesLedger({
                       }}
                     >
                       <ClipboardList size={13} /> 전자 결재 상신
+                    </button>
+
+                    <button
+                      onClick={() => onOpenTimeline && onOpenTimeline(item)}
+                      className="btn btn-outline"
+                      style={{
+                        fontSize: "0.78rem",
+                        padding: "5px 12px",
+                        color: "#a78bfa",
+                        border: "1px solid rgba(167,139,250,0.4)",
+                        gap: 5,
+                      }}
+                    >
+                      <Clock size={13} /> 사건 타임라인
                     </button>
 
                     {item.bookingBasis?.includes("http") && (
@@ -1676,6 +1693,7 @@ export default function MyCasesLedger({
             setEditingCase(null);
           }}
           prosecutorsList={prosecutorsList}
+          chargesData={chargesData}
         />
       )}
     </div>

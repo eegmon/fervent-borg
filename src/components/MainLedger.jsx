@@ -10,6 +10,7 @@ import {
   Filter,
   Pencil,
   Lock,
+  Clock,
 } from "lucide-react";
 import EditCaseModal from "./EditCaseModal";
 
@@ -63,6 +64,7 @@ export default function MainLedger({
   ledgerData,
   departmentsData = [],
   prosecutorsList = [],
+  chargesData = [],
   onSelectEvidence,
   onSelectSuspect,
   onCreateApproval,
@@ -71,6 +73,7 @@ export default function MainLedger({
   approvalsData = [],
   onDesignateCase,
   onUndesignateCase,
+  onOpenTimeline,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -407,7 +410,7 @@ export default function MainLedger({
                         color: "var(--primary-amber)",
                       }}
                     >
-                      {item.prosecutorName[0]}
+                      {(item.prosecutorName || "?")[0]}
                     </div>
                     <div>
                       <div
@@ -514,7 +517,7 @@ export default function MainLedger({
                         marginTop: 2,
                       }}
                     >
-                      {item.suspectUuid}
+                      {item.suspectUuid && item.suspectUuid !== "-" && item.suspectUuid !== "00" ? item.suspectUuid : ""}
                     </div>
                     <div
                       style={{
@@ -692,6 +695,23 @@ export default function MainLedger({
                           수정
                         </>
                       )}
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenTimeline && onOpenTimeline(item);
+                      }}
+                      className="btn btn-outline"
+                      style={{
+                        padding: "5px 10px",
+                        fontSize: "0.75rem",
+                        color: "#a78bfa",
+                        border: "1px solid rgba(167,139,250,0.4)",
+                      }}
+                    >
+                      <Clock size={12} />
+                      타임라인
                     </button>
 
                     <button
@@ -957,6 +977,7 @@ export default function MainLedger({
         caseItem={editingCase}
         onSave={handleSaveGuarded}
         prosecutorsList={prosecutorsList}
+        chargesData={chargesData}
       />
     </div>
   );

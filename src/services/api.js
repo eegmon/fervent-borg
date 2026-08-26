@@ -416,3 +416,66 @@ export function rejectDocApi(docId, reason) {
     body: JSON.stringify({ reason }),
   });
 }
+
+// ════════════════════════════════════════════════════════════════════
+// Case Memos — 사건 수사 메모
+// ════════════════════════════════════════════════════════════════════
+export function fetchCaseMemos(caseId) {
+  return apiFetch(`/cases/${encodeURIComponent(caseId)}/memos`);
+}
+
+export function createCaseMemoApi(caseId, content, isPrivate = false) {
+  return apiFetch(`/cases/${encodeURIComponent(caseId)}/memos`, {
+    method: "POST",
+    body: JSON.stringify({ content, isPrivate }),
+  });
+}
+
+export function deleteCaseMemoApi(caseId, memoId) {
+  return apiFetch(
+    `/cases/${encodeURIComponent(caseId)}/memos/${encodeURIComponent(memoId)}`,
+    { method: "DELETE" },
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Suspect Profile — 피의자 통합 프로필
+// ════════════════════════════════════════════════════════════════════
+export function fetchSuspectProfile(uuid) {
+  return apiFetch(`/suspects/${encodeURIComponent(uuid)}/profile`);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Bulk Reassign — 사건 일괄 재배당
+// ════════════════════════════════════════════════════════════════════
+export function bulkReassignApi({
+  caseIds,
+  toProsecutorId,
+  toProsecutorName,
+  reason,
+}) {
+  return apiFetch("/cases/bulk-reassign", {
+    method: "POST",
+    body: JSON.stringify({ caseIds, toProsecutorId, toProsecutorName, reason }),
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Approval Templates — 결재선 템플릿
+// ════════════════════════════════════════════════════════════════════
+export function fetchApprovalTemplates() {
+  return apiFetch("/approval-templates");
+}
+
+export function createApprovalTemplateApi({ name, description, steps, isShared }) {
+  return apiFetch("/approval-templates", {
+    method: "POST",
+    body: JSON.stringify({ name, description, steps, isShared }),
+  });
+}
+
+export function deleteApprovalTemplateApi(id) {
+  return apiFetch(`/approval-templates/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}

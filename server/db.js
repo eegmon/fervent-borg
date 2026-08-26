@@ -60,6 +60,7 @@ export async function initDb() {
     "dual_secretariat_work INTEGER DEFAULT 0",
     "can_arbitrary_approve INTEGER DEFAULT 0",
     "note TEXT DEFAULT ''",
+    "discord_id TEXT DEFAULT ''",
   ]) {
     try {
       await db.execute(`ALTER TABLE prosecutors ADD COLUMN ${column}`);
@@ -351,6 +352,36 @@ export async function initDb() {
         throw error;
     }
   }
+
+  // ── case_memos (사건 수사 메모) ────────────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS case_memos (
+      id           TEXT PRIMARY KEY,
+      case_id      TEXT NOT NULL,
+      hyeongje_no  TEXT NOT NULL,
+      author_id    TEXT NOT NULL,
+      author_name  TEXT NOT NULL,
+      content      TEXT NOT NULL,
+      is_private   INTEGER DEFAULT 0,
+      created_at   TEXT DEFAULT (datetime('now')),
+      deleted_at   TEXT DEFAULT ''
+    )
+  `);
+
+  // ── approval_templates (결재선 템플릿) ────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS approval_templates (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      steps_json  TEXT NOT NULL,
+      created_by  TEXT NOT NULL,
+      is_shared   INTEGER DEFAULT 0,
+      dept        TEXT DEFAULT '',
+      created_at  TEXT DEFAULT (datetime('now')),
+      deleted_at  TEXT DEFAULT ''
+    )
+  `);
 
   console.log("[DB] 테이블 초기화 완료");
 }

@@ -41,18 +41,18 @@ export default function IntakeModal({
     getNextNumber("내사", caseNumberSettings.naesaStart || 1);
   const [formData, setFormData] = useState({
     hyeongjeNo: generateCaseNumber(),
-    chargeName: "자본시장법 위반 및 사기",
+    chargeName: "",
     bookingStatus: "입건:불구속",
     visibility: "PUBLIC",
     prosecutorId: "AUTO_ASSIGN",
-    bookingBasis: "https://cafe.naver.com/doseonline/",
+    bookingBasis: "",
     content: "",
-    confiscation: "0 원",
+    confiscation: "",
     incidentDate: todayStr,
     bookingDate: todayStr,
   });
   const [chargeRows, setChargeRows] = useState([
-    { id: 1, name: "자본시장법 위반 및 사기", type: "주위적" },
+    { id: 1, name: "", type: "주위적" },
   ]);
   // Reset case numbers each time the modal opens
   React.useEffect(() => {
@@ -246,6 +246,7 @@ export default function IntakeModal({
       chargeName: formattedChargeName,
       prosecutorId: assignedProsecutor?.id || "",
       prosecutorName: assignedProsecutor?.name || "",
+      prosecutorDiscordId: assignedProsecutor?.discordId || "",
       sujeNo: isPreBookingInvestigation ? "내사" : formData.hyeongjeNo,
       hyeongjeNo: "-", // 기소 결정 시 형제번호 부여
       suspectName: displaySuspectName,

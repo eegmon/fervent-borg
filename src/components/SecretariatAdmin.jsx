@@ -1611,20 +1611,31 @@ function ActingOrderPanel({
   );
 }
 
+const CATEGORIES = [
+  { id: "ALL", label: "전체 메뉴" },
+  { id: "USERS", label: "👥 계정 · 조직 관리" },
+  { id: "CASES", label: "⚖️ 사건 · 배당 관리" },
+  { id: "DOCS", label: "📁 공문서 · 죄명 관리" },
+  { id: "SECURITY", label: "🛡️ 보안 · 감사" },
+];
+
 const SUB_TABS = [
-  { id: "registrations", label: "🆕 가입 신청 허가", icon: ClipboardList },
-  { id: "prosecutors", label: "검사 계정 관리", icon: Users },
-  { id: "acting", label: "🏛️ 직무대리명령 발령", icon: Award },
-  { id: "depts", label: "부서 & 부원 관리", icon: Building2 },
-  { id: "casenos", label: "사건번호 공식 배정", icon: Scale },
-  { id: "delete", label: "🗑️ 기록 삭제", icon: Trash2 },
-  { id: "reassign", label: "사건 재배당", icon: RefreshCw },
-  { id: "import", label: "엑셀 일괄 등록", icon: FileSpreadsheet },
-  { id: "docnos", label: "문서번호 관리", icon: FilePen },
-  { id: "designate", label: "🔒 결재 필수 지정", icon: ShieldAlert },
-  { id: "docmgmt", label: "문서 관리", icon: FileBox },
-  { id: "charges", label: "죄명 관리", icon: Scale },
-  { id: "audit", label: "감사 로그", icon: History },
+  { id: "registrations", label: "🆕 가입 신청 허가", icon: ClipboardList, category: "USERS" },
+  { id: "prosecutors", label: "검사 계정 관리", icon: Users, category: "USERS" },
+  { id: "acting", label: "🏛️ 직무대리명령 발령", icon: Award, category: "USERS" },
+  { id: "depts", label: "부서 & 부원 관리", icon: Building2, category: "USERS" },
+
+  { id: "casenos", label: "사건번호 공식 배정", icon: Scale, category: "CASES" },
+  { id: "reassign", label: "사건 재배당", icon: RefreshCw, category: "CASES" },
+  { id: "designate", label: "🔒 결재 필수 지정", icon: ShieldAlert, category: "CASES" },
+  { id: "import", label: "엑셀 일괄 등록", icon: FileSpreadsheet, category: "CASES" },
+
+  { id: "docmgmt", label: "문서 관리", icon: FileBox, category: "DOCS" },
+  { id: "docnos", label: "문서번호 관리", icon: FilePen, category: "DOCS" },
+  { id: "charges", label: "죄명 관리", icon: Scale, category: "DOCS" },
+
+  { id: "delete", label: "🗑️ 기록 삭제", icon: Trash2, category: "SECURITY" },
+  { id: "audit", label: "감사 로그", icon: History, category: "SECURITY" },
 ];
 
 const Label = ({ children }) => (
@@ -1641,6 +1652,58 @@ const Label = ({ children }) => (
   </label>
 );
 
+// 디스코드 ID 인라인 편집 셀
+function DiscordIdCell({ prosecutor: p, onUpdateProsecutorStatus, addLog }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(p.discordId || "");
+
+  const handleSave = () => {
+    if (onUpdateProsecutorStatus) {
+      onUpdateProsecutorStatus(p.id, { discordId: val.trim() });
+    }
+    addLog("디스코드 ID 변경", `'${p.name}' 검사 디스코드 ID: ${val.trim() || "(삭제)"}`);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div style={{ display: "flex", gap: 4, alignItems: "center", minWidth: 160 }}>
+        <input
+          className="input-field"
+          style={{ padding: "3px 7px", fontSize: "0.75rem", height: 28 }}
+          placeholder="username"
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") { setVal(p.discordId || ""); setEditing(false); }
+          }}
+          autoFocus
+        />
+        <button onClick={handleSave} className="btn btn-gold" style={{ padding: "3px 8px", fontSize: "0.68rem" }}>저장</button>
+        <button onClick={() => { setVal(p.discordId || ""); setEditing(false); }} className="btn btn-secondary" style={{ padding: "3px 6px", fontSize: "0.68rem" }}>✕</button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+      onClick={() => setEditing(true)}
+      title="클릭하여 편집"
+    >
+      {p.discordId ? (
+        <span style={{ fontSize: "0.75rem", color: "#818cf8", fontFamily: "monospace" }}>
+          @{p.discordId}
+        </span>
+      ) : (
+        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>—</span>
+      )}
+      <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", opacity: 0.6 }}>✏️</span>
+    </div>
+  );
+}
+
 export default function SecretariatAdmin({
   ledgerData,
   approvalsData,
@@ -1650,6 +1713,7 @@ export default function SecretariatAdmin({
   departmentsData = [],
   prosecutorsList: propProsecutorsList,
   onReassignCase,
+  onBulkReassign,
   onUpdateCase,
   onDeleteCase,
   onDeleteAppeal,
@@ -1685,6 +1749,7 @@ export default function SecretariatAdmin({
   auditLogs: initialAuditLogs = [],
 }) {
   const [activeSubTab, setActiveSubTab] = useState("registrations");
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
   const prosecutorsList = (propProsecutorsList || PROSECUTORS).filter(
     (p) => !p.isSuperAdmin,
   );
@@ -1696,6 +1761,7 @@ export default function SecretariatAdmin({
     roleLevel: "PROSECUTOR",
     dept: departmentsData[0]?.name || "",
     password: "",
+    discordId: "",
   });
 
   // ── 가입 신청 허가 상태 ──────────────────────────────────────
@@ -1821,6 +1887,10 @@ export default function SecretariatAdmin({
     ledgerData[0]?.hyeongjeNo || "",
   );
   const [targetPId, setTargetPId] = useState("");
+  const [bulkSourcePName, setBulkSourcePName] = useState("");
+  const [bulkTargetPId, setBulkTargetPId] = useState("");
+  const [selectedBulkCaseIds, setSelectedBulkCaseIds] = useState([]);
+  const [bulkReason, setBulkReason] = useState("인사 이동 및 업무 재배당");
   const [editingDocId, setEditingDocId] = useState(null);
   const [editingDocNoValue, setEditingDocNoValue] = useState("");
 
@@ -2199,6 +2269,9 @@ export default function SecretariatAdmin({
     if ((t.id === "delete" || t.id === "import") && !hasHighLevelAdminAccess) {
       return false;
     }
+    if (selectedCategory !== "ALL" && t.category !== selectedCategory) {
+      return false;
+    }
     return true;
   });
 
@@ -2238,6 +2311,53 @@ export default function SecretariatAdmin({
           <Award size={12} />
           SECRETARIAT ADMIN
         </span>
+      </div>
+
+      {/* Category Group Filter Bar (메뉴 간소화) */}
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          alignItems: "center",
+          flexWrap: "wrap",
+          padding: "8px 12px",
+          background: "rgba(15, 23, 42, 0.5)",
+          borderRadius: 10,
+          border: "1px solid var(--border-subtle)",
+        }}
+      >
+        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 700, marginRight: 4 }}>
+          📂 카테고리 분류:
+        </span>
+        {CATEGORIES.map((cat) => {
+          const active = selectedCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => {
+                setSelectedCategory(cat.id);
+                // Switch subtab to first subtab in category if activeSubTab is filtered out
+                const catTabs = SUB_TABS.filter((t) => cat.id === "ALL" || t.category === cat.id);
+                if (catTabs.length > 0 && !catTabs.some((t) => t.id === activeSubTab)) {
+                  setActiveSubTab(catTabs[0].id);
+                }
+              }}
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 800,
+                padding: "4px 10px",
+                borderRadius: 20,
+                cursor: "pointer",
+                transition: "all 0.15s",
+                background: active ? "var(--primary-amber)" : "var(--bg-elevated)",
+                color: active ? "#000" : "var(--text-muted)",
+                border: active ? "1px solid var(--primary-amber)" : "1px solid var(--border-subtle)",
+              }}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Sub Tab Bar */}
@@ -2837,6 +2957,20 @@ export default function SecretariatAdmin({
                 </select>
               </div>
               <div>
+                <Label>디스코드 ID (선택)</Label>
+                <input
+                  className="input-field"
+                  placeholder="예: username 또는 username#1234"
+                  value={newP.discordId || ""}
+                  onChange={(e) =>
+                    setNewP({ ...newP, discordId: e.target.value })
+                  }
+                />
+                <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginTop: 4 }}>
+                  입력 시 사건 접수 알림 메시지에 멘션이 포함됩니다.
+                </div>
+              </div>
+              <div>
                 <Label>초기 비밀번호</Label>
                 <input
                   className="input-field"
@@ -2883,6 +3017,7 @@ export default function SecretariatAdmin({
                     <th>직위 (Position)</th>
                     <th>직급 (Rank)</th>
                     <th>소속 부서</th>
+                    <th>디스코드 ID</th>
                     <th>신분 / 결재권한</th>
                     <th>계정 관리</th>
                   </tr>
@@ -2938,6 +3073,13 @@ export default function SecretariatAdmin({
                           </span>
                         </td>
                         <td style={{ color: "var(--text-muted)" }}>{p.dept}</td>
+                        <td>
+                          <DiscordIdCell
+                            prosecutor={p}
+                            onUpdateProsecutorStatus={onUpdateProsecutorStatus}
+                            addLog={addLog}
+                          />
+                        </td>
                         <td>
                           <div
                             style={{
@@ -4237,66 +4379,270 @@ export default function SecretariatAdmin({
       )}
 
       {activeSubTab === "reassign" && (
-        <div className="glass-panel" style={{ padding: 24, maxWidth: 520 }}>
-          <div
-            style={{
-              fontWeight: 800,
-              fontSize: "0.9rem",
-              color: "var(--text-main)",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              marginBottom: 20,
-            }}
-          >
-            <RefreshCw size={15} color="var(--primary-amber)" />
-            검찰사무국 직권 담당검사 재배당
-          </div>
-          <form
-            onSubmit={handleReassign}
-            style={{ display: "flex", flexDirection: "column", gap: 14 }}
-          >
-            <div>
-              <Label>재배당 대상 사건 *</Label>
-              <select
-                className="select-field"
-                value={selectedCaseNo}
-                onChange={(e) => setSelectedCaseNo(e.target.value)}
-              >
-                {ledgerData.map((c) => (
-                  <option key={c.id} value={c.hyeongjeNo}>
-                    {c.hyeongjeNo} (담당: {c.prosecutorName} | 피의자:{" "}
-                    {c.suspectName})
-                  </option>
-                ))}
-              </select>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {/* 좌측: 단건 직권 재배당 */}
+          <div className="glass-panel" style={{ padding: 24 }}>
+            <div
+              style={{
+                fontWeight: 800,
+                fontSize: "0.9rem",
+                color: "var(--text-main)",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 16,
+              }}
+            >
+              <RefreshCw size={15} color="var(--primary-amber)" />
+              단건 사건 직권 재배당
             </div>
-            <div>
-              <Label>변경할 신규 담당검사 *</Label>
-              <select
-                className="select-field"
-                value={targetPId}
-                onChange={(e) => setTargetPId(e.target.value)}
-              >
-                {prosecutorsList
-                  .filter((p) => ["ACTIVE", "ON_LEAVE"].includes(p.status))
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.title} / {p.dept})
-                      {p.status === "ON_LEAVE" ? " [휴직중]" : ""}
+            <form
+              onSubmit={handleReassign}
+              style={{ display: "flex", flexDirection: "column", gap: 14 }}
+            >
+              <div>
+                <Label>재배당 대상 사건 *</Label>
+                <select
+                  className="select-field"
+                  value={selectedCaseNo}
+                  onChange={(e) => setSelectedCaseNo(e.target.value)}
+                >
+                  {ledgerData.map((c) => (
+                    <option key={c.id} value={c.hyeongjeNo}>
+                      {c.hyeongjeNo} (담당: {c.prosecutorName} | 피의자:{" "}
+                      {c.suspectName})
                     </option>
                   ))}
-              </select>
-            </div>
-            <button
-              type="submit"
-              className="btn btn-gold"
-              style={{ marginTop: 4 }}
+                </select>
+              </div>
+              <div>
+                <Label>변경할 신규 담당검사 *</Label>
+                <select
+                  className="select-field"
+                  value={targetPId}
+                  onChange={(e) => setTargetPId(e.target.value)}
+                >
+                  <option value="">담당검사 선택...</option>
+                  {prosecutorsList
+                    .filter((p) => ["ACTIVE", "ON_LEAVE"].includes(p.status))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.title} / {p.dept})
+                        {p.status === "ON_LEAVE" ? " [휴직중]" : ""}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="btn btn-gold"
+                style={{ marginTop: 4 }}
+              >
+                <CheckCircle2 size={14} />
+                직권 재배당 실행
+              </button>
+            </form>
+          </div>
+
+          {/* 우측: 사건 일괄 재배당 (휴직 / 부서이동 시) */}
+          <div className="glass-panel" style={{ padding: 24 }}>
+            <div
+              style={{
+                fontWeight: 800,
+                fontSize: "0.9rem",
+                color: "var(--text-main)",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 16,
+              }}
             >
-              <CheckCircle2 size={14} />
-              직권 재배당 실행
-            </button>
-          </form>
+              <Users size={15} color="#818cf8" />
+              사건 일괄 재배당 (인사이동 · 휴직 전담)
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <Label>기존 담당 검사 선택 (출처) *</Label>
+                <select
+                  className="select-field"
+                  value={bulkSourcePName}
+                  onChange={(e) => {
+                    setBulkSourcePName(e.target.value);
+                    const matchingCases = ledgerData
+                      .filter((c) => c.prosecutorName === e.target.value)
+                      .map((c) => c.id);
+                    setSelectedBulkCaseIds(matchingCases);
+                  }}
+                >
+                  <option value="">검사 선택...</option>
+                  {Array.from(new Set(ledgerData.map((c) => c.prosecutorName).filter(Boolean))).map(
+                    (name) => (
+                      <option key={name} value={name}>
+                        {name} (현재 사건 {ledgerData.filter((c) => c.prosecutorName === name).length}건)
+                      </option>
+                    ),
+                  )}
+                </select>
+              </div>
+
+              {bulkSourcePName && (
+                <div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <Label>이전 대상 사건 선택 ({selectedBulkCaseIds.length}건 선택됨)</Label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allIds = ledgerData
+                          .filter((c) => c.prosecutorName === bulkSourcePName)
+                          .map((c) => c.id);
+                        setSelectedBulkCaseIds(
+                          selectedBulkCaseIds.length === allIds.length ? [] : allIds,
+                        );
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--primary-amber)",
+                        fontSize: "0.72rem",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {selectedBulkCaseIds.length ===
+                      ledgerData.filter((c) => c.prosecutorName === bulkSourcePName).length
+                        ? "전체 해제"
+                        : "전체 선택"}
+                    </button>
+                  </div>
+                  <div
+                    style={{
+                      maxHeight: 180,
+                      overflowY: "auto",
+                      border: "1px solid var(--border-subtle)",
+                      borderRadius: 8,
+                      padding: 8,
+                      background: "var(--bg-elevated)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
+                    {ledgerData
+                      .filter((c) => c.prosecutorName === bulkSourcePName)
+                      .map((c) => {
+                        const isChecked = selectedBulkCaseIds.includes(c.id);
+                        return (
+                          <label
+                            key={c.id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              fontSize: "0.78rem",
+                              cursor: "pointer",
+                              padding: "4px 6px",
+                              borderRadius: 4,
+                              background: isChecked ? "rgba(129,140,248,0.1)" : "transparent",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedBulkCaseIds([...selectedBulkCaseIds, c.id]);
+                                } else {
+                                  setSelectedBulkCaseIds(
+                                    selectedBulkCaseIds.filter((id) => id !== c.id),
+                                  );
+                                }
+                              }}
+                            />
+                            <span style={{ fontFamily: "monospace", color: "var(--primary-amber)" }}>
+                              {c.hyeongjeNo}
+                            </span>
+                            <span>| {c.suspectName} ({c.chargeName})</span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <Label>인계받을 신임 검사 (도착) *</Label>
+                <select
+                  className="select-field"
+                  value={bulkTargetPId}
+                  onChange={(e) => setBulkTargetPId(e.target.value)}
+                >
+                  <option value="">신임 검사 선택...</option>
+                  {prosecutorsList
+                    .filter((p) => p.name !== bulkSourcePName && ["ACTIVE", "ON_LEAVE"].includes(p.status))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.title} / {p.dept})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <Label>재배당 사유</Label>
+                <input
+                  className="input-field"
+                  placeholder="예: 인사 이동, 휴직, 부서 인사이동"
+                  value={bulkReason}
+                  onChange={(e) => setBulkReason(e.target.value)}
+                />
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-gold"
+                disabled={!bulkSourcePName || selectedBulkCaseIds.length === 0 || !bulkTargetPId}
+                onClick={async () => {
+                  const targetP = prosecutorsList.find((p) => p.id === bulkTargetPId);
+                  if (!targetP) return;
+                  if (
+                    !window.confirm(
+                      `'${bulkSourcePName}' 검사의 사건 ${selectedBulkCaseIds.length}건을 '${targetP.name}' 검사에게 일괄 재배당하시겠습니까?`,
+                    )
+                  )
+                    return;
+
+                  if (onBulkReassign) {
+                    const ok = await onBulkReassign(
+                      selectedBulkCaseIds,
+                      targetP.id,
+                      targetP.name,
+                      bulkReason,
+                    );
+                    if (ok) {
+                      addLog(
+                        "사건 일괄 재배당",
+                        `'${bulkSourcePName}' → '${targetP.name}' 검사로 사건 ${selectedBulkCaseIds.length}건 일괄 재배당 (${bulkReason})`,
+                      );
+                      setSelectedBulkCaseIds([]);
+                      setBulkSourcePName("");
+                      setBulkTargetPId("");
+                    }
+                  }
+                }}
+                style={{ marginTop: 4 }}
+              >
+                <RefreshCw size={14} />
+                일괄 재배당 실행 ({selectedBulkCaseIds.length}건)
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

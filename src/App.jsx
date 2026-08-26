@@ -29,6 +29,7 @@ import PasswordChangeModal from "./components/PasswordChangeModal";
 import DeadlineAlertModal from "./components/DeadlineAlertModal";
 import OfficialTemplateModal from "./components/OfficialTemplateModal";
 import RegisterModal from "./components/RegisterModal";
+import CaseTimelineModal from "./components/CaseTimelineModal";
 
 import AuditLogViewer from "./components/AuditLogViewer";
 import Toast from "./components/Toast";
@@ -118,6 +119,7 @@ import {
   fetchDepartments,
   saveDepartmentsApi,
   fetchCharges,
+  bulkReassignApi,
 } from "./services/api";
 
 export default function App() {
@@ -174,6 +176,7 @@ export default function App() {
   const [isIntakeModalOpen, setIsIntakeModalOpen] = useState(false);
   const [evidenceModalInfo, setEvidenceModalInfo] = useState(null);
   const [suspectHistoryName, setSuspectHistoryName] = useState(null);
+  const [timelineCaseItem, setTimelineCaseItem] = useState(null);
   const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [intakeNoticeData, setIntakeNoticeData] = useState(null);
@@ -751,6 +754,30 @@ export default function App() {
         return item;
       }),
     );
+  };
+
+  // Handler: Bulk Reassign Cases (Secretariat Action)
+  const handleBulkReassignCases = async (caseIds, toProsecutorId, toProsecutorName, reason) => {
+    const res = await bulkReassignApi({ caseIds, toProsecutorId, toProsecutorName, reason });
+    if (!res?.success) {
+      showToast(`❌ 사건 일괄 재배당 저장 실패: ${res?.message || "서버 오류"}`, "error");
+      return false;
+    }
+    const targetSet = new Set(caseIds.map(String));
+    setLedgerData((prev) =>
+      prev.map((item) => {
+        if (targetSet.has(String(item.id)) || targetSet.has(String(item.hyeongjeNo))) {
+          return {
+            ...item,
+            prosecutorName: toProsecutorName,
+            prosecutorId: toProsecutorId,
+          };
+        }
+        return item;
+      }),
+    );
+    showToast(`🔄 사건 ${caseIds.length}건이 '${toProsecutorName}' 검사에게 일괄 재배당되었습니다.`, "success");
+    return true;
   };
 
   // Handler: Add New Prosecutor Account (Secretariat Action)
@@ -1549,12 +1576,14 @@ export default function App() {
                 ledgerData={ledgerData}
                 currentUser={currentUser}
                 prosecutorsList={operationalProsecutorsList}
+                chargesData={chargesData}
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspectName) =>
                   setSuspectHistoryName(suspectName)
                 }
+                onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
                 onOpenApprovalForCase={handleCreateApprovalForCase}
                 onUpdateCase={handleUpdateCase}
                 onOpenLoginModal={() => setIsLoginModalOpen(true)}
@@ -1585,12 +1614,14 @@ export default function App() {
                 ledgerData={scopedLedgerData}
                 departmentsData={departmentsData}
                 prosecutorsList={operationalProsecutorsList}
+                chargesData={chargesData}
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspectName) =>
                   setSuspectHistoryName(suspectName)
                 }
+                onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
                 onCreateApproval={handleCreateApprovalForCase}
                 onUpdateCase={handleUpdateCase}
                 currentRole={currentUser?.id || ""}
@@ -1629,6 +1660,7 @@ export default function App() {
                 departmentsData={departmentsData}
                 prosecutorsList={prosecutorsList}
                 onReassignCase={handleReassignCase}
+                onBulkReassign={handleBulkReassignCases}
                 onUpdateCase={handleUpdateCase}
                 onDeleteCase={handleDeleteCase}
                 onDesignateCase={(caseId) =>
@@ -1764,6 +1796,17 @@ export default function App() {
         suspectName={suspectHistoryName}
         ledgerData={ledgerData}
         onClose={() => setSuspectHistoryName(null)}
+      />
+
+      <CaseTimelineModal
+        isOpen={!!timelineCaseItem}
+        onClose={() => setTimelineCaseItem(null)}
+        caseItem={timelineCaseItem}
+        reportsData={reportsData}
+        bookingsData={bookingsData}
+        approvalsData={approvalsData}
+        appealsData={appealsData}
+        onSelectEvidence={(url, caseNo, suspectName) => setEvidenceModalInfo({ url, caseNo, suspectName })}
       />
 
       <DeadlineAlertModal

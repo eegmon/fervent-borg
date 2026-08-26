@@ -12,6 +12,9 @@ import {
   ArrowRight,
   AlertCircle,
   UserCheck,
+  BookMarked,
+  Save,
+  ChevronDown,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import {
@@ -19,7 +22,12 @@ import {
   NON_INDICTMENT_REASONS,
 } from "../data/prosecutionData";
 import { HWP_TEMPLATES } from "../data/hwpTemplates";
-import { fetchEvidence } from "../services/api";
+import {
+  fetchEvidence,
+  fetchApprovalTemplates,
+  createApprovalTemplateApi,
+  deleteApprovalTemplateApi,
+} from "../services/api";
 
 const NAVER_CAFE_MENU_URL =
   "https://cafe.naver.com/f-e/cafes/29669442/menus/262";
@@ -650,6 +658,66 @@ export default function ApprovalSystem({
       date: "-",
     },
   ]);
+
+  // 결재선 템플릿 상태
+  const [templates, setTemplates] = useState([]);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+  const [showSaveTemplateForm, setShowSaveTemplateForm] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [newTemplateShared, setNewTemplateShared] = useState(false);
+
+  useEffect(() => {
+    fetchApprovalTemplates().then((data) => {
+      if (Array.isArray(data)) setTemplates(data);
+    });
+  }, []);
+
+  const handleApplyTemplate = (tpl) => {
+    const now = new Date().toISOString().replace("T", " ").substring(0, 16);
+    const newLine = tpl.steps.map((step, idx) => {
+      const matched = prosecutorsList.find(
+        (p) => p.roleLevel === step.roleLevel,
+      );
+      return {
+        role: step.role,
+        name: idx === 0
+          ? (currentUser?.name || matched?.name || step.name || "")
+          : (matched?.name || step.name || ""),
+        status: idx === 0 ? "상신완료" : "결재대기",
+        date: idx === 0 ? now : "-",
+      };
+    });
+    setApprovalLine(newLine);
+    setShowTemplateDropdown(false);
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!newTemplateName.trim()) return;
+    const steps = approvalLine.map((step) => ({
+      role: step.role,
+      name: step.name,
+      roleLevel: prosecutorsList.find((p) => p.name === step.name)?.roleLevel || "",
+    }));
+    const res = await createApprovalTemplateApi({
+      name: newTemplateName.trim(),
+      description: "",
+      steps,
+      isShared: newTemplateShared,
+    });
+    if (res?.success && res.template) {
+      setTemplates((prev) => [res.template, ...prev]);
+      setShowSaveTemplateForm(false);
+      setNewTemplateName("");
+      setNewTemplateShared(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (tplId) => {
+    const res = await deleteApprovalTemplateApi(tplId);
+    if (res?.success) {
+      setTemplates((prev) => prev.filter((t) => t.id !== tplId));
+    }
+  };
 
   const [showDelegationRulesModal, setShowDelegationRulesModal] =
     useState(false);
@@ -1512,7 +1580,7 @@ export default function ApprovalSystem({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      marginBottom: 10,
+                      marginBottom: 8,
                     }}
                   >
                     <span
@@ -1528,30 +1596,235 @@ export default function ApprovalSystem({
                       <Users size={14} />
                       결재라인 편집
                     </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setApprovalLine([
-                          ...approvalLine,
-                          {
-                            role: "차장검사",
-                            name:
-                              prosecutorsList.find(
-                                (p) => p.roleLevel === "DEPUTY_CHIEF",
-                              )?.name ||
-                              prosecutorsList[0]?.name ||
-                              "",
-                            status: "결재대기",
-                            date: "-",
-                          },
-                        ])
-                      }
-                      className="btn btn-outline"
-                      style={{ fontSize: "0.72rem", padding: "4px 10px" }}
-                    >
-                      + 단계 추가
-                    </button>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {/* 템플릿 불러오기 드롭다운 */}
+                      <div style={{ position: "relative" }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowTemplateDropdown((v) => !v)}
+                          className="btn btn-outline"
+                          style={{
+                            fontSize: "0.72rem",
+                            padding: "4px 10px",
+                            color: "#818cf8",
+                            borderColor: "rgba(129,140,248,0.4)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          <BookMarked size={12} />
+                          템플릿 불러오기
+                          <ChevronDown size={11} />
+                        </button>
+                        {showTemplateDropdown && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              right: 0,
+                              top: "calc(100% + 4px)",
+                              zIndex: 200,
+                              background: "var(--bg-card)",
+                              border: "1px solid var(--border-subtle)",
+                              borderRadius: 8,
+                              boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+                              minWidth: 220,
+                              padding: 6,
+                            }}
+                          >
+                            {templates.length === 0 ? (
+                              <div
+                                style={{
+                                  padding: "10px 12px",
+                                  fontSize: "0.75rem",
+                                  color: "var(--text-muted)",
+                                  textAlign: "center",
+                                }}
+                              >
+                                저장된 템플릿이 없습니다
+                              </div>
+                            ) : (
+                              templates.map((tpl) => (
+                                <div
+                                  key={tpl.id}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: 4,
+                                    padding: "6px 8px",
+                                    borderRadius: 6,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApplyTemplate(tpl)}
+                                    style={{
+                                      flex: 1,
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      textAlign: "left",
+                                      fontSize: "0.78rem",
+                                      color: "var(--text-main)",
+                                      padding: 0,
+                                    }}
+                                  >
+                                    {tpl.name}
+                                    {tpl.isShared && (
+                                      <span
+                                        style={{
+                                          marginLeft: 6,
+                                          fontSize: "0.65rem",
+                                          color: "#60a5fa",
+                                          fontWeight: 700,
+                                        }}
+                                      >
+                                        [공유]
+                                      </span>
+                                    )}
+                                    <div
+                                      style={{
+                                        fontSize: "0.68rem",
+                                        color: "var(--text-muted)",
+                                        marginTop: 1,
+                                      }}
+                                    >
+                                      {(tpl.steps || []).map((s) => s.role).join(" → ")}
+                                    </div>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteTemplate(tpl.id)}
+                                    style={{
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      color: "#f87171",
+                                      flexShrink: 0,
+                                      padding: "2px 4px",
+                                    }}
+                                    title="템플릿 삭제"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {/* 현재 결재선 저장 */}
+                      <button
+                        type="button"
+                        onClick={() => setShowSaveTemplateForm((v) => !v)}
+                        className="btn btn-outline"
+                        style={{
+                          fontSize: "0.72rem",
+                          padding: "4px 10px",
+                          color: "var(--primary-amber)",
+                          borderColor: "rgba(245,158,11,0.4)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <Save size={12} />
+                        템플릿 저장
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setApprovalLine([
+                            ...approvalLine,
+                            {
+                              role: "차장검사",
+                              name:
+                                prosecutorsList.find(
+                                  (p) => p.roleLevel === "DEPUTY_CHIEF",
+                                )?.name ||
+                                prosecutorsList[0]?.name ||
+                                "",
+                              status: "결재대기",
+                              date: "-",
+                            },
+                          ])
+                        }
+                        className="btn btn-outline"
+                        style={{ fontSize: "0.72rem", padding: "4px 10px" }}
+                      >
+                        + 단계 추가
+                      </button>
+                    </div>
                   </div>
+
+                  {/* 템플릿 저장 폼 */}
+                  {showSaveTemplateForm && (
+                    <div
+                      style={{
+                        background: "rgba(245,158,11,0.06)",
+                        border: "1px solid rgba(245,158,11,0.25)",
+                        borderRadius: 8,
+                        padding: "10px 12px",
+                        marginBottom: 10,
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <input
+                        className="input-field"
+                        placeholder="템플릿 이름 입력 (예: 표준 3단계 결재)"
+                        value={newTemplateName}
+                        onChange={(e) => setNewTemplateName(e.target.value)}
+                        style={{ flex: 1, minWidth: 160, fontSize: "0.78rem" }}
+                      />
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: "0.75rem",
+                          color: "var(--text-muted)",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newTemplateShared}
+                          onChange={(e) => setNewTemplateShared(e.target.checked)}
+                        />
+                        공유 템플릿
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleSaveTemplate}
+                        className="btn btn-gold"
+                        style={{ fontSize: "0.75rem", padding: "5px 12px" }}
+                      >
+                        <Save size={12} /> 저장
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSaveTemplateForm(false);
+                          setNewTemplateName("");
+                        }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          color: "var(--text-muted)",
+                          fontSize: "1rem",
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                   {approvalLine.map((step, idx) => (
                     <div
                       key={idx}

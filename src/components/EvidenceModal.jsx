@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, ExternalLink, Plus, Trash2, FileText, CheckCircle2, Shield, FolderPlus } from 'lucide-react';
+import { X, ExternalLink, Plus, Trash2, FileText, CheckCircle2, Shield, FolderPlus, Upload } from 'lucide-react';
 import { createEvidenceApi, deleteEvidenceApi, fetchEvidence, updateEvidenceApi } from '../services/api';
 
 const EVIDENCE_TYPES = [
@@ -10,6 +10,16 @@ const EVIDENCE_TYPES = [
   { id: 'ACCOUNT', label: '계좌 / 금융 거래 내역', color: '#f87171' },
 ];
 
+// base64 파일 → evidence url 필드에 저장, 미리보기에서 <img> 또는 iframe으로 표시
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectName, onSaveEvidence }) {
   const [activeUrl, setActiveUrl] = useState(url || '');
   const [evidenceList, setEvidenceList] = useState([]);
@@ -18,10 +28,12 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
   const [error, setError] = useState('');
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const [inputMode, setInputMode] = useState('url'); // 'url' | 'file'
   const [newTitle, setNewTitle] = useState('');
   const [newUrl, setNewUrl] = useState('');
   const [newType, setNewType] = useState('CAFE');
   const [newRecord, setNewRecord] = useState('');
+  const [fileData, setFileData] = useState(null); // { dataUrl, name, type }
   const [editingId, setEditingId] = useState(null);
   const [editingRecord, setEditingRecord] = useState('');
 
@@ -47,16 +59,25 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
 
   const handleAddEvidence = async (e) => {
     e.preventDefault();
-    if (!newUrl.trim()) {
-      alert('증거 URL 또는 파일 링크를 입력해주세요.');
+    const finalUrl = inputMode === 'file' ? fileData?.dataUrl : newUrl.trim();
+    if (!finalUrl) {
+      alert(inputMode === 'file' ? '파일을 선택해주세요.' : '증거 URL을 입력해주세요.');
+      return;
+    }
+    if (inputMode === 'file' && fileData && fileData.dataUrl.length > 5 * 1024 * 1024) {
+      alert('파일 크기는 5MB 이하만 업로드할 수 있습니다.');
       return;
     }
     setSaving(true);
     setError('');
+    const evidenceType = inputMode === 'file'
+      ? (fileData?.type?.startsWith('image/') ? 'IMAGE' : 'DOCUMENT')
+      : newType;
+    const title = newTitle.trim() || (inputMode === 'file' ? (fileData?.name || '첨부 파일') : `신규 증거 자료 #${evidenceList.length + 1}`);
     const res = await createEvidenceApi(caseNo, {
-      title: newTitle.trim() || `신규 증거 자료 #${evidenceList.length + 1}`,
-      url: newUrl.trim(),
-      type: newType,
+      title,
+      url: finalUrl,
+      type: evidenceType,
       record: newRecord.trim(),
     });
     setSaving(false);
@@ -70,8 +91,28 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
     setNewTitle('');
     setNewUrl('');
     setNewRecord('');
+    setFileData(null);
     setShowAddForm(false);
     alert('✅ 신규 증거 자료가 정상적으로 저장되었습니다.');
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) { setFileData(null); return; }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('파일 크기는 5MB 이하만 업로드할 수 있습니다.');
+      e.target.value = '';
+      setFileData(null);
+      return;
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setFileData({ dataUrl, name: file.name, type: file.type });
+      if (!newTitle) setNewTitle(file.name);
+    } catch {
+      alert('파일을 읽지 못했습니다.');
+      setFileData(null);
+    }
   };
 
   const handleRemoveEvidence = async (id) => {
@@ -128,35 +169,89 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
             <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--primary-amber)', marginBottom: 10 }}>
               📥 신규 디지털 증거 및 수사 서류 추가 저장
             </div>
-            <form onSubmit={handleAddEvidence} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.5fr 1fr auto', gap: 10, alignItems: 'flex-end' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>증거 명칭</label>
-                <input
-                  className="input-field"
-                  placeholder="예: 피의자 자백 녹취록 / 스크린샷"
-                  value={newTitle}
-                  onChange={e => setNewTitle(e.target.value)}
-                />
+
+            {/* 입력 모드 탭 */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              <button
+                type="button"
+                onClick={() => setInputMode('url')}
+                className={inputMode === 'url' ? 'btn btn-gold' : 'btn btn-secondary'}
+                style={{ fontSize: '0.75rem', padding: '4px 12px' }}
+              >
+                🔗 URL 입력
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputMode('file')}
+                className={inputMode === 'file' ? 'btn btn-gold' : 'btn btn-secondary'}
+                style={{ fontSize: '0.75rem', padding: '4px 12px' }}
+              >
+                <Upload size={12} /> 파일 업로드
+              </button>
+            </div>
+
+            <form onSubmit={handleAddEvidence} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: inputMode === 'url' ? '1.2fr 1.5fr 1fr' : '1.2fr 1.5fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>증거 명칭</label>
+                  <input
+                    className="input-field"
+                    placeholder="예: 피의자 자백 녹취록 / 스크린샷"
+                    value={newTitle}
+                    onChange={e => setNewTitle(e.target.value)}
+                  />
+                </div>
+
+                {inputMode === 'url' ? (
+                  <>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>증거 URL / 카페 링크 *</label>
+                      <input
+                        className="input-field"
+                        placeholder="https://cafe.naver.com/doseonline/..."
+                        value={newUrl}
+                        onChange={e => setNewUrl(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>증거 종류</label>
+                      <select className="select-field" value={newType} onChange={e => setNewType(e.target.value)}>
+                        {EVIDENCE_TYPES.map(t => (
+                          <option key={t.id} value={t.id}>{t.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>파일 선택 * (최대 5MB)</label>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.hwp"
+                      onChange={handleFileChange}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '6px 10px',
+                        borderRadius: 8,
+                        border: '1px solid var(--border-subtle)',
+                        background: 'var(--bg-elevated)',
+                        color: 'var(--text-main)',
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                      }}
+                    />
+                    {fileData && (
+                      <div style={{ marginTop: 4, fontSize: '0.7rem', color: '#34d399' }}>
+                        ✅ {fileData.name} ({(fileData.dataUrl.length * 0.75 / 1024).toFixed(0)} KB)
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+
               <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>증거 URL / 카페 링크 *</label>
-                <input
-                  className="input-field"
-                  placeholder="https://cafe.naver.com/doseonline/..."
-                  value={newUrl}
-                  onChange={e => setNewUrl(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>증거 종류</label>
-                <select className="select-field" value={newType} onChange={e => setNewType(e.target.value)}>
-                  {EVIDENCE_TYPES.map(t => (
-                    <option key={t.id} value={t.id}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>사건기록 / 증거 설명</label>
                 <textarea
                   className="textarea-field"
@@ -166,9 +261,12 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
                   onChange={e => setNewRecord(e.target.value)}
                 />
               </div>
-              <button type="submit" className="btn btn-gold" style={{ padding: '8px 14px', fontSize: '0.8rem', gap: 4 }}>
-                <CheckCircle2 size={14} /> {saving ? '저장 중...' : '저장'}
-              </button>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" className="btn btn-gold" style={{ padding: '8px 14px', fontSize: '0.8rem', gap: 4 }}>
+                  <CheckCircle2 size={14} /> {saving ? '저장 중...' : '저장'}
+                </button>
+              </div>
             </form>
           </div>
         )}
@@ -220,7 +318,7 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
                     </div>
                     <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontFamily: 'monospace', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {item.url}
+                        {item.url.startsWith('data:') ? '📎 업로드 파일' : item.url}
                       </span>
                       <span>{(item.createdAt || item.date || '').slice(0, 10)}</span>
                     </div>
@@ -247,13 +345,34 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
               <>
                 <div style={{ padding: '8px 14px', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '0.72rem', color: '#60a5fa', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {activeUrl}
+                    {activeUrl.startsWith('data:') ? '📎 업로드된 파일' : activeUrl}
                   </span>
-                  <a href={activeUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{ padding: '2px 8px', fontSize: '0.7rem', color: 'var(--primary-amber)' }}>
-                    <ExternalLink size={11} /> 새 창에서 열기
-                  </a>
+                  {!activeUrl.startsWith('data:') && (
+                    <a href={activeUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline" style={{ padding: '2px 8px', fontSize: '0.7rem', color: 'var(--primary-amber)' }}>
+                      <ExternalLink size={11} /> 새 창에서 열기
+                    </a>
+                  )}
                 </div>
-                <iframe src={activeUrl} title="증거자료 미리보기" style={{ width: '100%', flex: 1, border: 'none' }} />
+                {activeUrl.startsWith('data:image/') ? (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: 8 }}>
+                    <img src={activeUrl} alt="증거자료" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }} />
+                  </div>
+                ) : activeUrl.startsWith('data:') ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text-muted)' }}>
+                    <FileText size={48} color="var(--primary-amber)" />
+                    <div style={{ fontSize: '0.85rem' }}>업로드된 파일 (미리보기 미지원)</div>
+                    <a
+                      href={activeUrl}
+                      download="evidence"
+                      className="btn btn-gold"
+                      style={{ fontSize: '0.78rem', padding: '6px 14px' }}
+                    >
+                      📥 파일 다운로드
+                    </a>
+                  </div>
+                ) : (
+                  <iframe src={activeUrl} title="증거자료 미리보기" style={{ width: '100%', flex: 1, border: 'none' }} />
+                )}
               </>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '0.85rem' }}>

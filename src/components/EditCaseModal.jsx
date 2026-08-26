@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { X, Save, Edit, Scale, AlertCircle, Search, RefreshCw, Plus, Trash2, Users } from 'lucide-react';
+import { X, Save, Edit, Scale, AlertCircle, Search, RefreshCw, Plus, Trash2, Users, MessageSquare } from 'lucide-react';
 import { fetchMojangUuid } from '../services/mojangApi';
+import CaseMemoPanel from './CaseMemoPanel';
 
-export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prosecutorsList = [] }) {
+export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prosecutorsList = [], chargesData = [], currentUser, onToast }) {
   if (!isOpen || !caseItem) return null;
 
+  const [activeTab, setActiveTab] = useState('info'); // 'info' | 'memos'
   const [formData, setFormData] = useState({ ...caseItem });
   const [suspectsList, setSuspectsList] = useState(() => {
     if (caseItem.suspects && caseItem.suspects.length > 0) {
@@ -104,7 +106,42 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
           </button>
         </div>
 
-        {/* Form */}
+        {/* 탭 전환 */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 0 }}>
+          {[
+            { key: 'info', label: '사건 정보', icon: <Scale size={13} /> },
+            { key: 'memos', label: '수사 메모', icon: <MessageSquare size={13} /> },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '8px 16px', fontSize: '0.8rem', fontWeight: 700,
+                background: 'none', border: 'none', cursor: 'pointer',
+                borderBottom: activeTab === tab.key ? '2px solid var(--primary-amber)' : '2px solid transparent',
+                color: activeTab === tab.key ? 'var(--primary-amber)' : 'var(--text-muted)',
+                marginBottom: -1,
+                transition: 'all 0.15s',
+              }}
+            >
+              {tab.icon}{tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 탭 콘텐츠 */}
+        {activeTab === 'memos' ? (
+          <CaseMemoPanel
+            caseId={caseItem.id}
+            hyeongjeNo={caseItem.hyeongjeNo}
+            currentUser={currentUser}
+            onToast={onToast}
+          />
+        ) : (
+
+        /* Form */
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Section 1: Basic Info */}
           <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 16, border: '1px solid var(--border-subtle)' }}>
@@ -218,7 +255,12 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
 
             <div style={{ marginTop: 12 }}>
               <label className="input-label">적용 죄명</label>
-              <input className="input-field" name="chargeName" value={formData.chargeName || ''} onChange={handleChange} required />
+              <input className="input-field" name="chargeName" value={formData.chargeName || ''} onChange={handleChange} required list="edit-charge-options" placeholder="죄명 직접 입력 또는 목록 선택" />
+              <datalist id="edit-charge-options">
+                {chargesData.map((charge) => (
+                  <option key={charge.id || charge} value={charge.name || charge} />
+                ))}
+              </datalist>
             </div>
           </div>
 
@@ -290,6 +332,7 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
             </button>
           </div>
         </form>
+        )} {/* end activeTab === 'info' */}
       </div>
     </div>
   );
