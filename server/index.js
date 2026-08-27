@@ -166,8 +166,21 @@ async function requireAuth(req, res, next) {
   }
 }
 
+// ── 직무대리(dualRoleLevel) 통합 유효 권한 헬퍼 ────────────────────
+// 직무대리 발령 시 대리자의 dualRoleLevel이 피대리인 roleLevel로 설정됨.
+// 권한 체크는 모두 이 함수를 통해 "더 높은 쪽"을 사용하도록 통일.
+function effectiveRoleLevel(user) {
+  if (!user) return "PROBATIONARY";
+  const base = user.roleLevel || "PROBATIONARY";
+  const dual = user.dualRoleLevel || "";
+  if (!dual) return base;
+  const baseAuth = ROLE_AUTHORITY[base] || 0;
+  const dualAuth = ROLE_AUTHORITY[dual] || 0;
+  return dualAuth > baseAuth ? dual : base;
+}
+
 function hasGlobalDataAccess(user) {
-  return Boolean(user.isSuperAdmin || GLOBAL_DATA_ROLES.has(user.roleLevel));
+  return Boolean(user.isSuperAdmin || GLOBAL_DATA_ROLES.has(effectiveRoleLevel(user)));
 }
 
 function hasSecretariatWorkAccess(user) {
@@ -189,7 +202,7 @@ function isManagementAccount(account) {
 
 function isProsecutorGeneral(user) {
   return Boolean(
-    user?.isSuperAdmin || user?.roleLevel === "PROSECUTOR_GENERAL",
+    user?.isSuperAdmin || effectiveRoleLevel(user) === "PROSECUTOR_GENERAL",
   );
 }
 
@@ -237,7 +250,7 @@ async function validateForcedCaseAssignee(prosecutorId) {
 }
 
 function requireApprovalAuthority(req, res, next) {
-  if (!APPROVAL_ROLES.has(req.user.roleLevel)) {
+  if (!APPROVAL_ROLES.has(effectiveRoleLevel(req.user))) {
     return res
       .status(403)
       .json({ success: false, message: "결재 권한이 필요합니다." });
@@ -1519,7 +1532,7 @@ async function requireProsecutorAccountManager(req, res, next) {
     return requireSecretariat(req, res, next);
   if (
     !["PROSECUTOR_GENERAL", "CHIEF_PROSECUTOR", "SUPER_ADMIN"].includes(
-      req.user.roleLevel,
+      effectiveRoleLevel(req.user),
     )
   ) {
     const result = await db.execute({
@@ -1551,6 +1564,7 @@ app.patch(
       dualPosition: "dual_position",
       dualDept: "dual_dept",
       dualRoleLevel: "dual_role_level",
+      actingTitle: "acting_title",
       dualSecretariatWork: "dual_secretariat_work",
       isAutoAssignExcluded: "is_auto_assign_excluded",
       canArbitraryApprove: "can_arbitrary_approve",
@@ -1583,13 +1597,13 @@ app.patch(
     const canManageAnyRole =
       req.user.isSuperAdmin ||
       hasSecretariatWorkAccess(req.user) ||
-      TOP_ROLE_MANAGERS.has(req.user.roleLevel);
+      TOP_ROLE_MANAGERS.has(effectiveRoleLevel(req.user));
     if (
       (req.body.roleLevel !== undefined || req.body.rank !== undefined) &&
       !canManageAnyRole &&
       !(
         req.params.id === req.user.id &&
-        SELF_ROLE_CHANGE_ROLES.has(req.user.roleLevel)
+        SELF_ROLE_CHANGE_ROLES.has(effectiveRoleLevel(req.user))
       )
     ) {
       return res
@@ -1597,7 +1611,7 @@ app.patch(
         .json({ success: false, message: "승진·직급 변경 권한이 필요합니다." });
     }
     const canChangeOwnRole =
-      req.user.isSuperAdmin || SELF_ROLE_CHANGE_ROLES.has(req.user.roleLevel);
+      req.user.isSuperAdmin || SELF_ROLE_CHANGE_ROLES.has(effectiveRoleLevel(req.user));
     if (
       (req.body.roleLevel !== undefined || req.body.rank !== undefined) &&
       req.params.id === req.user.id &&
@@ -1611,7 +1625,7 @@ app.patch(
     if (req.body.roleLevel !== undefined) {
       const actorAuthority = req.user.isSuperAdmin
         ? ROLE_AUTHORITY.SUPER_ADMIN
-        : ROLE_AUTHORITY[req.user.roleLevel] || 0;
+        : ROLE_AUTHORITY[effectiveRoleLevel(req.user)] || 0;
       const targetAuthority = ROLE_AUTHORITY[req.body.roleLevel] || 0;
       if (
         !targetAuthority ||
@@ -1977,7 +1991,7 @@ app.put("/api/registrations/:id/reject", requireAuth, async (req, res) => {
 // 공통: 사무국 권한 체크 헬퍼
 function requireSecretariat(req, res, next) {
   const ok =
-    SECRETARIAT_ROLES.has(req.user.roleLevel) ||
+    SECRETARIAT_ROLES.has(effectiveRoleLevel(req.user)) ||
     hasSecretariatWorkAccess(req.user);
   if (!ok) {
     return res
@@ -1990,7 +2004,7 @@ function requireSecretariat(req, res, next) {
 function requireLoginRecordAccess(req, res, next) {
   const allowed =
     req.user.isSuperAdmin ||
-    MANAGEMENT_ROLE_LEVELS.has(req.user.roleLevel) ||
+    MANAGEMENT_ROLE_LEVELS.has(effectiveRoleLevel(req.user)) ||
     hasSecretariatWorkAccess(req.user);
   if (!allowed) {
     return res.status(403).json({

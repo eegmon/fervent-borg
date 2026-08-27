@@ -1273,8 +1273,12 @@ function ActingOrderPanel({
     });
   }, []);
 
+  // 공석 모드: 원 결재권자 계정이 없을 때 직위명을 직접 입력
+  const [vacantMode, setVacantMode] = useState(false);
+
   const [form, setForm] = useState({
     originalUserId: prosecutorsList[0]?.id || "",
+    originalVacantTitle: "",   // 공석 모드 전용 — 피대리 직위 직접 입력
     actingUserId: prosecutorsList[1]?.id || "",
     actingTitle: "부장검사 직무대리",
     orderNo: `검찰사무국 직무대리명령 제2026-00${orders.length + 1}호`,
@@ -1284,16 +1288,31 @@ function ActingOrderPanel({
 
   const handleIssueOrder = async (e) => {
     e.preventDefault();
-    const orig = prosecutorsList.find((p) => p.id === form.originalUserId);
     const act = prosecutorsList.find((p) => p.id === form.actingUserId);
-    if (!orig || !act) return;
+    if (!act) return;
+
+    let origLabel, origId;
+    if (vacantMode) {
+      // 공석 모드: 계정 없음 — 직위명만 기록, origId는 빈 문자열
+      if (!form.originalVacantTitle.trim()) {
+        alert("피대리 직위명을 입력해 주세요.");
+        return;
+      }
+      origLabel = `${form.originalVacantTitle.trim()} (공석)`;
+      origId = "";
+    } else {
+      const orig = prosecutorsList.find((p) => p.id === form.originalUserId);
+      if (!orig) return;
+      origLabel = `${orig.name} (${orig.position || orig.title})`;
+      origId = orig.id;
+    }
 
     const newOrder = {
       id: `ACT-${Date.now()}`,
       orderNo:
         form.orderNo || `검찰사무국 직무대리명령 제2026-${orders.length + 1}호`,
-      originalUser: `${orig.name} (${orig.position || orig.title})`,
-      originalUserId: orig.id,
+      originalUser: origLabel,
+      originalUserId: origId,
       actingUser: `${act.name} (${act.position || act.title})`,
       actingUserId: act.id,
       actingTitle: form.actingTitle,
@@ -1310,24 +1329,40 @@ function ActingOrderPanel({
     }
     setOrders((prev) => [saved.document || newOrder, ...prev]);
 
-    if (onUpdateProsecutorStatus) {
-      onUpdateProsecutorStatus(orig.id, {
+    // 계정이 있는 경우에만 계정 status 업데이트
+    if (onUpdateProsecutorStatus && origId) {
+      onUpdateProsecutorStatus(origId, {
         status: "DELEGATED",
         delegateTo: `${act.name} (${form.actingTitle})`,
         delegateReason: `[직무대리명령] ${form.reason}`,
       });
     }
 
+    // 직무대리자 계정에 대결 직위 + dualRoleLevel(피대리인 권한 등급) 부여
+    // 공석 모드일 때는 actingTitle에서 직위를 유추할 수 없으므로 form에 별도 roleLevel 선택 없이
+    // 원 결재권자의 roleLevel을 그대로 전달 (계정 있을 때), 공석이면 빈 문자열로 유지
+    const origRoleLevel = vacantMode
+      ? ""
+      : (prosecutorsList.find((p) => p.id === form.originalUserId)?.roleLevel || "");
+    if (onUpdateProsecutorStatus) {
+      onUpdateProsecutorStatus(act.id, {
+        delegateTo: origLabel,
+        delegateReason: `[직무대리명령 수임] ${form.orderNo}`,
+        actingTitle: form.actingTitle,
+        ...(origRoleLevel ? { dualRoleLevel: origRoleLevel } : {}),
+      });
+    }
+
     addLog?.(
       "직무대리명령 공식 발령",
-      `${form.orderNo}: '${act.name}' 검사를 '${orig.name}' 직무대리로 발령`,
+      `${form.orderNo}: '${act.name}' 검사를 '${origLabel}' 직무대리로 발령`,
     );
     alert(
       `[검찰사무국 관인 날인] ${form.orderNo} 직무대리명령이 성공적으로 발령되었습니다.`,
     );
   };
 
-  const handleRevokeOrder = async (orderId, origUserId) => {
+  const handleRevokeOrder = async (orderId, origUserId, actingUserId) => {
     if (!window.confirm("해당 직무대리명령을 해제하시겠습니까?")) return;
     const saved = await updateOfficeDocumentApi(orderId, {
       status: "해제완료",
@@ -1339,9 +1374,19 @@ function ActingOrderPanel({
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? saved.document : o)),
     );
+    // 피대리인 계정 복원 (계정 존재할 때만)
     if (onUpdateProsecutorStatus && origUserId) {
       onUpdateProsecutorStatus(origUserId, {
         status: "ACTIVE",
+        delegateTo: "",
+        delegateReason: "",
+      });
+    }
+    // 대리자 계정의 dualRoleLevel 및 대결 정보 초기화
+    if (onUpdateProsecutorStatus && actingUserId) {
+      onUpdateProsecutorStatus(actingUserId, {
+        actingTitle: "",
+        dualRoleLevel: "",
         delegateTo: "",
         delegateReason: "",
       });
@@ -1412,20 +1457,64 @@ function ActingOrderPanel({
             </div>
 
             <div>
-              <Label>원 결재권자 (피대리인) *</Label>
-              <select
-                className="select-field"
-                value={form.originalUserId}
-                onChange={(e) =>
-                  setForm({ ...form, originalUserId: e.target.value })
-                }
-              >
-                {prosecutorsList.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.position || p.title} / {p.dept})
-                  </option>
-                ))}
-              </select>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <Label>원 결재권자 (피대리인) *</Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVacantMode((v) => !v);
+                    setForm((f) => ({ ...f, originalVacantTitle: "" }));
+                  }}
+                  style={{
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                    padding: "2px 9px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    border: vacantMode
+                      ? "1px solid rgba(245,158,11,0.6)"
+                      : "1px solid var(--border-subtle)",
+                    background: vacantMode
+                      ? "rgba(245,158,11,0.12)"
+                      : "var(--bg-elevated)",
+                    color: vacantMode ? "var(--primary-amber)" : "var(--text-muted)",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {vacantMode ? "🔓 공석 입력 중" : "🏚️ 공석 (계정 없음)"}
+                </button>
+              </div>
+              {vacantMode ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <input
+                    className="input-field"
+                    placeholder="예: 검찰사무국장 / 부장검사 (공석)"
+                    value={form.originalVacantTitle}
+                    onChange={(e) =>
+                      setForm({ ...form, originalVacantTitle: e.target.value })
+                    }
+                    required
+                    autoFocus
+                  />
+                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", paddingLeft: 2 }}>
+                    계정 없는 공석 직위명을 직접 입력합니다. 발령 대장에 <em>(공석)</em>으로 표시됩니다.
+                  </div>
+                </div>
+              ) : (
+                <select
+                  className="select-field"
+                  value={form.originalUserId}
+                  onChange={(e) =>
+                    setForm({ ...form, originalUserId: e.target.value })
+                  }
+                >
+                  {prosecutorsList.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.position || p.title} / {p.dept})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>
@@ -1587,7 +1676,7 @@ function ActingOrderPanel({
                       {o.status === "발령중" && (
                         <button
                           onClick={() =>
-                            handleRevokeOrder(o.id, o.originalUserId)
+                            handleRevokeOrder(o.id, o.originalUserId, o.actingUserId)
                           }
                           className="btn btn-secondary"
                           style={{

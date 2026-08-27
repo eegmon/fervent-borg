@@ -241,6 +241,11 @@ export default function Header({
                   style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}
                 >
                   {currentUser.position || currentUser.title}
+                  {currentUser.actingTitle && (
+                    <span style={{ color: "var(--primary-amber)", fontWeight: 700 }}>
+                      {" | "}{currentUser.actingTitle}
+                    </span>
+                  )}
                 </div>
               </div>
               <button
