@@ -160,10 +160,6 @@ export async function initDb() {
       created_by TEXT DEFAULT ''
     )
   `);
-  await db.execute({
-    sql: "INSERT OR IGNORE INTO charges (name) VALUES (?)",
-    args: ["자본시장법 위반 및 사기"],
-  });
 
   // ── reports ────────────────────────────────────────────────────
   await db.execute(`
