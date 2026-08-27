@@ -817,6 +817,12 @@ export default function MyCasesLedger({
       (item.suspectName || "").toLowerCase().includes(q) ||
       (item.chargeName || "").toLowerCase().includes(q) ||
       (item.suspectUuid || "").toLowerCase().includes(q);
+    const matchStatus =
+      statusFilter === "ALL" ||
+      (item.disposition || item.bookingStatus || "")
+        .toLowerCase()
+        .includes(statusFilter.toLowerCase());
+
     const matchArchive =
       archiveFilter === "ALL"
         ? true
