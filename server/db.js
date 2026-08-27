@@ -121,6 +121,9 @@ export async function initDb() {
     "visibility TEXT DEFAULT 'PUBLIC'",
     "created_by TEXT DEFAULT ''",
     "private_viewer_ids TEXT DEFAULT '[]'",
+    "is_archived INTEGER DEFAULT 0",
+    "archived_at TEXT DEFAULT ''",
+    "archived_by TEXT DEFAULT ''",
   ]) {
     try {
       await db.execute(`ALTER TABLE cases ADD COLUMN ${column}`);

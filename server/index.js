@@ -951,6 +951,37 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, async (req, res) => {
   res.json({ success: true });
 });
 
+// PATCH /api/cases/:id/archive — 사건 보존 / 보존 해제 처리
+app.patch("/api/cases/:id/archive", requireAuth, async (req, res) => {
+  const isArchived = Boolean(req.body.isArchived);
+  const nowStr = isArchived
+    ? new Date().toISOString().replace("T", " ").substring(0, 19)
+    : "";
+  const actorName = isArchived ? req.user.name : "";
+
+  try {
+    await db.execute({
+      sql: `UPDATE cases SET is_archived=?, archived_at=?, archived_by=? WHERE id=?`,
+      args: [isArchived ? 1 : 0, nowStr, actorName, req.params.id],
+    });
+
+    await writeAuditLog({
+      action: "UPDATE",
+      entityType: "case",
+      entityId: req.params.id,
+      entityLabel: req.params.id,
+      actorId: req.user.id,
+      actorName: req.user.name,
+      detail: isArchived ? "사건 보존 처리 (서고 이동)" : "사건 보존 해제 (원부 복원)",
+    });
+
+    res.json({ success: true, isArchived, archivedAt: nowStr, archivedBy: actorName });
+  } catch (err) {
+    console.error("[PATCH /api/cases/:id/archive]", err);
+    res.status(500).json({ success: false, message: "사건 보존 처리 중 오류 발생" });
+  }
+});
+
 // ════════════════════════════════════════════════════════════════════
 // 3. Reports
 // ════════════════════════════════════════════════════════════════════

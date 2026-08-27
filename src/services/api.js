@@ -130,6 +130,13 @@ export function updateCaseApi(id, caseData) {
   });
 }
 
+export function archiveCaseApi(id, isArchived) {
+  return apiFetch(`/cases/${id}/archive`, {
+    method: "PATCH",
+    body: JSON.stringify({ isArchived }),
+  });
+}
+
 export function fetchDepartments() {
   return apiFetch("/departments");
 }

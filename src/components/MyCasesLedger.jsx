@@ -23,6 +23,7 @@ import {
   NON_INDICTMENT_REASONS,
   PROSECUTORS,
   calculateStatuteOfLimitations,
+  isCaseClosedOrIndicted,
 } from "../data/prosecutionData";
 
 const STATUS_COLOR = (s) => {
@@ -698,6 +699,7 @@ export default function MyCasesLedger({
   onSelectSuspect,
   onOpenApprovalForCase,
   onUpdateCase,
+  onArchiveCase,
   onOpenLoginModal,
   onAddApproval,
   approvalsData = [],
@@ -711,6 +713,7 @@ export default function MyCasesLedger({
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [archiveFilter, setArchiveFilter] = useState("ACTIVE");
 
   const [editingCase, setEditingCase] = useState(null);
   const [statusChangeCase, setStatusChangeCase] = useState(null);
@@ -814,12 +817,14 @@ export default function MyCasesLedger({
       (item.suspectName || "").toLowerCase().includes(q) ||
       (item.chargeName || "").toLowerCase().includes(q) ||
       (item.suspectUuid || "").toLowerCase().includes(q);
-    const matchStatus =
-      statusFilter === "ALL" ||
-      (item.disposition || item.bookingStatus || "")
-        .toLowerCase()
-        .includes(statusFilter.toLowerCase());
-    return matchQ && matchStatus;
+    const matchArchive =
+      archiveFilter === "ALL"
+        ? true
+        : archiveFilter === "ARCHIVED"
+          ? Boolean(item.isArchived)
+          : !item.isArchived;
+
+    return matchQ && matchStatus && matchArchive;
   });
 
   const activeCount = myCases.filter(
@@ -1076,6 +1081,55 @@ export default function MyCasesLedger({
             </div>
           ))}
         </div>
+      </div>
+
+      {/* 보존 상태 구별 필터 탭 */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        {[
+          {
+            id: "ACTIVE",
+            label: `📂 미보존·진행 사건 (${myCases.filter((c) => !c.isArchived).length}건)`,
+            color: "#3b82f6",
+          },
+          {
+            id: "ARCHIVED",
+            label: `📦 보존기록 서고 (${myCases.filter((c) => Boolean(c.isArchived)).length}건)`,
+            color: "#f59e0b",
+          },
+          {
+            id: "ALL",
+            label: `📋 전체 사건 (${myCases.length}건)`,
+            color: "#94a3b8",
+          },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setArchiveFilter(t.id)}
+            className="btn"
+            style={{
+              fontSize: "0.78rem",
+              padding: "6px 14px",
+              background:
+                archiveFilter === t.id ? t.color : "rgba(255,255,255,0.05)",
+              color: archiveFilter === t.id ? "#000" : "var(--text-main)",
+              fontWeight: archiveFilter === t.id ? 800 : 500,
+              border:
+                archiveFilter === t.id
+                  ? "none"
+                  : "1px solid var(--border-subtle)",
+              borderRadius: 8,
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* Filter Bar */}
@@ -1392,6 +1446,43 @@ export default function MyCasesLedger({
                       공소시효 (소송법 제21조의2/3)
                     </span>
                     {(() => {
+                      if (isCaseClosedOrIndicted(item)) {
+                        const disp = (item.disposition || "").trim();
+                        const isIndicted =
+                          (disp.includes("기소") || disp.includes("구공판")) &&
+                          !disp.includes("불기소") &&
+                          !disp.includes("미기소") &&
+                          !disp.includes("기소유예") &&
+                          !disp.includes("기소중지");
+                        return (
+                          <div
+                            style={{
+                              fontSize: "0.73rem",
+                              fontFamily: "monospace",
+                            }}
+                          >
+                            <span
+                              style={{
+                                color: "#34d399",
+                                fontWeight: 800,
+                              }}
+                            >
+                              {isIndicted
+                                ? "기소 완료 (시효 정지)"
+                                : "종국 처분 (시효 종료)"}
+                            </span>
+                            <span
+                              style={{
+                                color: "var(--text-muted)",
+                                display: "block",
+                                fontSize: "0.68rem",
+                              }}
+                            >
+                              ({disp || "처분 완료"})
+                            </span>
+                          </div>
+                        );
+                      }
                       const sol = calculateStatuteOfLimitations(
                         item.chargeName,
                         item.bookingDate,
@@ -1496,6 +1587,28 @@ export default function MyCasesLedger({
                     >
                       <ClipboardList size={13} /> 전자 결재 상신
                     </button>
+
+                    {/* 사건 보존 / 보존 해제 버튼 */}
+                    {onArchiveCase && (
+                      <button
+                        onClick={() => onArchiveCase(item.id, !item.isArchived)}
+                        className="btn btn-outline"
+                        style={{
+                          fontSize: "0.78rem",
+                          padding: "5px 12px",
+                          color: item.isArchived ? "#34d399" : "#f59e0b",
+                          border: `1px solid ${item.isArchived ? "rgba(52,211,153,0.4)" : "rgba(245,158,11,0.3)"}`,
+                          gap: 5,
+                        }}
+                        title={
+                          item.isArchived
+                            ? "보존 해제하여 사건 원부 기본 목록으로 복원"
+                            : "사건을 보존 처리하여 보존기록 서고로 이동"
+                        }
+                      >
+                        {item.isArchived ? "🔄 보존 해제" : "📦 사건 보존"}
+                      </button>
+                    )}
 
                     <button
                       onClick={() => onOpenTimeline && onOpenTimeline(item)}

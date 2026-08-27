@@ -70,6 +70,7 @@ export default function MainLedger({
   onSelectSuspect,
   onCreateApproval,
   onUpdateCase,
+  onArchiveCase,
   currentUser,
   approvalsData = [],
   onDesignateCase,
@@ -81,6 +82,7 @@ export default function MainLedger({
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [prosecutorFilter, setProsecutorFilter] = useState("ALL");
   const [deptFilter, setDeptFilter] = useState("ALL");
+  const [archiveFilter, setArchiveFilter] = useState("ACTIVE");
   const [expandedId, setExpandedId] = useState(null);
   const [editingCase, setEditingCase] = useState(null);
 
@@ -153,7 +155,15 @@ export default function MainLedger({
       matchDept = pUser ? pUser.dept === deptFilter : false;
     }
 
-    return matchQ && matchStatus && matchP && matchDept;
+    // 보존 상태 필터링 (ACTIVE: 미보존 사건, ARCHIVED: 보존 서고 사건, ALL: 전체)
+    const matchArchive =
+      archiveFilter === "ALL"
+        ? true
+        : archiveFilter === "ARCHIVED"
+          ? Boolean(item.isArchived)
+          : !item.isArchived;
+
+    return matchQ && matchStatus && matchP && matchDept && matchArchive;
   });
 
   return (
@@ -243,6 +253,56 @@ export default function MainLedger({
               </div>
             ))}
           </div>
+        </div>
+
+        {/* 보존 상태 구별 필터 탭 (기본: 미보존 사건만 보기) */}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            alignItems: "center",
+            marginBottom: 10,
+          }}
+        >
+          {[
+            {
+              id: "ACTIVE",
+              label: `📂 미보존·진행 사건 (${(ledgerData || []).filter((c) => !c.isArchived).length}건)`,
+              color: "#3b82f6",
+            },
+            {
+              id: "ARCHIVED",
+              label: `📦 보존기록 서고 (${(ledgerData || []).filter((c) => Boolean(c.isArchived)).length}건)`,
+              color: "#f59e0b",
+            },
+            {
+              id: "ALL",
+              label: `📋 전체 보기 (${(ledgerData || []).length}건)`,
+              color: "#94a3b8",
+            },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setArchiveFilter(t.id)}
+              className="btn"
+              style={{
+                fontSize: "0.78rem",
+                padding: "6px 14px",
+                background:
+                  archiveFilter === t.id ? t.color : "rgba(255,255,255,0.05)",
+                color: archiveFilter === t.id ? "#000" : "var(--text-main)",
+                fontWeight: archiveFilter === t.id ? 800 : 500,
+                border:
+                  archiveFilter === t.id
+                    ? "none"
+                    : "1px solid var(--border-subtle)",
+                borderRadius: 8,
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
         {/* Filter Bar */}
@@ -611,6 +671,23 @@ export default function MainLedger({
                       justifyContent: "flex-end",
                     }}
                   >
+                    {/* 보존 완료 배지 */}
+                    {!!item.isArchived && (
+                      <span
+                        style={{
+                          fontSize: "0.7rem",
+                          fontWeight: 800,
+                          color: "#f59e0b",
+                          background: "rgba(245,158,11,0.15)",
+                          border: "1px solid rgba(245,158,11,0.4)",
+                          borderRadius: 6,
+                          padding: "3px 8px",
+                        }}
+                      >
+                        📦 보존 완료 ({item.archivedAt ? item.archivedAt.slice(0, 10) : "보존서고"})
+                      </span>
+                    )}
+
                     {/* 결재 필수 / 완료 배지 */}
                     {!!item.supervisorDesignated &&
                       !isCaseApprovalComplete(item) && (
@@ -647,6 +724,30 @@ export default function MainLedger({
                           ✅ 결재 완료
                         </span>
                       )}
+
+                    {/* 사건 보존 / 보존 해제 버튼 */}
+                    {onArchiveCase && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onArchiveCase(item.id, !item.isArchived);
+                        }}
+                        className="btn btn-outline"
+                        style={{
+                          padding: "5px 10px",
+                          fontSize: "0.75rem",
+                          color: item.isArchived ? "#34d399" : "#f59e0b",
+                          border: `1px solid ${item.isArchived ? "rgba(52,211,153,0.4)" : "rgba(245,158,11,0.3)"}`,
+                        }}
+                        title={
+                          item.isArchived
+                            ? "보존 해제하여 사건 원부 기본 목록으로 복원"
+                            : "사건을 보존 처리하여 보존기록 서고로 이동"
+                        }
+                      >
+                        {item.isArchived ? "🔄 보존 해제" : "📦 사건 보존"}
+                      </button>
+                    )}
 
                     <button
                         onClick={(e) => {

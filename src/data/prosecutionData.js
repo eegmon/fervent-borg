@@ -118,6 +118,62 @@ export function formatKSTDateStr(dateInput) {
 }
 
 /**
+ * 사건이 종국 처분되었거나 기소되었는지 여부 확인
+ * - 기소된 사건(구속기소, 불구속기소, 약식기소, 기소, 구공판 등): 공소제기가 완료되어 공소시효 진행이 정지/완료됨.
+ * - 종국 사건(불기소, 기소유예, 혐의없음, 죄가안됨, 공소권없음, 각하, 타관송치, 기소중지, 참고인중지, 종결, 처분완료 등): 이미 처분이 완료됨.
+ * - 따라서 종국/기소 사건은 공소시효 만료 경보 및 48시간 영장 기한 알림 대상에서 제외된다.
+ */
+export function isCaseClosedOrIndicted(c) {
+  if (!c) return false;
+  const disp = (c.disposition || "").trim();
+  const bookingStatus = (c.bookingStatus || "").trim();
+  const status = (c.status || "").trim();
+
+  // 1. 종국 / 불기소 / 처분완료 여부 확인
+  const isClosed =
+    Boolean(c.isConcluded) ||
+    status.includes("종국") ||
+    status.includes("완료") ||
+    status.includes("종결") ||
+    bookingStatus.includes("종국") ||
+    bookingStatus.includes("완료") ||
+    [
+      "불기소",
+      "종국",
+      "기소유예",
+      "혐의없음",
+      "무혐의",
+      "죄가안됨",
+      "공소권없음",
+      "각하",
+      "기소중지",
+      "참고인중지",
+      "타관송치",
+      "종결",
+      "처분완료",
+      "결재완료",
+    ].some((k) => disp.includes(k));
+
+  if (isClosed) return true;
+
+  // 2. 기소 여부 확인 (구속기소, 불구속기소, 약식기소, 기소, 구공판 등)
+  const isIndicted =
+    (disp.includes("기소") || disp.includes("구공판") || bookingStatus.includes("기소") || status.includes("기소")) &&
+    !disp.includes("불기소") &&
+    !disp.includes("미기소") &&
+    !disp.includes("기소유예") &&
+    !disp.includes("기소중지") &&
+    !bookingStatus.includes("불기소") &&
+    !bookingStatus.includes("미기소") &&
+    !bookingStatus.includes("기소유예") &&
+    !bookingStatus.includes("기소중지");
+
+  if (isIndicted) return true;
+
+  return false;
+}
+
+/**
  * 도스온라인 소송법 제21조의2 및 제21조의3(공소시효 특례) 기준 공소시효 자동 계산
  * - 제21조의2① 일반 범죄: 20일
  * - 제21조의3① 경제범죄(절도, 강도, 사기, 공갈, 횡령, 배임 등): 42일

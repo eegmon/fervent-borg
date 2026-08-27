@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { X, Bell, ShieldAlert, Clock, AlertTriangle, Scale, CheckCircle2, ChevronRight, ExternalLink } from 'lucide-react';
-import { calculateStatuteOfLimitations } from '../data/prosecutionData';
+import { calculateStatuteOfLimitations, isCaseClosedOrIndicted } from '../data/prosecutionData';
 
 export default function DeadlineAlertModal({
   isOpen,
@@ -21,6 +21,9 @@ export default function DeadlineAlertModal({
 
     // 1. 구속 기간 만료 (도스온라인 소송법 제14조제6항: 48시간 이내 기소 제한)
     ledgerData.forEach(c => {
+      // 이미 종국 처분되었거나 기소된 사건은 48시간 영장 기한 경보 대상에서 제외
+      if (isCaseClosedOrIndicted(c)) return;
+
       const statusStr = (c.bookingStatus || '').trim();
       // '불구속' / '미구속' 제외, 체포·구속영장 발부 포함
       const isArrested =
@@ -100,8 +103,10 @@ export default function DeadlineAlertModal({
 
     // 4. 공소시효 (도스온라인 소송법 제21조의2, 제21조의3 기준)
     ledgerData.forEach(c => {
-      if (!(c.disposition || '').includes('불기소') && !(c.disposition || '').includes('종국')) {
-        const sol = calculateStatuteOfLimitations(c.chargeName, c.incidentDate || c.bookingDate);
+      // 종국 처분되었거나 이미 기소된 사건은 공소시효 만료 경보 대상에서 제외
+      if (isCaseClosedOrIndicted(c)) return;
+
+      const sol = calculateStatuteOfLimitations(c.chargeName, c.incidentDate || c.bookingDate);
         
         let urgency = 'INFO';
         if (sol.dDay <= 3) urgency = 'CRITICAL';
@@ -119,7 +124,6 @@ export default function DeadlineAlertModal({
           targetTab: 'mycases',
           caseNo: c.hyeongjeNo,
         });
-      }
     });
 
     // Sort by urgency and D-day value

@@ -81,6 +81,7 @@ import {
   INITIAL_APPROVALS,
   INITIAL_DEPARTMENTS,
   calculateStatuteOfLimitations,
+  isCaseClosedOrIndicted,
   isManagementAccount,
 } from "./data/prosecutionData";
 
@@ -89,6 +90,7 @@ import {
   createCaseApi,
   createIntakeBundleApi,
   updateCaseApi,
+  archiveCaseApi,
   deleteCaseApi,
   fetchReports,
   createReportApi,
@@ -187,6 +189,7 @@ export default function App() {
   const totalDeadlineAlertsCount = useMemo(() => {
     let count = 0;
     (ledgerData || []).forEach((c) => {
+      if (isCaseClosedOrIndicted(c)) return;
       if ((c.bookingStatus || c.disposition || "").includes("구속")) count++;
     });
     (appealsData || []).forEach((a) => {
@@ -374,11 +377,7 @@ export default function App() {
         const cases = await fetchCases();
         if (!cases) return;
         const urgent = cases.filter((c) => {
-          if (
-            (c.disposition || "").includes("불기소") ||
-            (c.disposition || "").includes("종국")
-          )
-            return false;
+          if (isCaseClosedOrIndicted(c)) return false;
           const sol = calculateStatuteOfLimitations(
             c.chargeName,
             c.incidentDate || c.bookingDate,
@@ -439,6 +438,45 @@ export default function App() {
       `✏️ ${updatedCase.hyeongjeNo}호 사건 원부가 수정되었습니다.`,
       "success",
     );
+  };
+
+  // Handler: Archive Case (사건 보존 / 보존 해제 처리)
+  const handleArchiveCase = async (caseId, isArchived) => {
+    const target = (ledgerData || []).find((c) => c.id === caseId);
+    if (!target) return;
+
+    const res = await archiveCaseApi(caseId, isArchived);
+    if (res && res.success) {
+      const nowStr =
+        res.archivedAt ||
+        new Date().toISOString().replace("T", " ").substring(0, 19);
+      const actorName = res.archivedBy || currentUser?.name || "";
+      setLedgerData((prev) =>
+        prev.map((c) =>
+          c.id === caseId
+            ? {
+                ...c,
+                isArchived: isArchived ? 1 : 0,
+                archivedAt: nowStr,
+                archivedBy: actorName,
+              }
+            : c,
+        ),
+      );
+      if (isArchived) {
+        showToast(
+          `📦 [${target.hyeongjeNo || target.sujeNo || target.id}] 사건이 보존 처리되어 [보존기록 서고]로 이동했습니다.`,
+          "success",
+        );
+      } else {
+        showToast(
+          `🔄 [${target.hyeongjeNo || target.sujeNo || target.id}] 사건의 보존이 해제되어 원부 기본 목록으로 복원되었습니다.`,
+          "info",
+        );
+      }
+    } else {
+      showToast("❌ 사건 보존 처리 중 오류가 발생했습니다.", "error");
+    }
   };
 
   // Handler: Bulk Import Cases from Excel (검찰사무국 전용)
@@ -1589,6 +1627,7 @@ export default function App() {
                 onOpenMemo={(caseItem) => setMemoCaseItem(caseItem)}
                 onOpenApprovalForCase={handleCreateApprovalForCase}
                 onUpdateCase={handleUpdateCase}
+                onArchiveCase={handleArchiveCase}
                 onOpenLoginModal={() => setIsLoginModalOpen(true)}
                 onAddApproval={handleAddApprovalFromMyCases}
                 approvalsData={approvalsData}
@@ -1628,6 +1667,7 @@ export default function App() {
                 onOpenMemo={(caseItem) => setMemoCaseItem(caseItem)}
                 onCreateApproval={handleCreateApprovalForCase}
                 onUpdateCase={handleUpdateCase}
+                onArchiveCase={handleArchiveCase}
                 currentRole={currentUser?.id || ""}
                 currentUser={currentUser}
                 approvalsData={approvalsData}
