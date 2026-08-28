@@ -795,6 +795,18 @@ export default function MyCasesLedger({
       "CHIEF_ADMINISTRATOR",
     ].includes(currentUser.roleLevel);
 
+  // 결재 필수 지정/해제 권한 — 수사지휘 라인(부장검사 이상)만 허용.
+  // 검찰관리관(CHIEF_ADMINISTRATOR) 등 행정 직급은 수사 지휘권이 없으므로 제외.
+  const canDesignate =
+    currentUser.isSuperAdmin ||
+    [
+      "SUPER_ADMIN",
+      "PROSECUTOR_GENERAL",
+      "CHIEF_PROSECUTOR",
+      "DEPUTY_CHIEF",
+      "SENIOR_PROSECUTOR",
+    ].includes(currentUser.roleLevel);
+
   const targetProsecutorName =
     isHighAdmin && selectedProsecutorFilter
       ? selectedProsecutorFilter
@@ -1367,40 +1379,61 @@ export default function MyCasesLedger({
                     >
                       피의자 성명 / UUID
                     </span>
-                    <button
-                      onClick={() =>
-                        onSelectSuspect && onSelectSuspect(item.suspectName)
-                      }
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        padding: 0,
-                        textAlign: "left",
-                      }}
-                    >
-                      <strong
+                    {item._privateMasked ? (
+                      <span
                         style={{
-                          fontSize: "0.9rem",
-                          color: "var(--text-main)",
-                          textDecoration: "underline dotted",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          padding: "3px 9px",
+                          borderRadius: 6,
+                          background: "rgba(239,68,68,0.12)",
+                          border: "1px solid rgba(239,68,68,0.35)",
+                          color: "#f87171",
+                          fontSize: "0.78rem",
+                          fontWeight: 800,
                         }}
                       >
-                        {item.suspectName}
-                      </strong>
-                    </button>
-                    {item.suspectUuid && item.suspectUuid !== "-" && item.suspectUuid !== "00" && (
-                      <div
-                        style={{
-                          fontSize: "0.68rem",
-                          color: "var(--text-muted)",
-                          fontFamily: "monospace",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {item.suspectUuid}
-                      </div>
+                        🔐 보안사건 (신원 비공개)
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() =>
+                            onSelectSuspect && onSelectSuspect(item.suspectName)
+                          }
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: 0,
+                            textAlign: "left",
+                          }}
+                        >
+                          <strong
+                            style={{
+                              fontSize: "0.9rem",
+                              color: "var(--text-main)",
+                              textDecoration: "underline dotted",
+                            }}
+                          >
+                            {item.suspectName}
+                          </strong>
+                        </button>
+                        {item.suspectUuid && item.suspectUuid !== "-" && item.suspectUuid !== "00" && (
+                          <div
+                            style={{
+                              fontSize: "0.68rem",
+                              color: "var(--text-muted)",
+                              fontFamily: "monospace",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {item.suspectUuid}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                   <div>
@@ -1666,6 +1699,42 @@ export default function MyCasesLedger({
                       >
                         <ExternalLink size={13} /> 증거 보관함
                       </button>
+
+                    {/* 결재 필수 지정/해제 — 수사지휘 라인(부장검사 이상)만 표시 */}
+                    {canDesignate &&
+                      (item.supervisorDesignated ? (
+                        <button
+                          onClick={() =>
+                            onUndesignateCase && onUndesignateCase(item.id)
+                          }
+                          className="btn btn-outline"
+                          style={{
+                            fontSize: "0.78rem",
+                            padding: "5px 12px",
+                            color: "#94a3b8",
+                            border: "1px solid rgba(100,116,139,0.3)",
+                            gap: 5,
+                          }}
+                        >
+                          🔓 결재지정 해제
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            onDesignateCase && onDesignateCase(item.id)
+                          }
+                          className="btn btn-outline"
+                          style={{
+                            fontSize: "0.78rem",
+                            padding: "5px 12px",
+                            color: "var(--primary-amber)",
+                            border: "1px solid rgba(245,158,11,0.3)",
+                            gap: 5,
+                          }}
+                        >
+                          🔒 결재 필수 지정
+                        </button>
+                      ))}
                   </div>
                   <button
                     onClick={() => setEditingCase(item)}

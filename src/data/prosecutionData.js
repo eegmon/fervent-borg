@@ -17,17 +17,20 @@
  *   ADMINISTRATOR       검찰사무관     (평검사 대우)
  *   ADMIN_PROBATIONARY  검찰사무관시보 (검사시보 대우)
  */
+// 배열 순서: 앞일수록 상위 직급.
+// 검찰사무관/관리관은 행정 보조직이므로 수사지휘 라인 검사보다 하위에 위치.
+// (검찰청법 제3조·제4조, ROLE_AUTHORITY 수치와 동기화)
 export const ROLE_HIERARCHY = [
-  "SUPER_ADMIN", // 최고 시스템 관리자 (전체 퍼미션)
-  "PROSECUTOR_GENERAL",
-  "CHIEF_PROSECUTOR",
-  "DEPUTY_CHIEF",
-  "CHIEF_ADMINISTRATOR", // 차장검사 대우 (검찰관리관)
-  "SENIOR_PROSECUTOR",
-  "PROSECUTOR",
-  "ADMINISTRATOR", // 검찰사무관 (평검사 대우)
-  "ADMIN_PROBATIONARY", // 검찰사무관시보
-  "PROBATIONARY",
+  "SUPER_ADMIN",            // 최고 시스템 관리자 (전체 퍼미션)
+  "PROSECUTOR_GENERAL",     // 검찰총장
+  "CHIEF_PROSECUTOR",       // 검사장
+  "DEPUTY_CHIEF",           // 차장검사
+  "CHIEF_ADMINISTRATOR",    // 검찰관리관 (차장검사 대우 — 행정직)
+  "SENIOR_PROSECUTOR",      // 부장검사
+  "PROSECUTOR",             // 평검사 (소추·수사 주체)
+  "ADMINISTRATOR",          // 검찰사무관 (평검사 대우 — 행정/수사보조)
+  "ADMIN_PROBATIONARY",     // 검찰사무관시보
+  "PROBATIONARY",           // 검사시보
 ];
 
 // 배열의 앞일수록 상위 직급이다. 권한 비교는 문자열 비교 대신 이 순서를 사용한다.
@@ -44,10 +47,10 @@ export const ROLE_LABELS = {
   PROSECUTOR_GENERAL: "검찰총장",
   CHIEF_PROSECUTOR: "검사장",
   DEPUTY_CHIEF: "차장검사",
-  CHIEF_ADMINISTRATOR: "검찰관리관 (차장검사 대우)",
+  CHIEF_ADMINISTRATOR: "검찰관리관 (차장검사 대우 · 행정직)",
   SENIOR_PROSECUTOR: "부장검사",
   PROSECUTOR: "평검사",
-  ADMINISTRATOR: "검찰사무관",
+  ADMINISTRATOR: "검찰사무관 (평검사 대우 · 행정직)",
   PROBATIONARY: "검사시보",
   ADMIN_PROBATIONARY: "검찰사무관시보",
 };

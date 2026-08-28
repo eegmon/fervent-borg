@@ -72,16 +72,16 @@ const SELF_ROLE_CHANGE_ROLES = new Set([
 ]);
 const TOP_ROLE_MANAGERS = new Set(["PROSECUTOR_GENERAL", "CHIEF_PROSECUTOR"]);
 const ROLE_AUTHORITY = {
-  PROBATIONARY: 10,
-  PROSECUTOR: 20,
-  ADMIN_PROBATIONARY: 30,
-  ADMINISTRATOR: 40,
-  SENIOR_PROSECUTOR: 50,
-  DEPUTY_CHIEF: 60,
-  CHIEF_ADMINISTRATOR: 60,
-  CHIEF_PROSECUTOR: 70,
-  PROSECUTOR_GENERAL: 80,
-  SUPER_ADMIN: 100,
+  PROBATIONARY: 10,          // 검사시보
+  ADMIN_PROBATIONARY: 15,    // 검찰사무관시보 (검사시보 대우)
+  ADMINISTRATOR: 30,         // 검찰사무관 (평검사 대우 — 행정/수사보조)
+  PROSECUTOR: 40,            // 평검사 (소추·수사 주체, 검찰청법 제3조)
+  SENIOR_PROSECUTOR: 50,     // 부장검사
+  DEPUTY_CHIEF: 60,          // 차장검사
+  CHIEF_ADMINISTRATOR: 65,   // 검찰관리관 (차장검사 대우 — 행정직)
+  CHIEF_PROSECUTOR: 70,      // 검사장
+  PROSECUTOR_GENERAL: 80,    // 검찰총장
+  SUPER_ADMIN: 100,          // 최고 시스템 관리자
 };
 const ACCOUNT_ROLE_LEVELS = Object.keys(ROLE_AUTHORITY).filter(
   (roleLevel) => roleLevel !== "SUPER_ADMIN",
@@ -264,18 +264,58 @@ function requireApprovalScope(req, res, next) {
 }
 
 async function requireCaseScope(req, res, next) {
-  if (isProsecutorGeneral(req.user) || hasSecretariatWorkAccess(req.user)) {
+  // 검찰총장은 모든 사건 접근 가능
+  if (isProsecutorGeneral(req.user)) {
     return next();
   }
+  // 사무국 계정: PUBLIC 사건만 무조건 통과. PRIVATE 사건은 아래 허용 목록으로 판단.
   const result = await db.execute({
-    sql: `SELECT 1 FROM cases c JOIN prosecutors p ON c.prosecutor_id = p.id
-          WHERE c.id = ? AND ((c.visibility = 'PUBLIC' AND p.dept =
-            (SELECT dept FROM prosecutors WHERE id = ?))
-            OR c.created_by = ? OR c.prosecutor_id = ?
-            OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0)`,
-    args: [req.params.id, req.user.id, req.user.id, req.user.id, req.user.id],
+    sql: `SELECT c.visibility, c.created_by, c.prosecutor_id,
+                 COALESCE(c.private_viewer_ids, '[]') AS private_viewer_ids
+          FROM cases c WHERE c.id = ? AND c.deleted_at = ''`,
+    args: [req.params.id],
   });
   if (result.rows.length === 0) {
+    return res
+      .status(403)
+      .json({ success: false, message: "해당 사건에 접근할 권한이 없습니다." });
+  }
+  const row = result.rows[0];
+  const visibility = row.visibility;
+  const createdBy = row.created_by;
+  const prosecutorId = row.prosecutor_id;
+  const privateViewerIds = String(row.private_viewer_ids || "[]");
+  const uid = req.user.id;
+
+  // PRIVATE 사건: 담당검사, 작성자, privateViewerIds에 명시된 자, 검찰총장만 수사 내용 열람 가능.
+  // 사무국은 행정 접근(사건번호·처분 확인)은 허용하되 수사 내용은 GET /api/cases 마스킹으로 처리.
+  if (visibility === "PRIVATE") {
+    const isAllowed =
+      uid === prosecutorId ||
+      uid === createdBy ||
+      privateViewerIds.includes(`"${uid}"`) ||
+      hasSecretariatWorkAccess(req.user); // 사무국은 PRIVATE 상세도 접근 허용 (마스킹 적용)
+    if (!isAllowed) {
+      return res
+        .status(403)
+        .json({ success: false, message: "비공개 사건에 접근할 권한이 없습니다." });
+    }
+    return next();
+  }
+
+  // PUBLIC 사건: 사무국이면 통과, 아니면 부서 일치 또는 본인 사건 확인
+  if (hasSecretariatWorkAccess(req.user)) {
+    return next();
+  }
+  const scopeResult = await db.execute({
+    sql: `SELECT 1 FROM cases c JOIN prosecutors p ON c.prosecutor_id = p.id
+          WHERE c.id = ? AND
+            (p.dept = (SELECT dept FROM prosecutors WHERE id = ?)
+              OR c.created_by = ? OR c.prosecutor_id = ?
+              OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0)`,
+    args: [req.params.id, uid, uid, uid, uid],
+  });
+  if (scopeResult.rows.length === 0) {
     return res
       .status(403)
       .json({ success: false, message: "해당 사건에 접근할 권한이 없습니다." });
@@ -299,24 +339,44 @@ async function findCaseForEvidence(caseNo, user) {
 }
 
 function scopedQuery(table, user, orderBy = "rowid DESC") {
-  if (isProsecutorGeneral(user) || hasSecretariatWorkAccess(user)) {
+  // 검찰총장은 모든 테이블 전체 접근
+  if (isProsecutorGeneral(user)) {
     return {
       sql: `SELECT * FROM ${table} WHERE deleted_at = '' ORDER BY ${orderBy}`,
       args: [],
     };
   }
   if (table === "cases") {
+    if (hasSecretariatWorkAccess(user)) {
+      // 사무국 계정: 모든 사건 목록 조회 가능 (행정 업무 — 접수·배당·통계).
+      // 단, PRIVATE 사건의 수사 민감 필드(content 등)는 GET /api/cases 응답 단계에서 마스킹됨.
+      return {
+        sql: `SELECT c.* FROM cases c
+              WHERE c.deleted_at = ''
+              ORDER BY c.${orderBy}`,
+        args: [],
+      };
+    }
+    // 일반 계정: PUBLIC 사건 중 동일 부서 + 본인 담당/작성 + 명시 허용
     return {
       sql: `SELECT c.* FROM cases c
             JOIN prosecutors p ON c.prosecutor_id = p.id
             WHERE c.deleted_at = '' AND
               ((c.visibility = 'PUBLIC' AND p.dept = (SELECT dept FROM prosecutors WHERE id = ?))
-                OR c.created_by = ? OR c.prosecutor_id = ?)
+                OR c.created_by = ? OR c.prosecutor_id = ?
+                OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0)
             ORDER BY c.${orderBy}`,
-      args: [user.id, user.id, user.id],
+      args: [user.id, user.id, user.id, user.id],
     };
   }
-  const usesId = table === "cases" || table === "approvals";
+  // cases 외 테이블: 사무국이면 전체, 아니면 부서 한정
+  if (hasSecretariatWorkAccess(user)) {
+    return {
+      sql: `SELECT * FROM ${table} WHERE deleted_at = '' ORDER BY ${orderBy}`,
+      args: [],
+    };
+  }
+  const usesId = table === "approvals";
   const field = usesId ? "prosecutor_id" : "prosecutor_name";
   const value = usesId ? "p.id" : "p.name";
   return {
@@ -422,7 +482,37 @@ app.post("/api/auth/login", authRateLimit, async (req, res) => {
 // ════════════════════════════════════════════════════════════════════
 app.get("/api/cases", requireAuth, async (req, res) => {
   const result = await db.execute(scopedQuery("cases", req.user));
-  res.json(result.rows.map(toCamel));
+  const isSecretariat = hasSecretariatWorkAccess(req.user);
+  const canViewPrivate = isProsecutorGeneral(req.user);
+
+  // 사무국 계정(비검찰총장): PRIVATE 사건의 수사 민감 필드를 마스킹.
+  // 사건번호·처분내역·담당검사 등 행정 항목은 그대로 노출.
+  // 수사 내용(content)·메모(notes)·증거링크(bookingBasis)·피의자 신원은 비노출.
+  const PRIVATE_MASKED_FIELDS = [
+    "content",
+    "notes",
+    "bookingBasis",
+    "suspectName",   // 피의자 신원은 수사 기밀 — 행정 처리에 불필요
+    "suspectUuid",
+  ];
+  const rows = result.rows.map((row) => {
+    const c = toCamel(row);
+    if (
+      c.visibility === "PRIVATE" &&
+      isSecretariat &&
+      !canViewPrivate &&
+      c.prosecutorId !== req.user.id &&
+      c.createdBy !== req.user.id &&
+      !String(c.privateViewerIds || "[]").includes(`"${req.user.id}"`)
+    ) {
+      for (const field of PRIVATE_MASKED_FIELDS) {
+        c[field] = "";
+      }
+      c._privateMasked = true; // 프론트에서 [보안사건] 표시용 플래그
+    }
+    return c;
+  });
+  res.json(rows);
 });
 
 // ── 사건번호 자동계산 시작값 (검찰사무국 전용 수정) ────────────────
@@ -839,12 +929,225 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/cases/bulk-import — 엑셀 일괄 등록 DB 저장
+app.post("/api/cases/bulk-import", requireAuth, async (req, res) => {
+  const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+  if (rows.length === 0) {
+    return res.status(400).json({ success: false, message: "일괄 등록할 사건 데이터가 없습니다." });
+  }
+
+  try {
+    const insertedCases = [];
+    const insertedReports = [];
+    const insertedBookings = [];
+    const txStatements = [];
+
+    const now = new Date();
+
+    rows.forEach((r, i) => {
+      const caseId = String(now.getTime() + i);
+      const hyeongjeNo = String(r["형제번호"] || r["수제번호"] || "").trim() || "-";
+      const prosecutorName = String(r["검사명"] || "").trim();
+      const prosecutorId = prosecutorName;
+      const suspectName = String(r["피고인명"] || r["피의자명"] || "").trim();
+      const suspectUuid = String(r["UUID"] || "").trim();
+      const bookingStatus = String(r["현재 상황"] || "접수").trim();
+      const bookingDate = String(r["접수일시"] || "").trim();
+      const bookingBasis = String(r["접수근거"] || "").trim();
+      const disposition = String(r["처분내용"] || "").trim();
+      const chargeName = String(r["죄명"] || "").trim();
+
+      const caseObj = {
+        id: caseId,
+        sujeNo: hyeongjeNo.includes("수제") ? hyeongjeNo : "",
+        hyeongjeNo: !hyeongjeNo.includes("수제") ? hyeongjeNo : "-",
+        latestHyeongjeNo: hyeongjeNo,
+        prosecutorName,
+        prosecutorId,
+        suspectName,
+        suspectUuid,
+        bookingStatus,
+        bookingDate,
+        bookingBasis,
+        disposition,
+        reAppeal: "-",
+        court1No: String(r["1심 사건번호"] || "").trim(),
+        court1Result: String(r["1심 결과"] || "").trim(),
+        court1Doc: String(r["판결문"] || "").trim(),
+        court1Appealed: String(r["항소 여부"] || "").trim(),
+        court1Appellant: String(r["항소장"] || "").trim(),
+        court2No: String(r["2심 사건번호"] || "").trim(),
+        court2Dismissed: String(r["항소기각"] || "").trim(),
+        court2Result: String(r["2심 결과"] || "").trim(),
+        court2Doc: String(r["판결문(항소)"] || "").trim(),
+        court3Appealed: String(r["상고 여부"] || "").trim(),
+        court3Appellant: String(r["상고장"] || "").trim(),
+        court3No: String(r["3심 사건번호"] || "").trim(),
+        court3Remanded: String(r["파기환송"] || "").trim(),
+        court3Result: String(r["3심 결과"] || "").trim(),
+        court3Doc: String(r["판결문(상고)"] || "").trim(),
+        notes: "",
+        content: "",
+        confiscation: "",
+        chargeName,
+        visibility: "PUBLIC",
+        createdBy: req.user.id,
+        privateViewerIds: "[]",
+      };
+      insertedCases.push(caseObj);
+
+      txStatements.push({
+        sql: `INSERT INTO cases (
+                id, suje_no, hyeongje_no, latest_hyeongje_no,
+                prosecutor_name, prosecutor_id, suspect_name, suspect_uuid,
+                booking_status, booking_date, booking_basis, disposition,
+                re_appeal, court1_no, court1_result, court1_doc,
+                court1_appealed, court1_appellant, court2_no, court2_dismissed,
+                court2_result, court2_doc, court3_appealed, court3_appellant,
+                court3_no, court3_remanded, court3_result, court3_doc,
+                notes, content, confiscation, charge_name, visibility, created_by, private_viewer_ids
+              ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        args: [
+          caseObj.id,
+          caseObj.sujeNo,
+          caseObj.hyeongjeNo,
+          caseObj.latestHyeongjeNo,
+          caseObj.prosecutorName,
+          caseObj.prosecutorId,
+          caseObj.suspectName,
+          caseObj.suspectUuid,
+          caseObj.bookingStatus,
+          caseObj.bookingDate,
+          caseObj.bookingBasis,
+          caseObj.disposition,
+          caseObj.reAppeal,
+          caseObj.court1No,
+          caseObj.court1Result,
+          caseObj.court1Doc,
+          caseObj.court1Appealed,
+          caseObj.court1Appellant,
+          caseObj.court2No,
+          caseObj.court2Dismissed,
+          caseObj.court2Result,
+          caseObj.court2Doc,
+          caseObj.court3Appealed,
+          caseObj.court3Appellant,
+          caseObj.court3No,
+          caseObj.court3Remanded,
+          caseObj.court3Result,
+          caseObj.court3Doc,
+          caseObj.notes,
+          caseObj.content,
+          caseObj.confiscation,
+          caseObj.chargeName,
+          caseObj.visibility,
+          caseObj.createdBy,
+          caseObj.privateViewerIds,
+        ],
+      });
+
+      // Report
+      const reportId = String(now.getTime() + 1000 + i);
+      const reportObj = {
+        id: reportId,
+        reportNo: `접수-${now.getTime() + i}`,
+        hyeongjeNo,
+        title: `${chargeName || '사건'} 접수 건`,
+        prosecutorName,
+        suspectName,
+        suspectUuid,
+        status: "입건 완료",
+        createdAt: bookingDate || "",
+        basisUrl: bookingBasis,
+        period: `${bookingDate} ~ 수사중`,
+        confiscation: "-",
+      };
+      insertedReports.push(reportObj);
+
+      txStatements.push({
+        sql: `INSERT INTO reports (id, report_no, hyeongje_no, title, prosecutor_name, suspect_name, suspect_uuid, status, created_at, basis_url, period, confiscation)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        args: [
+          reportObj.id,
+          reportObj.reportNo,
+          reportObj.hyeongjeNo,
+          reportObj.title,
+          reportObj.prosecutorName,
+          reportObj.suspectName,
+          reportObj.suspectUuid,
+          reportObj.status,
+          reportObj.createdAt,
+          reportObj.basisUrl,
+          reportObj.period,
+          reportObj.confiscation,
+        ],
+      });
+
+      // Booking
+      const bookingId = String(now.getTime() + 2000 + i);
+      const bookingObj = {
+        id: bookingId,
+        hyeongjeNo,
+        prosecutorName,
+        suspectName,
+        suspectUuid,
+        dispositionStatus: bookingStatus,
+        bookingDate,
+        basisUrl: bookingBasis,
+        daysElapsed: 0,
+        indictmentDecision: disposition || "수사 진행 중",
+      };
+      insertedBookings.push(bookingObj);
+
+      txStatements.push({
+        sql: `INSERT INTO bookings (id, hyeongje_no, prosecutor_name, suspect_name, suspect_uuid, disposition_status, booking_date, basis_url, days_elapsed, indictment_decision)
+              VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        args: [
+          bookingObj.id,
+          bookingObj.hyeongjeNo,
+          bookingObj.prosecutorName,
+          bookingObj.suspectName,
+          bookingObj.suspectUuid,
+          bookingObj.dispositionStatus,
+          bookingObj.bookingDate,
+          bookingObj.basisUrl,
+          bookingObj.daysElapsed,
+          bookingObj.indictmentDecision,
+        ],
+      });
+    });
+
+    await db.batch(txStatements, "write");
+
+    await writeAuditLog({
+      action: "CREATE",
+      entityType: "cases_bulk",
+      entityId: `BULK-${Date.now()}`,
+      entityLabel: `${insertedCases.length}건 엑셀 일괄 등록`,
+      actorId: req.user.id,
+      actorName: req.user.name,
+      detail: `엑셀 일괄 등록 ${insertedCases.length}건 DB 반영 완료`,
+    });
+
+    res.json({
+      success: true,
+      count: insertedCases.length,
+      cases: insertedCases,
+      reports: insertedReports,
+      bookings: insertedBookings,
+    });
+  } catch (err) {
+    console.error("[POST /api/cases/bulk-import]", err);
+    res.status(500).json({ success: false, message: "엑셀 일괄 등록 중 DB 저장에 실패했습니다." });
+  }
+});
+
 app.put("/api/cases/:id", requireAuth, requireCaseScope, async (req, res) => {
   const c = req.body;
   if (c.forceReassign) {
     if (
       !hasSecretariatWorkAccess(req.user) &&
-      !GLOBAL_DATA_ROLES.has(req.user.roleLevel)
+      !GLOBAL_DATA_ROLES.has(effectiveRoleLevel(req.user))
     ) {
       return res.status(403).json({
         success: false,
@@ -1447,7 +1750,7 @@ app.put(
 app.get("/api/prosecutors", requireAuth, async (req, res) => {
   const result = await db.execute("SELECT * FROM prosecutors");
   const canViewManagementAccounts =
-    req.user.isSuperAdmin || SECRETARIAT_ROLES.has(req.user.roleLevel);
+    req.user.isSuperAdmin || SECRETARIAT_ROLES.has(effectiveRoleLevel(req.user));
   const visibleRows = canViewManagementAccounts
     ? result.rows
     : result.rows.filter((row) => !isManagementAccount(toCamel(row)));
@@ -1478,7 +1781,7 @@ app.post(
       discordId = "",
     } = req.body;
     const canIssueAllRoles =
-      req.user.isSuperAdmin || req.user.roleLevel === "CHIEF_ADMINISTRATOR";
+      req.user.isSuperAdmin || effectiveRoleLevel(req.user) === "CHIEF_ADMINISTRATOR";
     const allowedRoles = canIssueAllRoles
       ? ACCOUNT_ROLE_LEVELS
       : [
@@ -1833,8 +2136,10 @@ app.post("/api/auth/register", authRateLimit, async (req, res) => {
 
 // ── 8-2. 가입 신청 목록 조회 (검찰사무국 전용) ──────────────────────
 app.get("/api/registrations", requireAuth, async (req, res) => {
-  // 검찰사무국 접근 가능 직급 체크
-  const isSecretariat = SECRETARIAT_ROLES.has(req.user.roleLevel);
+  // 직무대리 권한 포함 검찰사무국 접근 가능 직급 체크
+  const isSecretariat =
+    SECRETARIAT_ROLES.has(effectiveRoleLevel(req.user)) ||
+    hasSecretariatWorkAccess(req.user);
 
   if (!isSecretariat) {
     return res
@@ -1867,7 +2172,11 @@ app.put(
   requireAuth,
   requireSecretariat,
   async (req, res) => {
-    const isSecretariat = SECRETARIAT_ROLES.has(req.user.roleLevel);
+    // requireSecretariat 미들웨어가 이미 effectiveRoleLevel 기반으로 검증하므로
+    // 이중 체크도 동일 방식으로 통일
+    const isSecretariat =
+      SECRETARIAT_ROLES.has(effectiveRoleLevel(req.user)) ||
+      hasSecretariatWorkAccess(req.user);
 
     if (!isSecretariat) {
       return res
@@ -1966,7 +2275,9 @@ app.put(
 
 // ── 8-4. 가입 신청 거부 ─────────────────────────────────────────────
 app.put("/api/registrations/:id/reject", requireAuth, async (req, res) => {
-  const isSecretariat = SECRETARIAT_ROLES.has(req.user.roleLevel);
+  const isSecretariat =
+    SECRETARIAT_ROLES.has(effectiveRoleLevel(req.user)) ||
+    hasSecretariatWorkAccess(req.user);
 
   if (!isSecretariat) {
     return res
@@ -2241,7 +2552,9 @@ app.patch("/api/prosecutors/:id/password", requireAuth, async (req, res) => {
   }
 
   // 본인 또는 사무국 관리자만 변경 가능
-  const isAdmin = SECRETARIAT_ROLES.has(req.user.roleLevel);
+  const isAdmin =
+    SECRETARIAT_ROLES.has(effectiveRoleLevel(req.user)) ||
+    hasSecretariatWorkAccess(req.user);
   const isSelf = req.user.id === id;
 
   if (!isSelf && !isAdmin) {

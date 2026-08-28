@@ -91,6 +91,7 @@ import {
   createIntakeBundleApi,
   updateCaseApi,
   archiveCaseApi,
+  bulkImportCasesApi,
   deleteCaseApi,
   fetchReports,
   createReportApi,
@@ -479,78 +480,64 @@ export default function App() {
     }
   };
 
-  // Handler: Bulk Import Cases from Excel (검찰사무국 전용)
-  const handleBulkImport = (rows) => {
+  // Handler: Bulk Import Cases from Excel (검찰사무국 전용 — DB 영구 저장)
+  const handleBulkImport = async (rows) => {
     if (!rows || rows.length === 0) return;
-    const newCases = rows.map((r, i) => ({
-      id: Date.now() + i,
-      hyeongjeNo: r["형제번호"] || r["수제번호"] || "",
-      latestHyeongjeNo: r["형제번호"] || r["수제번호"] || "",
-      prosecutorName: r["검사명"] || "",
-      prosecutorId: r["검사명"] || "",
-      suspectName: r["피고인명"] || "",
-      suspectUuid: r["UUID"] || "",
-      bookingStatus: r["현재 상황"] || "접수",
-      bookingDate: r["접수일시"] || "",
-      bookingBasis: r["접수근거"] || "",
-      disposition: r["처분내용"] || "",
-      chargeName: r["죄명"] || "",
-      court1No: r["1심 사건번호"] || "",
-      court1Result: r["1심 결과"] || "",
-      court1Doc: r["판결문"] || "",
-      court1Appealed: r["항소 여부"] || "",
-      court1Appellant: r["항소장"] || "",
-      court2No: r["2심 사건번호"] || "",
-      court2Dismissed: r["항소기각"] || "",
-      court2Result: r["2심 결과"] || "",
-      court2Doc: r["판결문(항소)"] || "",
-      court3Appealed: r["상고 여부"] || "",
-      court3Appellant: r["상고장"] || "",
-      court3No: r["3심 사건번호"] || "",
-      court3Remanded: r["파기환송"] || "",
-      court3Result: r["3심 결과"] || "",
-      court3Doc: r["판결문(상고)"] || "",
-      reAppeal: "-",
-      notes: "",
-      content: "",
-      confiscation: "",
-    }));
 
-    const newReports = newCases.map((c, i) => ({
-      id: Date.now() + 1000 + i,
-      reportNo: `접수-${Date.now() + i}`,
-      hyeongjeNo: c.hyeongjeNo,
-      title: `${c.chargeName} 사건 접수 건`,
-      prosecutorName: c.prosecutorName,
-      suspectName: c.suspectName,
-      suspectUuid: c.suspectUuid,
-      status: "입건 완료",
-      createdAt: c.bookingDate,
-      basisUrl: c.bookingBasis,
-      period: `${c.bookingDate} ~ 수사중`,
-      confiscation: "-",
-    }));
+    // 1) API 호출하여 DB에 일괄 저장
+    const res = await bulkImportCasesApi(rows);
 
-    const newBookings = newCases.map((c, i) => ({
-      id: Date.now() + 2000 + i,
-      hyeongjeNo: c.hyeongjeNo,
-      prosecutorName: c.prosecutorName,
-      suspectName: c.suspectName,
-      suspectUuid: c.suspectUuid,
-      dispositionStatus: c.bookingStatus,
-      bookingDate: c.bookingDate,
-      basisUrl: c.bookingBasis,
-      daysElapsed: 0,
-      indictmentDecision: c.disposition || "수사 진행 중",
-    }));
+    if (res && res.success && res.cases) {
+      setLedgerData((prev) => [...res.cases, ...prev]);
+      if (res.reports) setReportsData((prev) => [...res.reports, ...prev]);
+      if (res.bookings) setBookingsData((prev) => [...res.bookings, ...prev]);
 
-    setLedgerData((prev) => [...newCases, ...prev]);
-    setReportsData((prev) => [...newReports, ...prev]);
-    setBookingsData((prev) => [...newBookings, ...prev]);
-    showToast(
-      `📥 ${newCases.length}건의 사건이 일괄 등록되었습니다.`,
-      "success",
-    );
+      showToast(
+        `📥 ${res.count || res.cases.length}건의 사건이 엑셀에서 DB로 일괄 등록 저장되었습니다.`,
+        "success",
+      );
+    } else {
+      // 서버 미연결 모드 또는 에러 시 폴백
+      const newCases = rows.map((r, i) => ({
+        id: Date.now() + i,
+        hyeongjeNo: r["형제번호"] || r["수제번호"] || "",
+        latestHyeongjeNo: r["형제번호"] || r["수제번호"] || "",
+        prosecutorName: r["검사명"] || "",
+        prosecutorId: r["검사명"] || "",
+        suspectName: r["피고인명"] || "",
+        suspectUuid: r["UUID"] || "",
+        bookingStatus: r["현재 상황"] || "접수",
+        bookingDate: r["접수일시"] || "",
+        bookingBasis: r["접수근거"] || "",
+        disposition: r["처분내용"] || "",
+        chargeName: r["죄명"] || "",
+        court1No: r["1심 사건번호"] || "",
+        court1Result: r["1심 결과"] || "",
+        court1Doc: r["판결문"] || "",
+        court1Appealed: r["항소 여부"] || "",
+        court1Appellant: r["항소장"] || "",
+        court2No: r["2심 사건번호"] || "",
+        court2Dismissed: r["항소기각"] || "",
+        court2Result: r["2심 결과"] || "",
+        court2Doc: r["판결문(항소)"] || "",
+        court3Appealed: r["상고 여부"] || "",
+        court3Appellant: r["상고장"] || "",
+        court3No: r["3심 사건번호"] || "",
+        court3Remanded: r["파기환송"] || "",
+        court3Result: r["3심 결과"] || "",
+        court3Doc: r["판결문(상고)"] || "",
+        reAppeal: "-",
+        notes: "",
+        content: "",
+        confiscation: "",
+      }));
+
+      setLedgerData((prev) => [...newCases, ...prev]);
+      showToast(
+        `📥 ${newCases.length}건의 사건이 화면 메모리에 등록되었습니다.`,
+        "info",
+      );
+    }
   };
 
   // Handler: Add New Appeal Record

@@ -137,6 +137,13 @@ export function archiveCaseApi(id, isArchived) {
   });
 }
 
+export function bulkImportCasesApi(rows) {
+  return apiFetch("/cases/bulk-import", {
+    method: "POST",
+    body: JSON.stringify({ rows }),
+  });
+}
+
 export function fetchDepartments() {
   return apiFetch("/departments");
 }

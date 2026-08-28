@@ -109,7 +109,9 @@ export default function MainLedger({
     if (onUpdateCase) onUpdateCase(updatedCase);
   };
 
-  // 상급자 여부 (지정/해제 버튼 노출 조건)
+  // 결재 필수 지정/해제 권한 — 수사지휘 라인(부장검사 이상)만 허용.
+  // 검찰사무관/관리관 등 행정 직급은 수사 지휘권이 없으므로 제외.
+  // (검찰청법 제3조·제4조, 검찰사무규칙 제18조 참조)
   const canDesignate =
     currentUser &&
     (currentUser.isSuperAdmin ||
@@ -118,7 +120,6 @@ export default function MainLedger({
         "PROSECUTOR_GENERAL",
         "CHIEF_PROSECUTOR",
         "DEPUTY_CHIEF",
-        "CHIEF_ADMINISTRATOR",
         "SENIOR_PROSECUTOR",
       ].includes(currentUser.roleLevel));
 
@@ -512,7 +513,25 @@ export default function MainLedger({
                         flexWrap: "wrap",
                       }}
                     >
-                      {item.suspects && item.suspects.length > 0 ? (
+                      {/* 보안사건 배지 — 사무국 마스킹 적용 시 피의자명 대신 표시 */}
+                      {item._privateMasked ? (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: "3px 9px",
+                            borderRadius: 6,
+                            background: "rgba(239,68,68,0.12)",
+                            border: "1px solid rgba(239,68,68,0.35)",
+                            color: "#f87171",
+                            fontSize: "0.78rem",
+                            fontWeight: 800,
+                          }}
+                        >
+                          🔐 보안사건 (신원 비공개)
+                        </span>
+                      ) : item.suspects && item.suspects.length > 0 ? (
                         item.suspects.map((s, sIdx) => (
                           <button
                             key={sIdx}
