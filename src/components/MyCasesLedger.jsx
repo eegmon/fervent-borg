@@ -714,7 +714,6 @@ export default function MyCasesLedger({
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [archiveFilter, setArchiveFilter] = useState("ACTIVE");
 
   const [editingCase, setEditingCase] = useState(null);
   const [statusChangeCase, setStatusChangeCase] = useState(null);
@@ -816,10 +815,12 @@ export default function MyCasesLedger({
   // 담당자 필터 적용 (전체 목록 — 보존 포함)
   const myCases = ledgerData.filter((item) => {
     if (!item) return false;
+    // targetProsecutorName이 비어 있으면 본인 사건만
+    const target = targetProsecutorName || currentUser.name;
     const pName = item.prosecutorName || "";
     return (
-      pName.includes(targetProsecutorName) ||
-      targetProsecutorName.includes(pName)
+      pName.includes(target) ||
+      target.includes(pName)
     );
   });
 
@@ -840,11 +841,8 @@ export default function MyCasesLedger({
         .toLowerCase()
         .includes(statusFilter.toLowerCase());
 
-    // 처리중/전체 구분 — 보존기록은 개인보관함에서 제외
-    const matchArchive =
-      archiveFilter === "ALL" ? true : !item.isArchived;
-
-    return matchQ && matchStatus && matchArchive;
+    // 개인보관함에서는 보존사건 항상 제외
+    return matchQ && matchStatus && !item.isArchived;
   });
 
   const activeCount = myActiveCases.filter(
@@ -1103,48 +1101,9 @@ export default function MyCasesLedger({
         </div>
       </div>
 
-      {/* 보존 상태 구별 필터 탭 — 처리중/전체만 표시 (보존기록은 검찰사무국에서 관리) */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
-      >
-        {[
-          {
-            id: "ACTIVE",
-            label: `📂 현재 처리중 (${myActiveCases.length}건)`,
-            color: "#3b82f6",
-          },
-          {
-            id: "ALL",
-            label: `📋 전체 사건 (${myCases.length}건)`,
-            color: "#94a3b8",
-          },
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setArchiveFilter(t.id)}
-            className="btn"
-            style={{
-              fontSize: "0.78rem",
-              padding: "6px 14px",
-              background:
-                archiveFilter === t.id ? t.color : "rgba(255,255,255,0.05)",
-              color: archiveFilter === t.id ? "#000" : "var(--text-main)",
-              fontWeight: archiveFilter === t.id ? 800 : 500,
-              border:
-                archiveFilter === t.id
-                  ? "none"
-                  : "1px solid var(--border-subtle)",
-              borderRadius: 8,
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* 현재 처리중 사건만 표시 — 보존기록은 검찰사무국에서 관리 */}
+      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", padding: "2px 0 6px 0" }}>
+        📂 현재 처리중 {myActiveCases.length}건 (보존사건 제외)
       </div>
 
       {/* Filter Bar */}

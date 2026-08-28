@@ -1280,7 +1280,7 @@ function ActingOrderPanel({
 
   const [form, setForm] = useState({
     originalUserId: prosecutorsList[0]?.id || "",
-    originalVacantTitle: "",   // 공석 모드 전용 — 피대리 직위 직접 입력
+    originalVacantTitle: "", // 공석 모드 전용 — 피대리 직위 직접 입력
     vacantRoleLevel: "SENIOR_PROSECUTOR", // 공석 모드 전용 — 부여할 권한 등급
     actingUserId: prosecutorsList[1]?.id || "",
     actingTitle: "부장검사 직무대리",
@@ -1348,8 +1348,9 @@ function ActingOrderPanel({
     // 계정이 있을 때: 피대리인의 roleLevel을 그대로 전달
     // 공석 모드일 때: 폼에서 직접 선택한 vacantRoleLevel을 사용
     const origRoleLevel = vacantMode
-      ? (form.vacantRoleLevel || "")
-      : (prosecutorsList.find((p) => p.id === form.originalUserId)?.roleLevel || "");
+      ? form.vacantRoleLevel || ""
+      : prosecutorsList.find((p) => p.id === form.originalUserId)?.roleLevel ||
+        "";
     if (onUpdateProsecutorStatus) {
       onUpdateProsecutorStatus(act.id, {
         delegateTo: origLabel,
@@ -1467,13 +1468,24 @@ function ActingOrderPanel({
             </div>
 
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 6,
+                }}
+              >
                 <Label>원 결재권자 (피대리인) *</Label>
                 <button
                   type="button"
                   onClick={() => {
                     setVacantMode((v) => !v);
-                    setForm((f) => ({ ...f, originalVacantTitle: "", vacantRoleLevel: "SENIOR_PROSECUTOR" }));
+                    setForm((f) => ({
+                      ...f,
+                      originalVacantTitle: "",
+                      vacantRoleLevel: "SENIOR_PROSECUTOR",
+                    }));
                   }}
                   style={{
                     fontSize: "0.68rem",
@@ -1487,7 +1499,9 @@ function ActingOrderPanel({
                     background: vacantMode
                       ? "rgba(245,158,11,0.12)"
                       : "var(--bg-elevated)",
-                    color: vacantMode ? "var(--primary-amber)" : "var(--text-muted)",
+                    color: vacantMode
+                      ? "var(--primary-amber)"
+                      : "var(--text-muted)",
                     transition: "all 0.15s",
                   }}
                 >
@@ -1495,7 +1509,9 @@ function ActingOrderPanel({
                 </button>
               </div>
               {vacantMode ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
                   <input
                     className="input-field"
                     placeholder="예: 검찰사무국장 / 부장검사 (공석)"
@@ -1506,8 +1522,15 @@ function ActingOrderPanel({
                     required
                     autoFocus
                   />
-                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", paddingLeft: 2 }}>
-                    계정 없는 공석 직위명을 직접 입력합니다. 발령 대장에 <em>(공석)</em>으로 표시됩니다.
+                  <div
+                    style={{
+                      fontSize: "0.7rem",
+                      color: "var(--text-muted)",
+                      paddingLeft: 2,
+                    }}
+                  >
+                    계정 없는 공석 직위명을 직접 입력합니다. 발령 대장에{" "}
+                    <em>(공석)</em>으로 표시됩니다.
                   </div>
                   <div style={{ marginTop: 2 }}>
                     <Label>공석 직위 권한 등급 *</Label>
@@ -1527,8 +1550,16 @@ function ActingOrderPanel({
                           </option>
                         ))}
                     </select>
-                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", paddingLeft: 2, marginTop: 3 }}>
-                      직무대리자에게 부여할 권한 등급입니다. 피대리 직위의 실제 권한과 일치해야 합니다.
+                    <div
+                      style={{
+                        fontSize: "0.7rem",
+                        color: "var(--text-muted)",
+                        paddingLeft: 2,
+                        marginTop: 3,
+                      }}
+                    >
+                      직무대리자에게 부여할 권한 등급입니다. 피대리 직위의 실제
+                      권한과 일치해야 합니다.
                     </div>
                   </div>
                 </div>
@@ -1586,22 +1617,41 @@ function ActingOrderPanel({
                   type="date"
                   className="input-field"
                   value={form.actingStart}
-                  onChange={(e) => setForm({ ...form, actingStart: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, actingStart: e.target.value })
+                  }
                   required
                   style={{ flex: 1 }}
                 />
-                <span style={{ color: "var(--text-muted)", fontSize: "0.82rem", flexShrink: 0 }}>~</span>
+                <span
+                  style={{
+                    color: "var(--text-muted)",
+                    fontSize: "0.82rem",
+                    flexShrink: 0,
+                  }}
+                >
+                  ~
+                </span>
                 <input
                   type="date"
                   className="input-field"
                   value={form.actingEnd}
-                  onChange={(e) => setForm({ ...form, actingEnd: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, actingEnd: e.target.value })
+                  }
                   required
                   style={{ flex: 1 }}
                   min={form.actingStart}
                 />
               </div>
-              <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: 3, paddingLeft: 2 }}>
+              <div
+                style={{
+                  fontSize: "0.7rem",
+                  color: "var(--text-muted)",
+                  marginTop: 3,
+                  paddingLeft: 2,
+                }}
+              >
                 종료일이 지나면 직무대리 권한이 자동으로 회수됩니다.
               </div>
             </div>
@@ -1725,7 +1775,11 @@ function ActingOrderPanel({
                       {o.status === "발령중" && (
                         <button
                           onClick={() =>
-                            handleRevokeOrder(o.id, o.originalUserId, o.actingUserId)
+                            handleRevokeOrder(
+                              o.id,
+                              o.originalUserId,
+                              o.actingUserId,
+                            )
                           }
                           className="btn btn-secondary"
                           style={{
@@ -1809,7 +1863,18 @@ const SUB_TABS = [
 
   { id: "delete", label: "🗑️ 기록 삭제", icon: Trash2, category: "SECURITY" },
   { id: "audit", label: "감사 로그", icon: History, category: "SECURITY" },
-  { id: "autoarchive", label: "📦 자동보존 설정", icon: Archive, category: "CASES" },
+  {
+    id: "autoarchive",
+    label: "📦 자동보존 설정",
+    icon: Archive,
+    category: "CASES",
+  },
+  {
+    id: "archivestore",
+    label: "🗄️ 보존기록 서고",
+    icon: Archive,
+    category: "CASES",
+  },
 ];
 
 const Label = ({ children }) => (
@@ -1854,7 +1919,10 @@ function AutoArchiveSettingsPanel({ addLog }) {
     setSaving(false);
     if (res?.success) {
       setSaved(true);
-      addLog?.("자동보존 설정 변경", `사용: ${enabled ? "ON" : "OFF"}, 기간: ${days}일`);
+      addLog?.(
+        "자동보존 설정 변경",
+        `사용: ${enabled ? "ON" : "OFF"}, 기간: ${days}일`,
+      );
       setTimeout(() => setSaved(false), 2500);
     }
   };
@@ -1865,25 +1933,72 @@ function AutoArchiveSettingsPanel({ addLog }) {
         className="glass-panel gold-border"
         style={{ padding: "14px 20px", background: "rgba(245,158,11,0.06)" }}
       >
-        <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--primary-amber)", display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <div
+          style={{
+            fontWeight: 800,
+            fontSize: "0.95rem",
+            color: "var(--primary-amber)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 4,
+          }}
+        >
           <Archive size={18} /> 불기소 자동보존 설정
         </div>
         <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-          불기소 처분 후 설정된 기간 동안 항고가 없으면 사건을 자동으로 보존기록 서고에 이관합니다.
+          불기소 처분 후 설정된 기간 동안 항고가 없으면 사건을 자동으로 보존기록
+          서고에 이관합니다.
         </div>
       </div>
 
       {loading ? (
-        <div style={{ color: "var(--text-muted)", fontSize: "0.85rem", padding: 20 }}>설정 불러오는 중...</div>
+        <div
+          style={{
+            color: "var(--text-muted)",
+            fontSize: "0.85rem",
+            padding: 20,
+          }}
+        >
+          설정 불러오는 중...
+        </div>
       ) : (
         <form onSubmit={handleSave}>
-          <div className="glass-panel" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 18, maxWidth: 480 }}>
-
+          <div
+            className="glass-panel"
+            style={{
+              padding: 24,
+              display: "flex",
+              flexDirection: "column",
+              gap: 18,
+              maxWidth: 480,
+            }}
+          >
             {/* 사용 여부 */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
               <div>
-                <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--text-main)" }}>자동보존 사용</div>
-                <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: 2 }}>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: "0.88rem",
+                    color: "var(--text-main)",
+                  }}
+                >
+                  자동보존 사용
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.72rem",
+                    color: "var(--text-muted)",
+                    marginTop: 2,
+                  }}
+                >
                   비활성화하면 자동보존이 실행되지 않습니다.
                 </div>
               </div>
@@ -1891,20 +2006,34 @@ function AutoArchiveSettingsPanel({ addLog }) {
                 type="button"
                 onClick={() => setEnabled((v) => !v)}
                 style={{
-                  width: 52, height: 28, borderRadius: 14, border: "none",
-                  cursor: "pointer", transition: "all 0.2s",
-                  background: enabled ? "var(--primary-amber)" : "var(--bg-elevated)",
-                  boxShadow: enabled ? "0 0 0 1px rgba(245,158,11,0.6)" : "0 0 0 1px var(--border-subtle)",
+                  width: 52,
+                  height: 28,
+                  borderRadius: 14,
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  background: enabled
+                    ? "var(--primary-amber)"
+                    : "var(--bg-elevated)",
+                  boxShadow: enabled
+                    ? "0 0 0 1px rgba(245,158,11,0.6)"
+                    : "0 0 0 1px var(--border-subtle)",
                   position: "relative",
                 }}
                 aria-label={enabled ? "자동보존 비활성화" : "자동보존 활성화"}
               >
-                <span style={{
-                  position: "absolute", top: 4, transition: "all 0.2s",
-                  left: enabled ? 28 : 4,
-                  width: 20, height: 20, borderRadius: "50%",
-                  background: enabled ? "#000" : "var(--text-muted)",
-                }} />
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 4,
+                    transition: "all 0.2s",
+                    left: enabled ? 28 : 4,
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    background: enabled ? "#000" : "var(--text-muted)",
+                  }}
+                />
               </button>
             </div>
 
@@ -1923,20 +2052,32 @@ function AutoArchiveSettingsPanel({ addLog }) {
                   style={{ width: 120, opacity: enabled ? 1 : 0.5 }}
                   required
                 />
-                <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                <span
+                  style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}
+                >
                   일 경과 후 항고 없으면 자동 보존
                 </span>
               </div>
             </div>
 
             {/* 대상 처분 안내 */}
-            <div style={{
-              padding: "10px 14px", borderRadius: 8,
-              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.25)",
-              fontSize: "0.78rem", color: "#a5b4fc",
-            }}>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>📋 자동보존 대상 처분</div>
-              <div>불기소 · 혐의없음 · 무혐의 · 기소유예 · 공소권없음 · 기소중지 · 죄가안됨</div>
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: "rgba(99,102,241,0.08)",
+                border: "1px solid rgba(99,102,241,0.25)",
+                fontSize: "0.78rem",
+                color: "#a5b4fc",
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                📋 자동보존 대상 처분
+              </div>
+              <div>
+                불기소 · 혐의없음 · 무혐의 · 기소유예 · 공소권없음 · 기소중지 ·
+                죄가안됨
+              </div>
               <div style={{ marginTop: 6, color: "var(--text-muted)" }}>
                 항고가 접수된 경우 자동보존 대상에서 제외됩니다.
               </div>
@@ -1944,17 +2085,154 @@ function AutoArchiveSettingsPanel({ addLog }) {
 
             {/* 저장 버튼 */}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button type="submit" className="btn btn-gold" style={{ padding: "9px 24px", fontWeight: 800 }} disabled={saving}>
+              <button
+                type="submit"
+                className="btn btn-gold"
+                style={{ padding: "9px 24px", fontWeight: 800 }}
+                disabled={saving}
+              >
                 {saving ? "저장 중..." : "💾 설정 저장"}
               </button>
               {saved && (
-                <span style={{ fontSize: "0.82rem", color: "#34d399", fontWeight: 700 }}>
+                <span
+                  style={{
+                    fontSize: "0.82rem",
+                    color: "#34d399",
+                    fontWeight: 700,
+                  }}
+                >
                   ✅ 저장되었습니다
                 </span>
               )}
             </div>
           </div>
         </form>
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 보존기록 서고 패널 (검찰사무국 전용)
+// ──────────────────────────────────────────────────────────────────────────────
+function ArchiveStoragePanel({ ledgerData = [], onArchiveCase, addLog }) {
+  const [searchQ, setSearchQ] = useState("");
+  const [confirmTarget, setConfirmTarget] = useState(null);
+
+  const archivedCases = ledgerData.filter((c) => Boolean(c.isArchived));
+  const q = searchQ.toLowerCase().trim();
+  const filtered = archivedCases.filter(
+    (c) =>
+      !q ||
+      (c.sujeNo || "").toLowerCase().includes(q) ||
+      (c.hyeongjeNo || "").toLowerCase().includes(q) ||
+      (c.suspectName || "").toLowerCase().includes(q) ||
+      (c.prosecutorName || "").toLowerCase().includes(q) ||
+      (c.chargeName || "").toLowerCase().includes(q),
+  );
+
+  const handleUnarchive = (c) => {
+    setConfirmTarget(c);
+  };
+
+  const doUnarchive = () => {
+    if (!confirmTarget) return;
+    onArchiveCase?.(confirmTarget.id, false);
+    addLog?.(
+      "보존 해제",
+      `[${confirmTarget.hyeongjeNo || confirmTarget.sujeNo}] 보존 해제 → 원부 복원`,
+    );
+    setConfirmTarget(null);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* 확인 다이얼로그 */}
+      {confirmTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+          <div className="glass-panel" style={{ maxWidth: 400, width: "90%", padding: 28, textAlign: "center" }}>
+            <div style={{ fontWeight: 800, fontSize: "1rem", color: "var(--text-main)", marginBottom: 10 }}>보존 해제 확인</div>
+            <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: 20, lineHeight: 1.6 }}>
+              <strong style={{ color: "var(--primary-amber)" }}>
+                {confirmTarget.hyeongjeNo || confirmTarget.sujeNo}
+              </strong> 사건을 보존 해제하고 원부 목록으로 복원합니다.
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button onClick={() => setConfirmTarget(null)} className="btn btn-secondary" style={{ padding: "8px 20px" }}>취소</button>
+              <button onClick={doUnarchive} className="btn btn-gold" style={{ padding: "8px 20px" }}>🔄 보존 해제</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 헤더 */}
+      <div className="glass-panel gold-border" style={{ padding: "14px 20px", background: "rgba(245,158,11,0.06)" }}>
+        <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--primary-amber)", display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <Archive size={18} /> 보존기록 서고
+        </div>
+        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+          보존 처리된 사건 기록 관리 · 총 <strong style={{ color: "var(--primary-amber)" }}>{archivedCases.length}건</strong> 보존 중
+        </div>
+      </div>
+
+      {/* 검색 */}
+      <div style={{ position: "relative" }}>
+        <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
+        <input
+          className="input-field"
+          style={{ paddingLeft: 32 }}
+          placeholder="사건번호, 피의자, 담당검사, 죄명 검색..."
+          value={searchQ}
+          onChange={(e) => setSearchQ(e.target.value)}
+        />
+      </div>
+
+      {/* 목록 */}
+      {filtered.length === 0 ? (
+        <div className="glass-panel" style={{ padding: 40, textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem" }}>
+          {archivedCases.length === 0 ? "보존된 사건이 없습니다." : "검색 조건에 해당하는 보존 사건이 없습니다."}
+        </div>
+      ) : (
+        <div className="glass-panel" style={{ overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+            <thead>
+              <tr style={{ background: "var(--bg-elevated)", borderBottom: "1px solid var(--border-subtle)" }}>
+                {["사건번호", "피의자", "죄명", "처분", "담당검사", "보존일", ""].map((h) => (
+                  <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700, color: "var(--text-muted)", fontSize: "0.75rem" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c) => (
+                <tr key={c.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                  <td style={{ padding: "10px 14px", fontFamily: "monospace", color: "var(--primary-amber)", fontWeight: 700 }}>
+                    {c.hyeongjeNo && c.hyeongjeNo !== "-" && c.sujeNo
+                      ? `${c.hyeongjeNo}(${c.sujeNo})`
+                      : c.hyeongjeNo || c.sujeNo || "-"}
+                  </td>
+                  <td style={{ padding: "10px 14px", color: "var(--text-main)" }}>{c.suspectName || "-"}</td>
+                  <td style={{ padding: "10px 14px", color: "var(--text-muted)" }}>{c.chargeName || "-"}</td>
+                  <td style={{ padding: "10px 14px", color: "#34d399", fontWeight: 600 }}>{c.disposition || "-"}</td>
+                  <td style={{ padding: "10px 14px", color: "var(--text-muted)" }}>{c.prosecutorName || "-"}</td>
+                  <td style={{ padding: "10px 14px", color: "var(--text-muted)", fontSize: "0.75rem", fontFamily: "monospace" }}>
+                    {c.archivedAt ? c.archivedAt.slice(0, 10) : "-"}
+                  </td>
+                  <td style={{ padding: "10px 14px" }}>
+                    {onArchiveCase && (
+                      <button
+                        onClick={() => handleUnarchive(c)}
+                        className="btn btn-outline"
+                        style={{ fontSize: "0.72rem", padding: "4px 10px", color: "#34d399", border: "1px solid rgba(52,211,153,0.4)", whiteSpace: "nowrap" }}
+                      >
+                        🔄 보존 해제
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -2087,6 +2365,7 @@ export default function SecretariatAdmin({
   onBulkImport,
   onDesignateCase,
   onUndesignateCase,
+  onArchiveCase,
   caseNumberSettings = {
     hyeongjeStart: 280,
     teuggongStart: 1,
@@ -2416,14 +2695,19 @@ export default function SecretariatAdmin({
       .catch((error) => console.warn("[audit log] 네트워크 오류", error));
   };
 
-  const handleAddProsecutor = (e) => {
+  const handleAddProsecutor = async (e) => {
     e.preventDefault();
     if (!newP.id || !newP.name) {
       alert("ID와 이름을 입력해주세요.");
       return;
     }
     const created = { ...newP, activeCases: 0 };
-    if (onAddProsecutor) onAddProsecutor(created);
+    if (onAddProsecutor) {
+      const ok = await onAddProsecutor(created);
+      // App.jsx에서 실패 시 return (undefined/void) — 성공 여부를 res로 체크
+      // onAddProsecutor가 실패하면 toast를 띄우고 return하므로 여기서는 폼 초기화만
+      if (ok === false) return; // 명시적 false면 실패
+    }
     addLog(
       "신규 검사 계정 생성",
       `${newP.name} (${newP.dept} / ${newP.title}) 계정 생성`,
@@ -2436,7 +2720,6 @@ export default function SecretariatAdmin({
       dept: departmentsData[0]?.name || "",
       password: "",
     });
-    alert(`[사무국 처리] 신규 검사 계정 '${created.name}'이 등록되었습니다.`);
   };
 
   const handleDeleteProsecutor = (pUser) => {
@@ -2565,7 +2848,7 @@ export default function SecretariatAdmin({
             marginBottom: 8,
           }}
         >
-          검찰사무국 총괄 관리 권한 필요
+          검찰사무국 관리 권한 필요
         </div>
         <div
           style={{
@@ -2575,7 +2858,7 @@ export default function SecretariatAdmin({
             marginBottom: 20,
           }}
         >
-          검찰사무국 총괄 시스템 관리는{" "}
+          검찰사무국 시스템 관리는{" "}
           <strong>검찰사무국 소속 직원 또는 검사장급 이상 직급</strong>부터
           사용할 수 있습니다.
           <br />
@@ -2596,8 +2879,7 @@ export default function SecretariatAdmin({
             marginBottom: 16,
           }}
         >
-          💡 <strong>권한 포함 대상</strong>: 검찰사무국 소속 직원, 최고 관리자,
-          검찰총장, 검사장, 차장검사, 검찰관리관
+          💡 <strong>권한 포함 대상</strong>: 검찰사무국 소속 직원
         </div>
         {onOpenLoginModal && (
           <button
@@ -6663,6 +6945,14 @@ export default function SecretariatAdmin({
 
       {activeSubTab === "autoarchive" && (
         <AutoArchiveSettingsPanel addLog={addLog} />
+      )}
+
+      {activeSubTab === "archivestore" && (
+        <ArchiveStoragePanel
+          ledgerData={ledgerData}
+          onArchiveCase={onArchiveCase}
+          addLog={addLog}
+        />
       )}
     </div>
   );

@@ -822,9 +822,11 @@ export default function App() {
     const res = await createProsecutorApi(newP);
     if (!res?.success) {
       showToast(`❌ 계정 저장 실패: ${res?.message || "서버 오류"}`, "error");
-      return;
+      return false;
     }
     setProsecutorsList((prev) => [...prev, res.prosecutor || newP]);
+    showToast(`✅ '${newP.name}' 계정이 등록되었습니다.`, "success");
+    return true;
   };
 
   // Handler: Delete Prosecutor Account (Secretariat Action)
@@ -1610,7 +1612,7 @@ export default function App() {
 
             {activeTab === "mycases" && (
               <MyCasesLedger
-                ledgerData={ledgerData}
+                ledgerData={scopedLedgerData}
                 currentUser={currentUser}
                 prosecutorsList={operationalProsecutorsList}
                 chargesData={chargesData}
@@ -1708,6 +1710,7 @@ export default function App() {
                   handleDesignateCase(caseId, currentUser)
                 }
                 onUndesignateCase={handleUndesignateCase}
+                onArchiveCase={handleArchiveCase}
                 onDeleteAppeal={handleDeleteAppeal}
                 onDeleteApproval={handleDeleteApproval}
                 onDeleteReport={handleDeleteReport}
