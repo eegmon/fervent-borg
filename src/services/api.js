@@ -495,3 +495,20 @@ export function deleteApprovalTemplateApi(id) {
 }
 
 
+
+// ════════════════════════════════════════════════════════════════════
+// System Settings — 자동보존 설정
+// ════════════════════════════════════════════════════════════════════
+
+/** 자동보존 설정 조회 */
+export function fetchAutoArchiveSettings() {
+  return apiFetch("/settings/auto-archive");
+}
+
+/** 자동보존 설정 저장 */
+export function updateAutoArchiveSettings(settings) {
+  return apiFetch("/settings/auto-archive", {
+    method: "PATCH",
+    body: JSON.stringify(settings),
+  });
+}

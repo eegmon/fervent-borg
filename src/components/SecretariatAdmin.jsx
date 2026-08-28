@@ -52,6 +52,8 @@ import {
   createChargeApi,
   deleteChargeApi,
   createAuditLogApi,
+  fetchAutoArchiveSettings,
+  updateAutoArchiveSettings,
 } from "../services/api";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1284,7 +1286,8 @@ function ActingOrderPanel({
     actingTitle: "부장검사 직무대리",
     orderNo: `검찰사무국 직무대리명령 제2026-00${orders.length + 1}호`,
     reason: "검찰 사무대리 규정 제7조 직무대리 지시",
-    period: `${today} ~ 2026-12-31`,
+    actingStart: today,
+    actingEnd: "2026-12-31",
   });
 
   const handleIssueOrder = async (e) => {
@@ -1318,7 +1321,9 @@ function ActingOrderPanel({
       actingUserId: act.id,
       actingTitle: form.actingTitle,
       reason: form.reason,
-      period: form.period,
+      actingStart: form.actingStart,
+      actingEnd: form.actingEnd,
+      period: `${form.actingStart} ~ ${form.actingEnd}`,
       status: "발령중",
       date: today,
     };
@@ -1350,6 +1355,8 @@ function ActingOrderPanel({
         delegateTo: origLabel,
         delegateReason: `[직무대리명령 수임] ${form.orderNo}`,
         actingTitle: form.actingTitle,
+        actingStart: form.actingStart,
+        actingEnd: form.actingEnd,
         ...(origRoleLevel ? { dualRoleLevel: origRoleLevel } : {}),
       });
     }
@@ -1388,6 +1395,8 @@ function ActingOrderPanel({
       onUpdateProsecutorStatus(actingUserId, {
         actingTitle: "",
         dualRoleLevel: "",
+        actingStart: "",
+        actingEnd: "",
         delegateTo: "",
         delegateReason: "",
       });
@@ -1572,12 +1581,29 @@ function ActingOrderPanel({
 
             <div>
               <Label>발령 기간 *</Label>
-              <input
-                className="input-field"
-                value={form.period}
-                onChange={(e) => setForm({ ...form, period: e.target.value })}
-                required
-              />
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="date"
+                  className="input-field"
+                  value={form.actingStart}
+                  onChange={(e) => setForm({ ...form, actingStart: e.target.value })}
+                  required
+                  style={{ flex: 1 }}
+                />
+                <span style={{ color: "var(--text-muted)", fontSize: "0.82rem", flexShrink: 0 }}>~</span>
+                <input
+                  type="date"
+                  className="input-field"
+                  value={form.actingEnd}
+                  onChange={(e) => setForm({ ...form, actingEnd: e.target.value })}
+                  required
+                  style={{ flex: 1 }}
+                  min={form.actingStart}
+                />
+              </div>
+              <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: 3, paddingLeft: 2 }}>
+                종료일이 지나면 직무대리 권한이 자동으로 회수됩니다.
+              </div>
             </div>
 
             <div>
@@ -1783,6 +1809,7 @@ const SUB_TABS = [
 
   { id: "delete", label: "🗑️ 기록 삭제", icon: Trash2, category: "SECURITY" },
   { id: "audit", label: "감사 로그", icon: History, category: "SECURITY" },
+  { id: "autoarchive", label: "📦 자동보존 설정", icon: Archive, category: "CASES" },
 ];
 
 const Label = ({ children }) => (
@@ -1798,6 +1825,140 @@ const Label = ({ children }) => (
     {children}
   </label>
 );
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 불기소 자동보존 설정 패널
+// ──────────────────────────────────────────────────────────────────────────────
+function AutoArchiveSettingsPanel({ addLog }) {
+  const [enabled, setEnabled] = useState(true);
+  const [days, setDays] = useState(7);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetchAutoArchiveSettings().then((res) => {
+      if (res) {
+        setEnabled(Boolean(res.enabled));
+        setDays(Number(res.days) || 7);
+      }
+      setLoading(false);
+    });
+  }, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setSaved(false);
+    const res = await updateAutoArchiveSettings({ enabled, days });
+    setSaving(false);
+    if (res?.success) {
+      setSaved(true);
+      addLog?.("자동보존 설정 변경", `사용: ${enabled ? "ON" : "OFF"}, 기간: ${days}일`);
+      setTimeout(() => setSaved(false), 2500);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div
+        className="glass-panel gold-border"
+        style={{ padding: "14px 20px", background: "rgba(245,158,11,0.06)" }}
+      >
+        <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--primary-amber)", display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <Archive size={18} /> 불기소 자동보존 설정
+        </div>
+        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+          불기소 처분 후 설정된 기간 동안 항고가 없으면 사건을 자동으로 보존기록 서고에 이관합니다.
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ color: "var(--text-muted)", fontSize: "0.85rem", padding: 20 }}>설정 불러오는 중...</div>
+      ) : (
+        <form onSubmit={handleSave}>
+          <div className="glass-panel" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 18, maxWidth: 480 }}>
+
+            {/* 사용 여부 */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--text-main)" }}>자동보존 사용</div>
+                <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: 2 }}>
+                  비활성화하면 자동보존이 실행되지 않습니다.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEnabled((v) => !v)}
+                style={{
+                  width: 52, height: 28, borderRadius: 14, border: "none",
+                  cursor: "pointer", transition: "all 0.2s",
+                  background: enabled ? "var(--primary-amber)" : "var(--bg-elevated)",
+                  boxShadow: enabled ? "0 0 0 1px rgba(245,158,11,0.6)" : "0 0 0 1px var(--border-subtle)",
+                  position: "relative",
+                }}
+                aria-label={enabled ? "자동보존 비활성화" : "자동보존 활성화"}
+              >
+                <span style={{
+                  position: "absolute", top: 4, transition: "all 0.2s",
+                  left: enabled ? 28 : 4,
+                  width: 20, height: 20, borderRadius: "50%",
+                  background: enabled ? "#000" : "var(--text-muted)",
+                }} />
+              </button>
+            </div>
+
+            {/* 보존 기간 */}
+            <div>
+              <Label>처분 후 자동보존 기간 (일)</Label>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <input
+                  type="number"
+                  className="input-field"
+                  value={days}
+                  min={1}
+                  max={365}
+                  onChange={(e) => setDays(Math.max(1, Number(e.target.value)))}
+                  disabled={!enabled}
+                  style={{ width: 120, opacity: enabled ? 1 : 0.5 }}
+                  required
+                />
+                <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                  일 경과 후 항고 없으면 자동 보존
+                </span>
+              </div>
+            </div>
+
+            {/* 대상 처분 안내 */}
+            <div style={{
+              padding: "10px 14px", borderRadius: 8,
+              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.25)",
+              fontSize: "0.78rem", color: "#a5b4fc",
+            }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>📋 자동보존 대상 처분</div>
+              <div>불기소 · 혐의없음 · 무혐의 · 기소유예 · 공소권없음 · 기소중지 · 죄가안됨</div>
+              <div style={{ marginTop: 6, color: "var(--text-muted)" }}>
+                항고가 접수된 경우 자동보존 대상에서 제외됩니다.
+              </div>
+            </div>
+
+            {/* 저장 버튼 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button type="submit" className="btn btn-gold" style={{ padding: "9px 24px", fontWeight: 800 }} disabled={saving}>
+                {saving ? "저장 중..." : "💾 설정 저장"}
+              </button>
+              {saved && (
+                <span style={{ fontSize: "0.82rem", color: "#34d399", fontWeight: 700 }}>
+                  ✅ 저장되었습니다
+                </span>
+              )}
+            </div>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
 
 // 디스코드 ID 인라인 편집 셀
 function DiscordIdCell({ prosecutor: p, onUpdateProsecutorStatus, addLog }) {
@@ -6498,6 +6659,10 @@ export default function SecretariatAdmin({
             </table>
           </div>
         </div>
+      )}
+
+      {activeSubTab === "autoarchive" && (
+        <AutoArchiveSettingsPanel addLog={addLog} />
       )}
     </div>
   );

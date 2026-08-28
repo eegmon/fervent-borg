@@ -17,6 +17,8 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
 
   const [mojangLoadingMap, setMojangLoadingMap] = useState({});
   const [mojangStatusMsg, setMojangStatusMsg] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -61,20 +63,30 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaveError(null);
+    setSaving(true);
     const validSuspects = suspectsList.filter(s => s.name.trim() !== '');
     const primarySuspect = validSuspects[0] || { name: formData.suspectName, uuid: formData.suspectUuid };
     const displaySuspectName = validSuspects.length > 1
       ? `${primarySuspect.name} 외 ${validSuspects.length - 1}명`
       : primarySuspect.name;
 
-    onSave({
+    const success = await onSave({
       ...formData,
       suspectName: displaySuspectName,
       suspectUuid: primarySuspect.uuid || '',
       suspects: validSuspects
     });
+
+    setSaving(false);
+    // onSave가 명시적으로 false를 반환하면 실패 — 모달 유지
+    if (success === false) {
+      setSaveError('저장에 실패했습니다. 다시 시도해주세요.');
+      return;
+    }
+    // 성공(true) 또는 구버전 onSave(undefined) 모두 닫기
     onClose();
   };
 
@@ -286,12 +298,25 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
           </div>
 
           {/* Submit buttons */}
+          {saveError && (
+            <div style={{
+              padding: '8px 14px',
+              borderRadius: 8,
+              background: 'rgba(239,68,68,0.12)',
+              border: '1px solid rgba(239,68,68,0.4)',
+              color: '#f87171',
+              fontSize: '0.82rem',
+              marginTop: 4,
+            }}>
+              ❌ {saveError}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
-            <button type="button" onClick={onClose} className="btn btn-secondary" style={{ padding: '10px 20px' }}>
+            <button type="button" onClick={onClose} className="btn btn-secondary" style={{ padding: '10px 20px' }} disabled={saving}>
               취소
             </button>
-            <button type="submit" className="btn btn-gold" style={{ padding: '10px 24px', fontWeight: 800 }}>
-              <Save size={16} /> 사건원부 저장 및 반영
+            <button type="submit" className="btn btn-gold" style={{ padding: '10px 24px', fontWeight: 800, opacity: saving ? 0.6 : 1 }} disabled={saving}>
+              <Save size={16} /> {saving ? '저장 중...' : '사건원부 저장 및 반영'}
             </button>
           </div>
         </form>

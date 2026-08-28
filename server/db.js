@@ -63,6 +63,8 @@ export async function initDb() {
     "can_arbitrary_approve INTEGER DEFAULT 0",
     "note TEXT DEFAULT ''",
     "discord_id TEXT DEFAULT ''",
+    "acting_start TEXT DEFAULT ''",
+    "acting_end TEXT DEFAULT ''",
   ]) {
     try {
       await db.execute(`ALTER TABLE prosecutors ADD COLUMN ${column}`);
@@ -154,6 +156,13 @@ export async function initDb() {
   });
   await db.execute({
     sql: "INSERT OR IGNORE INTO system_settings (key, value) VALUES ('departments_json', '[]')",
+    args: [],
+  });
+  // 불기소 자동보존 설정 초기값
+  await db.execute({
+    sql: `INSERT OR IGNORE INTO system_settings (key, value) VALUES
+            ('auto_archive_enabled', '1'),
+            ('auto_archive_days', '7')`,
     args: [],
   });
 

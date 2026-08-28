@@ -14,6 +14,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import EditCaseModal from "./EditCaseModal";
+import { getDisplayCaseNumber, getMasterCaseNumber, matchesCaseNumber } from "../services/caseUtils";
 
 const STATUS_COLOR = (s) => {
   if (!s) return "#94a3b8";
@@ -86,6 +87,16 @@ export default function MainLedger({
   const [expandedId, setExpandedId] = useState(null);
   const [editingCase, setEditingCase] = useState(null);
 
+  // 검사장 이상: 보존사건 포함 전체 원부 조회 가능
+  const isChiefOrAbove =
+    currentUser &&
+    (currentUser.isSuperAdmin ||
+      [
+        "SUPER_ADMIN",
+        "PROSECUTOR_GENERAL",
+        "CHIEF_PROSECUTOR",
+      ].includes(currentUser.roleLevel));
+
   // 결재 완료 여부: 해당 사건의 최종승인된 결재 문서 존재 여부
   const isCaseApprovalComplete = (caseItem) =>
     approvalsData.some(
@@ -97,16 +108,17 @@ export default function MainLedger({
     );
 
   // EditCaseModal의 onSave를 가로채어 결재 필수 사건 차단
-  const handleSaveGuarded = (updatedCase) => {
+  const handleSaveGuarded = async (updatedCase) => {
     const original = (ledgerData || []).find((c) => c.id === updatedCase.id);
     if (original?.supervisorDesignated && !isCaseApprovalComplete(original)) {
       alert(
         `🔒 [결재 필수 사건]\n\n이 사건은 직근상급자(${original.supervisorName || "상급자"})가 결재 필수로 지정하였습니다.\n\n` +
           `전자 결재함에서 결재가 최종 승인된 후에만 사건 정보를 수정할 수 있습니다.`,
       );
-      return;
+      return false;
     }
-    if (onUpdateCase) onUpdateCase(updatedCase);
+    if (onUpdateCase) return await onUpdateCase(updatedCase);
+    return false;
   };
 
   // 결재 필수 지정/해제 권한 — 수사지휘 라인(부장검사 이상)만 허용.
@@ -126,6 +138,7 @@ export default function MainLedger({
   const filtered = (ledgerData || []).filter((item) => {
     const q = (searchTerm || "").toLowerCase().trim();
     const hNo = (item.hyeongjeNo || "").toLowerCase();
+    const sNo = (item.sujeNo || "").toLowerCase();
     const sName = (item.suspectName || "").toLowerCase();
     const pName = (item.prosecutorName || "").toLowerCase();
     const cName = (item.chargeName || "").toLowerCase();
@@ -133,7 +146,7 @@ export default function MainLedger({
 
     const matchQ =
       !q ||
-      hNo.includes(q) ||
+      matchesCaseNumber(item, q) ||
       sName.includes(q) ||
       pName.includes(q) ||
       cName.includes(q) ||
@@ -156,11 +169,14 @@ export default function MainLedger({
       matchDept = pUser ? pUser.dept === deptFilter : false;
     }
 
-    // 보존 상태 필터링 (ACTIVE: 미보존 사건, ARCHIVED: 보존 서고 사건, ALL: 전체)
+    // 보존 상태 필터링:
+    //   검사장 이상 — ACTIVE / ARCHIVED / ALL 탭 모두 선택 가능
+    //   일반 사용자 — 보존사건은 기본 제외(ACTIVE 고정), ALL 탭은 미표시
+    const effectiveArchiveFilter = isChiefOrAbove ? archiveFilter : "ACTIVE";
     const matchArchive =
-      archiveFilter === "ALL"
+      effectiveArchiveFilter === "ALL"
         ? true
-        : archiveFilter === "ARCHIVED"
+        : effectiveArchiveFilter === "ARCHIVED"
           ? Boolean(item.isArchived)
           : !item.isArchived;
 
@@ -256,7 +272,7 @@ export default function MainLedger({
           </div>
         </div>
 
-        {/* 보존 상태 구별 필터 탭 (기본: 미보존 사건만 보기) */}
+        {/* 보존 상태 구별 필터 탭 — 검사장 이상만 전체·보존 탭 표시 */}
         <div
           style={{
             display: "flex",
@@ -269,20 +285,23 @@ export default function MainLedger({
           {[
             {
               id: "ACTIVE",
-              label: `📂 미보존·진행 사건 (${(ledgerData || []).filter((c) => !c.isArchived).length}건)`,
+              label: `📂 현재 처리중 (${(ledgerData || []).filter((c) => !c.isArchived).length}건)`,
               color: "#3b82f6",
+              show: true,
             },
             {
               id: "ARCHIVED",
               label: `📦 보존기록 서고 (${(ledgerData || []).filter((c) => Boolean(c.isArchived)).length}건)`,
               color: "#f59e0b",
+              show: isChiefOrAbove,
             },
             {
               id: "ALL",
-              label: `📋 전체 보기 (${(ledgerData || []).length}건)`,
+              label: `📋 전체 원부 (${(ledgerData || []).length}건)`,
               color: "#94a3b8",
+              show: isChiefOrAbove,
             },
-          ].map((t) => (
+          ].filter((t) => t.show).map((t) => (
             <button
               key={t.id}
               onClick={() => setArchiveFilter(t.id)}
@@ -408,7 +427,7 @@ export default function MainLedger({
                   }}
                 >
                   {/* Case No */}
-                  <div style={{ flexShrink: 0, minWidth: 120 }}>
+                  <div style={{ flexShrink: 0, minWidth: 130 }}>
                     <div
                       style={{
                         fontFamily: "monospace",
@@ -417,10 +436,9 @@ export default function MainLedger({
                         color: "var(--primary-amber)",
                       }}
                     >
-                      {item.sujeNo ||
-                        (item.hyeongjeNo || "").replace("형제", "수제")}
+                      {getDisplayCaseNumber(item)}
                     </div>
-                    {/* 기소 결정 시 형제번호 표시 */}
+                    {/* 기소 결정 시 형제번호 배지 표시 */}
                     {(item.disposition || "").includes("기소") &&
                     !(item.disposition || "").includes("불기소") &&
                     !(item.disposition || "").includes("유예") ? (
@@ -432,13 +450,7 @@ export default function MainLedger({
                           display: "inline-block",
                         }}
                       >
-                        ⚖️{" "}
-                        {item.hyeongjeNo && item.hyeongjeNo !== "-" && item.hyeongjeNo !== "00"
-                          ? item.hyeongjeNo
-                          : (item.sujeNo || item.hyeongjeNo).replace(
-                              "수제",
-                              "형제",
-                            )}
+                        ⚖️ 기소
                       </span>
                     ) : (
                       <span
@@ -773,9 +785,7 @@ export default function MainLedger({
                           e.stopPropagation();
                           onSelectEvidence(
                             item.bookingBasis || "",
-                            item.hyeongjeNo && item.hyeongjeNo !== "-"
-                              ? item.hyeongjeNo
-                              : item.sujeNo || item.hyeongjeNo,
+                            getMasterCaseNumber(item),
                             item.suspectName,
                           );
                         }}

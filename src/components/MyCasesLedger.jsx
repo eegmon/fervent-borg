@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { getDisplayCaseNumber, getMasterCaseNumber, matchesCaseNumber } from "../services/caseUtils";
 import {
   UserCheck,
   Search,
@@ -812,6 +813,7 @@ export default function MyCasesLedger({
       ? selectedProsecutorFilter
       : currentUser.name;
 
+  // 담당자 필터 적용 (전체 목록 — 보존 포함)
   const myCases = ledgerData.filter((item) => {
     if (!item) return false;
     const pName = item.prosecutorName || "";
@@ -821,11 +823,14 @@ export default function MyCasesLedger({
     );
   });
 
+  // 현재 처리중 사건 = 보존 제외
+  const myActiveCases = myCases.filter((c) => !c.isArchived);
+
   const filteredMyCases = myCases.filter((item) => {
     const q = searchTerm.toLowerCase().trim();
     const matchQ =
       !q ||
-      (item.hyeongjeNo || "").toLowerCase().includes(q) ||
+      matchesCaseNumber(item, q) ||
       (item.suspectName || "").toLowerCase().includes(q) ||
       (item.chargeName || "").toLowerCase().includes(q) ||
       (item.suspectUuid || "").toLowerCase().includes(q);
@@ -835,6 +840,8 @@ export default function MyCasesLedger({
         .toLowerCase()
         .includes(statusFilter.toLowerCase());
 
+    // 보존사건 제외: ACTIVE = 처리중만, ARCHIVED = 보존서고만, ALL = 전체
+    // 개인보관함(MyCases)에서는 기본적으로 보존사건 제외(ACTIVE)
     const matchArchive =
       archiveFilter === "ALL"
         ? true
@@ -845,17 +852,17 @@ export default function MyCasesLedger({
     return matchQ && matchStatus && matchArchive;
   });
 
-  const activeCount = myCases.filter(
+  const activeCount = myActiveCases.filter(
     (c) =>
       !(c.disposition || "").includes("불기소") &&
       !(c.disposition || "").includes("종국"),
   ).length;
-  const indictmentCount = myCases.filter(
+  const indictmentCount = myActiveCases.filter(
     (c) =>
       (c.disposition || "").includes("기소") &&
       !(c.disposition || "").includes("불기소"),
   ).length;
-  const nonIndictmentCount = myCases.filter(
+  const nonIndictmentCount = myActiveCases.filter(
     (c) =>
       (c.disposition || "").includes("불기소") ||
       (c.disposition || "").includes("종국"),
@@ -1059,7 +1066,7 @@ export default function MyCasesLedger({
           {[
             {
               label: "전체 담당 사건",
-              value: myCases.length,
+              value: myActiveCases.length,
               color: "var(--primary-amber)",
             },
             { label: "수사 진행 중", value: activeCount, color: "#60a5fa" },
@@ -1113,7 +1120,7 @@ export default function MyCasesLedger({
         {[
           {
             id: "ACTIVE",
-            label: `📂 미보존·진행 사건 (${myCases.filter((c) => !c.isArchived).length}건)`,
+            label: `📂 현재 처리중 (${myActiveCases.length}건)`,
             color: "#3b82f6",
           },
           {
@@ -1266,8 +1273,7 @@ export default function MyCasesLedger({
                         fontSize: "0.82rem",
                       }}
                     >
-                      {item.sujeNo ||
-                        (item.hyeongjeNo || "").replace("형제", "수제")}
+                      {getDisplayCaseNumber(item)}
                     </span>
                     {(item.disposition || "").includes("기소") &&
                       !(item.disposition || "").includes("불기소") &&
@@ -1282,13 +1288,7 @@ export default function MyCasesLedger({
                             fontSize: "0.78rem",
                           }}
                         >
-                          ⚖️{" "}
-                          {item.hyeongjeNo && item.hyeongjeNo !== "-" && item.hyeongjeNo !== "00"
-                            ? item.hyeongjeNo
-                            : (item.sujeNo || item.hyeongjeNo).replace(
-                                "수제",
-                                "형제",
-                              )}
+                          ⚖️ 기소
                         </span>
                       )}
                     {!!item.supervisorDesignated &&
@@ -1682,9 +1682,7 @@ export default function MyCasesLedger({
                           onSelectEvidence &&
                           onSelectEvidence(
                             item.bookingBasis || "",
-                            item.hyeongjeNo && item.hyeongjeNo !== "-"
-                              ? item.hyeongjeNo
-                              : item.sujeNo || item.hyeongjeNo,
+                            getMasterCaseNumber(item),
                             item.suspectName,
                           )
                         }
@@ -1892,9 +1890,9 @@ export default function MyCasesLedger({
           isOpen={!!editingCase}
           onClose={() => setEditingCase(null)}
           caseItem={editingCase}
-          onSave={(updated) => {
-            if (onUpdateCase) onUpdateCase(updated);
-            setEditingCase(null);
+          onSave={async (updated) => {
+            if (onUpdateCase) return await onUpdateCase(updated);
+            return false;
           }}
           prosecutorsList={prosecutorsList}
           chargesData={chargesData}

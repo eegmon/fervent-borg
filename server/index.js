@@ -143,7 +143,7 @@ async function requireAuth(req, res, next) {
   try {
     const claims = jwt.verify(header.slice(7), JWT_SECRET);
     const result = await db.execute({
-      sql: "SELECT id, name, role_level, dept, status, is_super_admin, dual_dept, dual_role_level, dual_secretariat_work, can_arbitrary_approve FROM prosecutors WHERE id = ?",
+      sql: "SELECT id, name, role_level, dept, status, is_super_admin, dual_dept, dual_role_level, dual_secretariat_work, can_arbitrary_approve, acting_start, acting_end FROM prosecutors WHERE id = ?",
       args: [claims.id],
     });
     if (result.rows.length === 0 || result.rows[0].status !== "ACTIVE") {
@@ -158,6 +158,27 @@ async function requireAuth(req, res, next) {
       isSuperAdmin: Boolean(account.isSuperAdmin),
       canArbitraryApprove: Boolean(account.canArbitraryApprove),
     };
+
+    // 직무대리 기간 만료 자동 회수: acting_end가 지났으면 dualRoleLevel 초기화
+    if (account.dualRoleLevel && account.actingEnd) {
+      const now = new Date();
+      const end = new Date(account.actingEnd);
+      if (!isNaN(end) && now > end) {
+        // 비동기 정리 — 응답 블로킹 없이 처리
+        db.execute({
+          sql: `UPDATE prosecutors SET
+                  dual_role_level='', acting_title='', acting_start='', acting_end='',
+                  delegate_to='', delegate_reason=''
+                WHERE id=?`,
+          args: [account.id],
+        }).catch((e) => console.warn("[acting expiry cleanup]", e.message));
+        // 현재 요청에서는 이미 만료된 것으로 처리
+        req.user.dualRoleLevel = "";
+        req.user.actingStart = "";
+        req.user.actingEnd = "";
+      }
+    }
+
     next();
   } catch {
     return res
@@ -169,11 +190,22 @@ async function requireAuth(req, res, next) {
 // ── 직무대리(dualRoleLevel) 통합 유효 권한 헬퍼 ────────────────────
 // 직무대리 발령 시 대리자의 dualRoleLevel이 피대리인 roleLevel로 설정됨.
 // 권한 체크는 모두 이 함수를 통해 "더 높은 쪽"을 사용하도록 통일.
+// acting_start ~ acting_end 기간 외에는 dualRoleLevel을 무시한다.
 function effectiveRoleLevel(user) {
   if (!user) return "PROBATIONARY";
   const base = user.roleLevel || "PROBATIONARY";
   const dual = user.dualRoleLevel || "";
   if (!dual) return base;
+
+  // 기간 체크: acting_start ~ acting_end 범위 내에만 대리 권한 유효
+  const now = new Date();
+  const start = user.actingStart ? new Date(user.actingStart) : null;
+  const end   = user.actingEnd   ? new Date(user.actingEnd)   : null;
+  // start가 설정됐는데 아직 시작 전이면 무효
+  if (start && now < start) return base;
+  // end가 설정됐는데 이미 만료됐으면 무효
+  if (end && now > end) return base;
+
   const baseAuth = ROLE_AUTHORITY[base] || 0;
   const dualAuth = ROLE_AUTHORITY[dual] || 0;
   return dualAuth > baseAuth ? dual : base;
@@ -341,6 +373,13 @@ async function findCaseForEvidence(caseNo, user) {
 function scopedQuery(table, user, orderBy = "rowid DESC") {
   // 검찰총장은 모든 테이블 전체 접근
   if (isProsecutorGeneral(user)) {
+    return {
+      sql: `SELECT * FROM ${table} WHERE deleted_at = '' ORDER BY ${orderBy}`,
+      args: [],
+    };
+  }
+  // 검사장 이상(CHIEF_PROSECUTOR)도 전체 사건 원부 접근 가능
+  if (GLOBAL_DATA_ROLES.has(effectiveRoleLevel(user))) {
     return {
       sql: `SELECT * FROM ${table} WHERE deleted_at = '' ORDER BY ${orderBy}`,
       args: [],
@@ -1251,7 +1290,7 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, async (req, res) => {
       ? `강제 재배당: ${assignedName} (${assignedId})`
       : `처분: ${c.disposition || ""}, 상태: ${c.bookingStatus || ""}`,
   });
-  res.json({ success: true });
+  res.json({ success: true, id: req.params.id });
 });
 
 // PATCH /api/cases/:id/archive — 사건 보존 / 보존 해제 처리
@@ -1899,6 +1938,8 @@ app.patch(
       dualDept: "dual_dept",
       dualRoleLevel: "dual_role_level",
       actingTitle: "acting_title",
+      actingStart: "acting_start",
+      actingEnd: "acting_end",
       dualSecretariatWork: "dual_secretariat_work",
       isAutoAssignExcluded: "is_auto_assign_excluded",
       canArbitraryApprove: "can_arbitrary_approve",
@@ -3600,12 +3641,133 @@ app.get("/{*splat}", (req, res) => {
   res.sendFile(join(distPath, "index.html"));
 });
 
+// ════════════════════════════════════════════════════════════════════
+// 자동보존 설정 API (GET / PATCH /api/settings/auto-archive)
+// ════════════════════════════════════════════════════════════════════
+app.get("/api/settings/auto-archive", requireAuth, requireSecretariat, async (req, res) => {
+  const result = await db.execute({
+    sql: "SELECT key, value FROM system_settings WHERE key IN ('auto_archive_enabled', 'auto_archive_days')",
+    args: [],
+  });
+  const settings = {};
+  for (const row of result.rows) {
+    settings[row.key] = row.value;
+  }
+  res.json({
+    enabled: settings["auto_archive_enabled"] !== "0",
+    days: Number(settings["auto_archive_days"] || 7),
+  });
+});
+
+app.patch("/api/settings/auto-archive", requireAuth, requireSecretariat, async (req, res) => {
+  const { enabled, days } = req.body;
+  if (enabled !== undefined) {
+    await db.execute({
+      sql: "UPDATE system_settings SET value=?, updated_at=datetime('now'), updated_by=? WHERE key='auto_archive_enabled'",
+      args: [enabled ? "1" : "0", req.user.name],
+    });
+  }
+  if (days !== undefined) {
+    const d = Math.max(1, Math.floor(Number(days)));
+    await db.execute({
+      sql: "UPDATE system_settings SET value=?, updated_at=datetime('now'), updated_by=? WHERE key='auto_archive_days'",
+      args: [String(d), req.user.name],
+    });
+  }
+  res.json({ success: true });
+});
+
+// ════════════════════════════════════════════════════════════════════
+// 불기소 자동보존 스케줄러
+// 불기소처분 후 설정된 기간(auto_archive_days) 동안 항고가 없으면 자동 보존.
+// 서버 시작 후 1분 뒤 최초 실행, 이후 1시간마다 반복.
+// ════════════════════════════════════════════════════════════════════
+const NON_INDICT_KEYWORDS = ["불기소", "혐의없음", "무혐의", "기소유예", "공소권없음", "기소중지", "죄가안됨"];
+
+function isNonIndictDisposition(disposition) {
+  if (!disposition) return false;
+  return NON_INDICT_KEYWORDS.some((kw) => disposition.includes(kw));
+}
+
+async function runAutoArchiveScheduler() {
+  try {
+    // 설정 조회
+    const settingRows = await db.execute({
+      sql: "SELECT key, value FROM system_settings WHERE key IN ('auto_archive_enabled', 'auto_archive_days')",
+      args: [],
+    });
+    const settings = {};
+    for (const row of settingRows.rows) settings[row.key] = row.value;
+
+    if (settings["auto_archive_enabled"] === "0") return; // 비활성화
+
+    const days = Math.max(1, Number(settings["auto_archive_days"] || 7));
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffStr = cutoff.toISOString().replace("T", " ").substring(0, 19);
+
+    // 불기소 처분이며 아직 보존되지 않은 사건 조회
+    const casesResult = await db.execute({
+      sql: `SELECT id, hyeongje_no, suje_no, disposition, created_at
+            FROM cases
+            WHERE is_archived = 0
+              AND deleted_at = ''
+              AND created_at <= ?`,
+      args: [cutoffStr],
+    });
+
+    let archivedCount = 0;
+    for (const row of casesResult.rows) {
+      const c = toCamel(row);
+      if (!isNonIndictDisposition(c.disposition)) continue;
+
+      // 항고 접수 여부 확인 (hyeongje_no 또는 suje_no 기준)
+      const appealCheck = await db.execute({
+        sql: `SELECT id FROM appeals
+              WHERE deleted_at = ''
+                AND (hyeongje_no = ? OR suje_no = ? OR hyeongje_no = ? OR suje_no = ?)
+              LIMIT 1`,
+        args: [c.hyeongjeNo || "", c.hyeongjeNo || "", c.sujeNo || "", c.sujeNo || ""],
+      });
+      if (appealCheck.rows.length > 0) continue; // 항고 있음 → 보존 스킵
+
+      // 자동 보존 처리
+      const nowStr = new Date().toISOString().replace("T", " ").substring(0, 19);
+      await db.execute({
+        sql: "UPDATE cases SET is_archived=1, archived_at=?, archived_by=? WHERE id=?",
+        args: [nowStr, "[자동보존]", c.id],
+      });
+      await writeAuditLog({
+        action: "UPDATE",
+        entityType: "case",
+        entityId: c.id,
+        entityLabel: c.hyeongjeNo || c.sujeNo || c.id,
+        actorId: "SYSTEM",
+        actorName: "자동보존 스케줄러",
+        detail: `불기소 처분(${c.disposition}) 후 ${days}일 경과, 항고 없음 — 자동 보존 처리`,
+      });
+      archivedCount++;
+    }
+
+    if (archivedCount > 0) {
+      console.log(`[자동보존] ${archivedCount}건 자동 보존 완료 (기준: ${days}일)`);
+    }
+  } catch (e) {
+    console.error("[자동보존 스케줄러 오류]", e.message);
+  }
+}
+
 // ── 서버 시작 ─────────────────────────────────────────────────────
 async function start() {
   await initDb();
   app.listen(PORT, () => {
     console.log(`[Dose-PROS API] http://localhost:${PORT}`);
   });
+  // 자동보존 스케줄러: 1분 후 최초 실행, 이후 1시간마다
+  setTimeout(() => {
+    runAutoArchiveScheduler();
+    setInterval(runAutoArchiveScheduler, 60 * 60 * 1000);
+  }, 60 * 1000);
 }
 
 start().catch((err) => {

@@ -422,23 +422,33 @@ export default function App() {
     return true;
   };
 
-  // Handler: Update Case Ledger Record (Persists in State & DB)
+  // Handler: Update Case Ledger Record (서버 저장 성공 후 state 갱신)
   const handleUpdateCase = async (updatedCase) => {
+    if (!updatedCase.id) {
+      showToast("❌ 사건 ID가 없어 수정할 수 없습니다.", "error");
+      return false;
+    }
+    const res = await updateCaseApi(updatedCase.id, updatedCase);
+    if (!res || !res.success) {
+      showToast(
+        `❌ 사건 수정 실패: ${res?.message || "서버 오류가 발생했습니다."}`,
+        "error",
+      );
+      return false;
+    }
+    // 서버 저장 성공 후 화면 상태 갱신
     setLedgerData((prev) =>
       prev.map((item) =>
-        item.id === updatedCase.id || item.hyeongjeNo === updatedCase.hyeongjeNo
+        item.id === updatedCase.id
           ? { ...item, ...updatedCase }
           : item,
       ),
     );
-    // 서버 수정 이력 반영
-    if (updatedCase.id) {
-      await updateCaseApi(updatedCase.id, updatedCase);
-    }
     showToast(
-      `✏️ ${updatedCase.hyeongjeNo}호 사건 원부가 수정되었습니다.`,
+      `✏️ ${updatedCase.hyeongjeNo || updatedCase.sujeNo || updatedCase.id}호 사건 원부가 수정되었습니다.`,
       "success",
     );
+    return true;
   };
 
   // Handler: Archive Case (사건 보존 / 보존 해제 처리)
