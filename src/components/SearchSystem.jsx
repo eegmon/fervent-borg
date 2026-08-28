@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Search, ExternalLink, AlertCircle, Scale, RefreshCw, FileText, UserCheck, ChevronRight } from 'lucide-react';
+import { Search, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react';
+import { isCaseConcluded, isCaseIndicted, isCaseInvestigating } from '../data/prosecutionData';
+import { isArchivedCase, matchesCaseNumber } from '../services/caseUtils';
 
 const STATUS_COLOR = (s) => {
   if (!s) return '#94a3b8';
@@ -13,31 +15,26 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
   const [query, setQuery] = useState('');
   const [searchType, setSearchType] = useState('all');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [archiveFilter, setArchiveFilter] = useState('ALL');
 
-  // Real-time null-safe filter calculation
   const filteredResults = useMemo(() => {
     const q = (query || '').toLowerCase().trim();
 
     return ledgerData.filter(item => {
       if (!item) return false;
 
-      const hNo = (item.hyeongjeNo || '').toLowerCase();
-      const sNo = (item.sujeNo || '').toLowerCase();
       const sName = (item.suspectName || '').toLowerCase();
       const pName = (item.prosecutorName || '').toLowerCase();
       const cName = (item.chargeName || '').toLowerCase();
       const sUuid = (item.suspectUuid || '').toLowerCase();
       const disp = (item.disposition || item.bookingStatus || '').toLowerCase();
       const c1No = (item.court1No || '').toLowerCase();
-      const c2No = (item.court2No || '').toLowerCase();
-      const c3No = (item.court3No || '').toLowerCase();
       const notes = (item.notes || '').toLowerCase();
 
-      // 1. Text Search Filter
       let matchQuery = true;
       if (q) {
         if (searchType === 'case') {
-          matchQuery = hNo.includes(q) || sNo.includes(q) || c1No.includes(q) || c2No.includes(q) || c3No.includes(q);
+          matchQuery = matchesCaseNumber(item, q) || c1No.includes(q);
         } else if (searchType === 'suspect') {
           matchQuery = sName.includes(q) || sUuid.includes(q);
         } else if (searchType === 'prosecutor') {
@@ -45,10 +42,8 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
         } else if (searchType === 'charge') {
           matchQuery = cName.includes(q);
         } else {
-          // 'all' - Deep integrated search
           matchQuery =
-            hNo.includes(q) ||
-            sNo.includes(q) ||
+            matchesCaseNumber(item, q) ||
             sName.includes(q) ||
             pName.includes(q) ||
             cName.includes(q) ||
@@ -59,25 +54,37 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
         }
       }
 
-      // 2. Status Filter
       let matchStatus = true;
-      if (statusFilter !== 'ALL') {
+      if (statusFilter === 'CONCLUDED') matchStatus = isCaseConcluded(item);
+      else if (statusFilter === 'INDICTED') matchStatus = isCaseIndicted(item);
+      else if (statusFilter === 'INVESTIGATING') matchStatus = isCaseInvestigating(item);
+      else if (statusFilter === 'NON_INDICT') {
+        const d = item.disposition || item.bookingStatus || '';
+        matchStatus = d.includes('불기소') || d.includes('무혐의') || d.includes('기소유예');
+      }
+      else if (statusFilter !== 'ALL') {
         matchStatus = disp.includes(statusFilter.toLowerCase());
       }
 
-      return matchQuery && matchStatus;
+      let matchArchive = true;
+      if (archiveFilter === 'ACTIVE') matchArchive = !isArchivedCase(item);
+      else if (archiveFilter === 'ARCHIVED') matchArchive = isArchivedCase(item);
+
+      return matchQuery && matchStatus && matchArchive;
     });
-  }, [ledgerData, query, searchType, statusFilter]);
+  }, [ledgerData, query, searchType, statusFilter, archiveFilter]);
 
   const handleReset = () => {
     setQuery('');
     setSearchType('all');
     setStatusFilter('ALL');
+    setArchiveFilter('ALL');
   };
+
+  const hasFilters = query || searchType !== 'all' || statusFilter !== 'ALL' || archiveFilter !== 'ALL';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Search Header Banner */}
       <div className="glass-panel gold-border" style={{ padding: '20px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
           <div>
@@ -86,15 +93,14 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
               사건 통합 맞춤 검색 & 실시간 조회 시스템
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
-              사건번호, 피의자 닉네임, UUID, 죄명, 담당검사 키워드로 즉시 실시간 조회가 가능합니다.
+              사건번호, 피의자, 죄명, 담당검사 검색 · 종국사건·보존사건 필터 지원
             </div>
           </div>
           <span className="badge badge-gold" style={{ fontSize: '0.78rem', padding: '5px 12px' }}>
-            조회 가능 사건: {ledgerData.length}건
+            조회 가능: {ledgerData.length}건
           </span>
         </div>
 
-        {/* Search Controls */}
         <form onSubmit={e => e.preventDefault()} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <select
             className="select-field"
@@ -127,14 +133,25 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
             onChange={e => setStatusFilter(e.target.value)}
             style={{ width: 140, flexShrink: 0 }}
           >
-            <option value="ALL">전체 사건 상태</option>
-            <option value="접수">접수중</option>
-            <option value="기소">구속/불구속 기소</option>
-            <option value="불기소">불기소 / 무혐의</option>
-            <option value="종국">종국 처분</option>
+            <option value="ALL">전체 처분</option>
+            <option value="INVESTIGATING">수사 진행중</option>
+            <option value="INDICTED">기소</option>
+            <option value="NON_INDICT">불기소 / 무혐의</option>
+            <option value="CONCLUDED">종국 처분</option>
           </select>
 
-          {(query || searchType !== 'all' || statusFilter !== 'ALL') && (
+          <select
+            className="select-field"
+            value={archiveFilter}
+            onChange={e => setArchiveFilter(e.target.value)}
+            style={{ width: 130, flexShrink: 0 }}
+          >
+            <option value="ALL">전체 (활성+보존)</option>
+            <option value="ACTIVE">현재 처리중</option>
+            <option value="ARCHIVED">보존사건</option>
+          </select>
+
+          {hasFilters && (
             <button
               type="button"
               onClick={handleReset}
@@ -147,7 +164,6 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
         </form>
       </div>
 
-      {/* Results Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
         <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
           {query.trim() ? (
@@ -155,12 +171,11 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
               '<span style={{ color: 'var(--primary-amber)', fontWeight: 800 }}>{query}</span>' 검색 결과: <strong style={{ color: 'var(--text-main)' }}>{filteredResults.length}건</strong>
             </>
           ) : (
-            <>전체 등록 사건 목록: <strong style={{ color: 'var(--primary-amber)' }}>{filteredResults.length}건</strong></>
+            <>조회 결과: <strong style={{ color: 'var(--primary-amber)' }}>{filteredResults.length}건</strong></>
           )}
         </div>
       </div>
 
-      {/* Results List */}
       <div className="glass-panel" style={{ overflow: 'hidden' }}>
         {filteredResults.length === 0 ? (
           <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -169,13 +184,15 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
               검색 조건에 해당되는 사건이 없습니다.
             </div>
             <div style={{ fontSize: '0.78rem' }}>
-              검색어(형제번호, 피의자 닉네임, UUID 등)나 필터 설정을 변경해보세요.
+              검색어, 처분 상태, 보존 여부 필터를 변경해보세요.
             </div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {filteredResults.map((item, idx) => {
               const statusColor = STATUS_COLOR(item.disposition || item.bookingStatus);
+              const archived = isArchivedCase(item);
+              const concluded = isCaseConcluded(item);
               return (
                 <div
                   key={item.id || idx}
@@ -186,18 +203,21 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
                     gridTemplateColumns: '130px 100px 1.2fr 1fr 120px auto',
                     gap: 14,
                     alignItems: 'center',
-                    background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
+                    background: archived ? 'rgba(245,158,11,0.04)' : idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
                     transition: 'background 0.15s',
                   }}
                 >
-                  {/* 사건번호 */}
                   <div>
                     <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '0.88rem', color: 'var(--primary-amber)' }}>
                       {item.hyeongjeNo || '번호미부여'}
                     </div>
+                    {archived && (
+                      <span className="badge" style={{ marginTop: 4, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontSize: '0.62rem' }}>
+                        보존
+                      </span>
+                    )}
                   </div>
 
-                  {/* 담당검사 */}
                   <div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>담당 검사</div>
                     <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-main)' }}>
@@ -205,7 +225,6 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
                     </div>
                   </div>
 
-                  {/* 피의자 정보 */}
                   <div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>피의자 닉네임 / UUID</div>
                     <button
@@ -223,7 +242,6 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
                     </button>
                   </div>
 
-                  {/* 죄명 & 재판번호 */}
                   <div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>죄명</div>
                     <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--primary-amber)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -236,14 +254,17 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
                     )}
                   </div>
 
-                  {/* 처분 상황 */}
                   <div>
                     <span className="badge" style={{ background: `${statusColor}20`, color: statusColor, fontSize: '0.72rem', padding: '4px 10px' }}>
                       {item.disposition || item.bookingStatus || '접수'}
                     </span>
+                    {concluded && (
+                      <span className="badge" style={{ marginLeft: 4, background: 'rgba(52,211,153,0.15)', color: '#34d399', fontSize: '0.62rem' }}>
+                        종국
+                      </span>
+                    )}
                   </div>
 
-                  {/* 증거 / 링크 */}
                   <div>
                     {item.bookingBasis?.includes('http') ? (
                       <button

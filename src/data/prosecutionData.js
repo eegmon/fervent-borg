@@ -120,47 +120,38 @@ export function formatKSTDateStr(dateInput) {
   return `${yyyy}.${mm}.${dd}`;
 }
 
-/**
- * 사건이 종국 처분되었거나 기소되었는지 여부 확인
- * - 기소된 사건(구속기소, 불구속기소, 약식기소, 기소, 구공판 등): 공소제기가 완료되어 공소시효 진행이 정지/완료됨.
- * - 종국 사건(불기소, 기소유예, 혐의없음, 죄가안됨, 공소권없음, 각하, 타관송치, 기소중지, 참고인중지, 종결, 처분완료 등): 이미 처분이 완료됨.
- * - 따라서 종국/기소 사건은 공소시효 만료 경보 및 48시간 영장 기한 알림 대상에서 제외된다.
- */
-export function isCaseClosedOrIndicted(c) {
+const CONCLUDED_KEYWORDS = [
+  "불기소", "종국", "기소유예", "혐의없음", "무혐의", "죄가안됨",
+  "공소권없음", "각하", "기소중지", "참고인중지", "타관송치",
+  "종결", "처분완료", "결재완료",
+];
+
+/** 종국 처분 여부 (불기소·기소유예·혐의없음 등, 기소 제외) */
+export function isCaseConcluded(c) {
   if (!c) return false;
   const disp = (c.disposition || "").trim();
   const bookingStatus = (c.bookingStatus || "").trim();
   const status = (c.status || "").trim();
 
-  // 1. 종국 / 불기소 / 처분완료 여부 확인
-  const isClosed =
+  return (
     Boolean(c.isConcluded) ||
     status.includes("종국") ||
     status.includes("완료") ||
     status.includes("종결") ||
     bookingStatus.includes("종국") ||
     bookingStatus.includes("완료") ||
-    [
-      "불기소",
-      "종국",
-      "기소유예",
-      "혐의없음",
-      "무혐의",
-      "죄가안됨",
-      "공소권없음",
-      "각하",
-      "기소중지",
-      "참고인중지",
-      "타관송치",
-      "종결",
-      "처분완료",
-      "결재완료",
-    ].some((k) => disp.includes(k));
+    CONCLUDED_KEYWORDS.some((k) => disp.includes(k))
+  );
+}
 
-  if (isClosed) return true;
+/** 기소 처분 여부 (구속기소·불구속기소·약식기소 등) */
+export function isCaseIndicted(c) {
+  if (!c) return false;
+  const disp = (c.disposition || "").trim();
+  const bookingStatus = (c.bookingStatus || "").trim();
+  const status = (c.status || "").trim();
 
-  // 2. 기소 여부 확인 (구속기소, 불구속기소, 약식기소, 기소, 구공판 등)
-  const isIndicted =
+  return (
     (disp.includes("기소") || disp.includes("구공판") || bookingStatus.includes("기소") || status.includes("기소")) &&
     !disp.includes("불기소") &&
     !disp.includes("미기소") &&
@@ -169,11 +160,24 @@ export function isCaseClosedOrIndicted(c) {
     !bookingStatus.includes("불기소") &&
     !bookingStatus.includes("미기소") &&
     !bookingStatus.includes("기소유예") &&
-    !bookingStatus.includes("기소중지");
+    !bookingStatus.includes("기소중지")
+  );
+}
 
-  if (isIndicted) return true;
+/** 수사 진행중 여부 (종국·기소 모두 아님) */
+export function isCaseInvestigating(c) {
+  if (!c) return false;
+  return !isCaseConcluded(c) && !isCaseIndicted(c);
+}
 
-  return false;
+/**
+ * 사건이 종국 처분되었거나 기소되었는지 여부 확인
+ * - 기소된 사건(구속기소, 불구속기소, 약식기소, 기소, 구공판 등): 공소제기가 완료되어 공소시효 진행이 정지/완료됨.
+ * - 종국 사건(불기소, 기소유예, 혐의없음, 죄가안됨, 공소권없음, 각하, 타관송치, 기소중지, 참고인중지, 종결, 처분완료 등): 이미 처분이 완료됨.
+ * - 따라서 종국/기소 사건은 공소시효 만료 경보 및 48시간 영장 기한 알림 대상에서 제외된다.
+ */
+export function isCaseClosedOrIndicted(c) {
+  return isCaseConcluded(c) || isCaseIndicted(c);
 }
 
 /**

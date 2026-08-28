@@ -16,11 +16,13 @@ import {
   KeyRound,
   UserCheck,
   ClipboardList,
+  Archive,
 } from "lucide-react";
 
 const TABS = [
   { id: "mycases", label: "내 담당 사건", icon: UserCheck },
   { id: "ledger", label: "사건 원부", icon: FileSpreadsheet },
+  { id: "preserved", label: "보존사건", icon: Archive },
   { id: "warrants", label: "영장 관리", icon: ShieldAlert },
   { id: "approvals", label: "전자 결재함", icon: FileCheck },
   { id: "secretariat", label: "검찰사무국", icon: Building2 },

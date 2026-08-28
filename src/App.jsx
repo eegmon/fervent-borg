@@ -19,6 +19,7 @@ import ReportLedger from "./components/ReportLedger";
 import AppealLedger from "./components/AppealLedger";
 import BookingLedger from "./components/BookingLedger";
 import SearchSystem from "./components/SearchSystem";
+import PreservedCasesLedger from "./components/PreservedCasesLedger";
 import AnalyticsDashboard from "./components/AnalyticsDashboard";
 import SecretariatAdmin from "./components/SecretariatAdmin";
 import IntakeModal from "./components/IntakeModal";
@@ -342,6 +343,8 @@ export default function App() {
         if (includeOwnRecord && item.prosecutorId === currentUser?.id) return true;
         // 동일 부서 사건
         if (isProsecutorInUserDept(item.prosecutorName)) return true;
+        // 보존사건은 전 부서 열람 가능
+        if (item.isArchived) return true;
         // 종국·기소 완료 사건은 전 부서 열람 가능 (서버 정책과 동기화)
         const disp = (item.disposition || "").toLowerCase();
         const status = (item.bookingStatus || "").toLowerCase();
@@ -1774,6 +1777,18 @@ export default function App() {
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
+              />
+            )}
+
+            {activeTab === "preserved" && (
+              <PreservedCasesLedger
+                ledgerData={scopedLedgerData}
+                currentUser={currentUser}
+                onSelectEvidence={(url, caseNo, suspectName) =>
+                  setEvidenceModalInfo({ url, caseNo, suspectName })
+                }
+                onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
+                onArchiveCase={handleArchiveCase}
               />
             )}
 
