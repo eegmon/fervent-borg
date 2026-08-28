@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Search,
   ExternalLink,
@@ -135,53 +135,74 @@ export default function MainLedger({
         "SENIOR_PROSECUTOR",
       ].includes(currentUser.roleLevel));
 
-  const filtered = (ledgerData || []).filter((item) => {
-    const q = (searchTerm || "").toLowerCase().trim();
-    const hNo = (item.hyeongjeNo || "").toLowerCase();
-    const sNo = (item.sujeNo || "").toLowerCase();
-    const sName = (item.suspectName || "").toLowerCase();
-    const pName = (item.prosecutorName || "").toLowerCase();
-    const cName = (item.chargeName || "").toLowerCase();
-    const sUuid = (item.suspectUuid || "").toLowerCase();
+  // 헤더 통계 — ledgerData가 바뀔 때만 재계산
+  const stats = useMemo(() => {
+    const data = ledgerData || [];
+    return {
+      total: data.length,
+      active: data.filter((c) => !c.isArchived).length,
+      archived: data.filter((c) => Boolean(c.isArchived)).length,
+      indicted: data.filter(
+        (d) =>
+          (d.disposition || "").includes("기소") &&
+          !(d.disposition || "").includes("불기소") &&
+          !(d.disposition || "").includes("유예"),
+      ).length,
+      investigating: data.filter(
+        (d) =>
+          !(d.disposition || "").includes("기소") &&
+          !(d.disposition || "").includes("불기소") &&
+          !(d.disposition || "").includes("유예") &&
+          !(d.disposition || "").includes("종국") &&
+          !(d.disposition || "").includes("이송"),
+      ).length,
+    };
+  }, [ledgerData]);
 
-    const matchQ =
-      !q ||
-      matchesCaseNumber(item, q) ||
-      sName.includes(q) ||
-      pName.includes(q) ||
-      cName.includes(q) ||
-      sUuid.includes(q);
-    const matchStatus =
-      statusFilter === "ALL" ||
-      (item.bookingStatus || item.disposition || "").includes(statusFilter);
-    const matchP =
-      prosecutorFilter === "ALL" ||
-      (item.prosecutorName || "").includes(prosecutorFilter);
+  // 필터 결과 — 검색/필터 조건이 바뀔 때만 재계산
+  const filtered = useMemo(() => {
+    return (ledgerData || []).filter((item) => {
+      const q = (searchTerm || "").toLowerCase().trim();
+      const sName = (item.suspectName || "").toLowerCase();
+      const pName = (item.prosecutorName || "").toLowerCase();
+      const cName = (item.chargeName || "").toLowerCase();
+      const sUuid = (item.suspectUuid || "").toLowerCase();
 
-    // 부서 필터링
-    let matchDept = true;
-    if (deptFilter !== "ALL") {
-      const pUser = prosecutorsList.find(
-        (p) =>
-          p.name.includes(item.prosecutorName || "") ||
-          (item.prosecutorName || "").includes(p.name),
-      );
-      matchDept = pUser ? pUser.dept === deptFilter : false;
-    }
+      const matchQ =
+        !q ||
+        matchesCaseNumber(item, q) ||
+        sName.includes(q) ||
+        pName.includes(q) ||
+        cName.includes(q) ||
+        sUuid.includes(q);
+      const matchStatus =
+        statusFilter === "ALL" ||
+        (item.bookingStatus || item.disposition || "").includes(statusFilter);
+      const matchP =
+        prosecutorFilter === "ALL" ||
+        (item.prosecutorName || "").includes(prosecutorFilter);
 
-    // 보존 상태 필터링:
-    //   검사장 이상 — ACTIVE / ARCHIVED / ALL 탭 모두 선택 가능
-    //   일반 사용자 — 보존사건은 기본 제외(ACTIVE 고정), ALL 탭은 미표시
-    const effectiveArchiveFilter = isChiefOrAbove ? archiveFilter : "ACTIVE";
-    const matchArchive =
-      effectiveArchiveFilter === "ALL"
-        ? true
-        : effectiveArchiveFilter === "ARCHIVED"
-          ? Boolean(item.isArchived)
-          : !item.isArchived;
+      let matchDept = true;
+      if (deptFilter !== "ALL") {
+        const pUser = prosecutorsList.find(
+          (p) =>
+            p.name.includes(item.prosecutorName || "") ||
+            (item.prosecutorName || "").includes(p.name),
+        );
+        matchDept = pUser ? pUser.dept === deptFilter : false;
+      }
 
-    return matchQ && matchStatus && matchP && matchDept && matchArchive;
-  });
+      const effectiveArchiveFilter = isChiefOrAbove ? archiveFilter : "ACTIVE";
+      const matchArchive =
+        effectiveArchiveFilter === "ALL"
+          ? true
+          : effectiveArchiveFilter === "ARCHIVED"
+            ? Boolean(item.isArchived)
+            : !item.isArchived;
+
+      return matchQ && matchStatus && matchP && matchDept && matchArchive;
+    });
+  }, [ledgerData, searchTerm, statusFilter, prosecutorFilter, deptFilter, archiveFilter, isChiefOrAbove, prosecutorsList]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -224,29 +245,9 @@ export default function MainLedger({
           {/* Quick Stats */}
           <div style={{ display: "flex", gap: 16 }}>
             {[
-              { label: "전체", value: ledgerData.length, color: "#93c5fd" },
-              {
-                label: "기소",
-                value: ledgerData.filter(
-                  (d) =>
-                    (d.disposition || "").includes("기소") &&
-                    !(d.disposition || "").includes("불기소") &&
-                    !(d.disposition || "").includes("유예"),
-                ).length,
-                color: "#fb923c",
-              },
-              {
-                label: "수사중",
-                value: ledgerData.filter(
-                  (d) =>
-                    !(d.disposition || "").includes("기소") &&
-                    !(d.disposition || "").includes("불기소") &&
-                    !(d.disposition || "").includes("유예") &&
-                    !(d.disposition || "").includes("종국") &&
-                    !(d.disposition || "").includes("이송"),
-                ).length,
-                color: "#fcd34d",
-              },
+              { label: "전체", value: stats.total, color: "#93c5fd" },
+              { label: "기소",  value: stats.indicted, color: "#fb923c" },
+              { label: "수사중", value: stats.investigating, color: "#fcd34d" },
             ].map((s) => (
               <div key={s.label} style={{ textAlign: "center" }}>
                 <div
@@ -285,19 +286,19 @@ export default function MainLedger({
           {[
             {
               id: "ACTIVE",
-              label: `📂 현재 처리중 (${(ledgerData || []).filter((c) => !c.isArchived).length}건)`,
+              label: `📂 현재 처리중 (${stats.active}건)`,
               color: "#3b82f6",
               show: true,
             },
             {
               id: "ARCHIVED",
-              label: `📦 보존기록 서고 (${(ledgerData || []).filter((c) => Boolean(c.isArchived)).length}건)`,
+              label: `📦 보존기록 서고 (${stats.archived}건)`,
               color: "#f59e0b",
               show: isChiefOrAbove,
             },
             {
               id: "ALL",
-              label: `📋 전체 원부 (${(ledgerData || []).length}건)`,
+              label: `📋 전체 원부 (${stats.total}건)`,
               color: "#94a3b8",
               show: isChiefOrAbove,
             },

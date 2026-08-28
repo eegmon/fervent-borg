@@ -840,14 +840,9 @@ export default function MyCasesLedger({
         .toLowerCase()
         .includes(statusFilter.toLowerCase());
 
-    // 보존사건 제외: ACTIVE = 처리중만, ARCHIVED = 보존서고만, ALL = 전체
-    // 개인보관함(MyCases)에서는 기본적으로 보존사건 제외(ACTIVE)
+    // 처리중/전체 구분 — 보존기록은 개인보관함에서 제외
     const matchArchive =
-      archiveFilter === "ALL"
-        ? true
-        : archiveFilter === "ARCHIVED"
-          ? Boolean(item.isArchived)
-          : !item.isArchived;
+      archiveFilter === "ALL" ? true : !item.isArchived;
 
     return matchQ && matchStatus && matchArchive;
   });
@@ -1108,7 +1103,7 @@ export default function MyCasesLedger({
         </div>
       </div>
 
-      {/* 보존 상태 구별 필터 탭 */}
+      {/* 보존 상태 구별 필터 탭 — 처리중/전체만 표시 (보존기록은 검찰사무국에서 관리) */}
       <div
         style={{
           display: "flex",
@@ -1122,11 +1117,6 @@ export default function MyCasesLedger({
             id: "ACTIVE",
             label: `📂 현재 처리중 (${myActiveCases.length}건)`,
             color: "#3b82f6",
-          },
-          {
-            id: "ARCHIVED",
-            label: `📦 보존기록 서고 (${myCases.filter((c) => Boolean(c.isArchived)).length}건)`,
-            color: "#f59e0b",
           },
           {
             id: "ALL",

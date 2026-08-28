@@ -367,7 +367,7 @@ export default function App() {
     } catch {}
     setIsLoginModalOpen(false);
     showToast(
-      `✅ ${user.name} (${user.position || user.title}) 로그인 승인`,
+      `✅ ${safeUser.name} (${safeUser.position || safeUser.title || safeUser.roleLevel}) 로그인 승인`,
       "success",
     );
 
