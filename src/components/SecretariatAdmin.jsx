@@ -1279,6 +1279,7 @@ function ActingOrderPanel({
   const [form, setForm] = useState({
     originalUserId: prosecutorsList[0]?.id || "",
     originalVacantTitle: "",   // 공석 모드 전용 — 피대리 직위 직접 입력
+    vacantRoleLevel: "SENIOR_PROSECUTOR", // 공석 모드 전용 — 부여할 권한 등급
     actingUserId: prosecutorsList[1]?.id || "",
     actingTitle: "부장검사 직무대리",
     orderNo: `검찰사무국 직무대리명령 제2026-00${orders.length + 1}호`,
@@ -1339,10 +1340,10 @@ function ActingOrderPanel({
     }
 
     // 직무대리자 계정에 대결 직위 + dualRoleLevel(피대리인 권한 등급) 부여
-    // 공석 모드일 때는 actingTitle에서 직위를 유추할 수 없으므로 form에 별도 roleLevel 선택 없이
-    // 원 결재권자의 roleLevel을 그대로 전달 (계정 있을 때), 공석이면 빈 문자열로 유지
+    // 계정이 있을 때: 피대리인의 roleLevel을 그대로 전달
+    // 공석 모드일 때: 폼에서 직접 선택한 vacantRoleLevel을 사용
     const origRoleLevel = vacantMode
-      ? ""
+      ? (form.vacantRoleLevel || "")
       : (prosecutorsList.find((p) => p.id === form.originalUserId)?.roleLevel || "");
     if (onUpdateProsecutorStatus) {
       onUpdateProsecutorStatus(act.id, {
@@ -1463,7 +1464,7 @@ function ActingOrderPanel({
                   type="button"
                   onClick={() => {
                     setVacantMode((v) => !v);
-                    setForm((f) => ({ ...f, originalVacantTitle: "" }));
+                    setForm((f) => ({ ...f, originalVacantTitle: "", vacantRoleLevel: "SENIOR_PROSECUTOR" }));
                   }}
                   style={{
                     fontSize: "0.68rem",
@@ -1485,7 +1486,7 @@ function ActingOrderPanel({
                 </button>
               </div>
               {vacantMode ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <input
                     className="input-field"
                     placeholder="예: 검찰사무국장 / 부장검사 (공석)"
@@ -1498,6 +1499,28 @@ function ActingOrderPanel({
                   />
                   <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", paddingLeft: 2 }}>
                     계정 없는 공석 직위명을 직접 입력합니다. 발령 대장에 <em>(공석)</em>으로 표시됩니다.
+                  </div>
+                  <div style={{ marginTop: 2 }}>
+                    <Label>공석 직위 권한 등급 *</Label>
+                    <select
+                      className="select-field"
+                      value={form.vacantRoleLevel}
+                      onChange={(e) =>
+                        setForm({ ...form, vacantRoleLevel: e.target.value })
+                      }
+                      required
+                    >
+                      {Object.entries(ROLE_LABELS)
+                        .filter(([key]) => key !== "SUPER_ADMIN")
+                        .map(([key, label]) => (
+                          <option key={key} value={key}>
+                            {label}
+                          </option>
+                        ))}
+                    </select>
+                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", paddingLeft: 2, marginTop: 3 }}>
+                      직무대리자에게 부여할 권한 등급입니다. 피대리 직위의 실제 권한과 일치해야 합니다.
+                    </div>
                   </div>
                 </div>
               ) : (
