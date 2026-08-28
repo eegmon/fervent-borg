@@ -1,6 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { BarChart3, Scale, Users, Archive, CheckCircle2, X } from 'lucide-react';
-import { isCaseConcluded, isCaseIndicted, isCaseInvestigating } from '../data/prosecutionData';
+import {
+  isCaseConcluded,
+  isCaseIndicted,
+  isCaseInvestigating,
+  isNonIndictmentCase,
+  buildNonIndictmentBreakdown,
+  NON_INDICTMENT_REASONS,
+  NON_INDICTMENT_REASON_COLORS,
+} from '../data/prosecutionData';
 import { isArchivedCase } from '../services/caseUtils';
 
 const ARCHIVE_FILTERS = [
@@ -12,7 +20,6 @@ const ARCHIVE_FILTERS = [
 const DISPOSITION_CATEGORIES = [
   { key: 'gusok', label: '구속기소', color: '#f87171' },
   { key: 'bulgusok', label: '불구속기소', color: '#fb923c' },
-  { key: 'bulgis', label: '불기소', color: '#34d399' },
   { key: 'investigating', label: '수사진행', color: '#fcd34d' },
   { key: 'concluded', label: '종국처분', color: '#6ee7b7' },
   { key: 'archived', label: '보존사건', color: '#f59e0b', hideWhen: ['ACTIVE', 'ARCHIVED'] },
@@ -26,6 +33,76 @@ const StatCard = ({ label, value, color, sub }) => (
   </div>
 );
 
+function NonIndictmentReasonPanel({ breakdown }) {
+  if (!breakdown || breakdown.total === 0) {
+    return (
+      <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', padding: '8px 0' }}>
+        해당 조건의 불기소 사건이 없습니다.
+      </div>
+    );
+  }
+
+  const items = [
+    ...NON_INDICTMENT_REASONS.map((r) => ({
+      id: r.id,
+      label: r.label,
+      category: r.category,
+      count: breakdown.byReason[r.id] || 0,
+      color: NON_INDICTMENT_REASON_COLORS[r.id],
+    })),
+    {
+      id: 'UNKNOWN',
+      label: '기타 / 미분류',
+      category: '',
+      count: breakdown.byReason.UNKNOWN || 0,
+      color: NON_INDICTMENT_REASON_COLORS.UNKNOWN,
+    },
+  ].filter((item) => item.count > 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+        {items.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              padding: '12px 14px',
+              borderRadius: 10,
+              background: `${item.color}12`,
+              border: `1px solid ${item.color}30`,
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '1.5rem', fontWeight: 900, color: item.color }}>{item.count}</div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-main)', marginTop: 4, lineHeight: 1.4 }}>
+              {item.label}
+            </div>
+            {item.category && (
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>{item.category}</div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {items.map((item) => {
+          const pct = breakdown.total ? Math.round((item.count / breakdown.total) * 100) : 0;
+          return (
+            <div key={`bar-${item.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8rem' }}>
+              <span style={{ flex: 1, color: 'var(--text-main)', fontWeight: 600 }}>{item.label}</span>
+              <span style={{ color: item.color, fontWeight: 700, minWidth: 48, textAlign: 'right' }}>
+                {item.count}건
+              </span>
+              <div style={{ width: 80, height: 6, background: 'var(--bg-elevated)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${pct}%`, background: item.color, borderRadius: 3 }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function buildDispositionBreakdown(cases) {
   return {
     total: cases.length,
@@ -35,7 +112,8 @@ function buildDispositionBreakdown(cases) {
       const disp = d.disposition || '';
       return disp.includes('불구속') && disp.includes('기소');
     }).length,
-    bulgis: cases.filter((d) => (d.disposition || '').includes('불기소')).length,
+    bulgis: cases.filter(isNonIndictmentCase).length,
+    nonIndictBreakdown: buildNonIndictmentBreakdown(cases),
     investigating: cases.filter(isCaseInvestigating).length,
     concluded: cases.filter(isCaseConcluded).length,
     indicted: cases.filter(isCaseIndicted).length,
@@ -69,7 +147,8 @@ function buildStats(data) {
       const disp = d.disposition || '';
       return disp.includes('불구속') && disp.includes('기소');
     }).length,
-    bulgis: data.filter((d) => (d.disposition || '').includes('불기소')).length,
+    bulgis: data.filter(isNonIndictmentCase).length,
+    nonIndictBreakdown: buildNonIndictmentBreakdown(data),
   };
 }
 
@@ -335,6 +414,17 @@ export default function AnalyticsDashboard({ ledgerData = [] }) {
               ))}
             </div>
 
+            {selectedProsecutorBreakdown.nonIndictBreakdown?.total > 0 && (
+              <>
+                <div style={{ fontWeight: 700, fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 8 }}>
+                  불기소 사유별 ({selectedProsecutorBreakdown.nonIndictBreakdown.total}건)
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <NonIndictmentReasonPanel breakdown={selectedProsecutorBreakdown.nonIndictBreakdown} />
+                </div>
+              </>
+            )}
+
             <div style={{ fontWeight: 700, fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 8 }}>
               세부 처분 내역
             </div>
@@ -386,6 +476,21 @@ export default function AnalyticsDashboard({ ledgerData = [] }) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* 불기소 사유별 현황 */}
+      <div className="glass-panel" style={{ padding: 20 }}>
+        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <Scale size={16} color="#34d399" />
+          불기소 사유별 현황
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+            · {filterMeta?.label} · 총 {stats.nonIndictBreakdown.total}건
+          </span>
+        </div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+          검찰사무규칙 제18조 불기소 결정 사유별 분류 (혐의없음·기소유예·공소권없음 등)
+        </div>
+        <NonIndictmentReasonPanel breakdown={stats.nonIndictBreakdown} />
       </div>
 
       {/* 종국 사건 안내 */}

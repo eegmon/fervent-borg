@@ -421,9 +421,10 @@ function scopedQuery(table, user, orderBy = "rowid DESC") {
 
     return {
       sql: `SELECT c.* FROM cases c
-            JOIN prosecutors p ON c.prosecutor_id = p.id
+            LEFT JOIN prosecutors p ON c.prosecutor_id = p.id
             WHERE c.deleted_at = '' AND
-              ((c.visibility = 'PUBLIC' AND p.dept = (SELECT dept FROM prosecutors WHERE id = ?))
+              (c.is_archived = 1
+                OR (c.visibility = 'PUBLIC' AND p.dept = (SELECT dept FROM prosecutors WHERE id = ?))
                 OR c.created_by = ? OR c.prosecutor_id = ?
                 OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0
                 OR (c.visibility = 'PUBLIC' AND (${closedCondition})))
@@ -739,14 +740,14 @@ app.post("/api/cases", requireAuth, async (req, res) => {
     sql: `INSERT INTO cases (
             id, suje_no, hyeongje_no, latest_hyeongje_no,
             prosecutor_name, prosecutor_id, suspect_name, suspect_uuid,
-            booking_status, booking_date, booking_basis, disposition,
+            booking_status, booking_date, incident_date, booking_basis, disposition,
             re_appeal, court1_no, court1_result, court1_doc,
             court1_appealed, court1_appellant, court2_no, court2_dismissed,
             court2_result, court2_doc, court3_appealed, court3_appellant,
             court3_no, court3_remanded, court3_result, court3_doc,
             notes, content, confiscation, charge_name, visibility, created_by, private_viewer_ids
           ) VALUES (
-            ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+            ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
           )`,
     args: [
       id,
@@ -759,6 +760,7 @@ app.post("/api/cases", requireAuth, async (req, res) => {
       c.suspectUuid || "",
       c.bookingStatus || "",
       c.bookingDate || "",
+      c.incidentDate || c.bookingDate || "",
       c.bookingBasis || "",
       c.disposition || "",
       c.reAppeal || "-",
@@ -879,6 +881,7 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
     c.suspectUuid || "",
     c.bookingStatus || "",
     c.bookingDate || "",
+    c.incidentDate || c.bookingDate || "",
     c.bookingBasis || "",
     c.disposition || "",
     c.reAppeal || "-",
@@ -909,7 +912,7 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
     await db.batch(
       [
         {
-          sql: `INSERT INTO cases (id,suje_no,hyeongje_no,latest_hyeongje_no,prosecutor_name,prosecutor_id,suspect_name,suspect_uuid,booking_status,booking_date,booking_basis,disposition,re_appeal,court1_no,court1_result,court1_doc,court1_appealed,court1_appellant,court2_no,court2_dismissed,court2_result,court2_doc,court3_appealed,court3_appellant,court3_no,court3_remanded,court3_result,court3_doc,notes,content,confiscation,charge_name,visibility,created_by,private_viewer_ids) VALUES (${Array(35).fill("?").join(",")})`,
+          sql: `INSERT INTO cases (id,suje_no,hyeongje_no,latest_hyeongje_no,prosecutor_name,prosecutor_id,suspect_name,suspect_uuid,booking_status,booking_date,incident_date,booking_basis,disposition,re_appeal,court1_no,court1_result,court1_doc,court1_appealed,court1_appellant,court2_no,court2_dismissed,court2_result,court2_doc,court3_appealed,court3_appellant,court3_no,court3_remanded,court3_result,court3_doc,notes,content,confiscation,charge_name,visibility,created_by,private_viewer_ids) VALUES (${Array(36).fill("?").join(",")})`,
           args: caseArgs,
         },
         {
@@ -1015,6 +1018,8 @@ app.post("/api/cases/bulk-import", requireAuth, async (req, res) => {
       const suspectUuid = String(r["UUID"] || "").trim();
       const bookingStatus = String(r["현재 상황"] || "접수").trim();
       const bookingDate = String(r["접수일시"] || "").trim();
+      const incidentDate =
+        String(r["사건 발생일"] || r["발생일시"] || "").trim() || bookingDate;
       const bookingBasis = String(r["접수근거"] || "").trim();
       const disposition = String(r["처분내용"] || "").trim();
       const chargeName = String(r["죄명"] || "").trim();
@@ -1030,6 +1035,7 @@ app.post("/api/cases/bulk-import", requireAuth, async (req, res) => {
         suspectUuid,
         bookingStatus,
         bookingDate,
+        incidentDate,
         bookingBasis,
         disposition,
         reAppeal: "-",
@@ -1062,13 +1068,13 @@ app.post("/api/cases/bulk-import", requireAuth, async (req, res) => {
         sql: `INSERT INTO cases (
                 id, suje_no, hyeongje_no, latest_hyeongje_no,
                 prosecutor_name, prosecutor_id, suspect_name, suspect_uuid,
-                booking_status, booking_date, booking_basis, disposition,
+                booking_status, booking_date, incident_date, booking_basis, disposition,
                 re_appeal, court1_no, court1_result, court1_doc,
                 court1_appealed, court1_appellant, court2_no, court2_dismissed,
                 court2_result, court2_doc, court3_appealed, court3_appellant,
                 court3_no, court3_remanded, court3_result, court3_doc,
                 notes, content, confiscation, charge_name, visibility, created_by, private_viewer_ids
-              ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         args: [
           caseObj.id,
           caseObj.sujeNo,
@@ -1080,6 +1086,7 @@ app.post("/api/cases/bulk-import", requireAuth, async (req, res) => {
           caseObj.suspectUuid,
           caseObj.bookingStatus,
           caseObj.bookingDate,
+          caseObj.incidentDate,
           caseObj.bookingBasis,
           caseObj.disposition,
           caseObj.reAppeal,
@@ -1242,12 +1249,21 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, async (req, res) => {
         ["hyeongjeNo", "형제번호"],
         ["prosecutorName", "담당검사"],
         ["suspectName", "피의자명"],
+        ["suspectUuid", "피의자 UUID"],
         ["bookingStatus", "입건상태"],
+        ["bookingDate", "접수일"],
+        ["incidentDate", "사건 발생일"],
         ["disposition", "처분내역"],
         ["chargeName", "죄명"],
         ["notes", "비고"],
         ["content", "사건 내용"],
         ["confiscation", "몰수추징"],
+        ["court1No", "1심 사건번호"],
+        ["court1Result", "1심 판결"],
+        ["court2No", "2심 사건번호"],
+        ["court2Result", "2심 판결"],
+        ["court3No", "3심 사건번호"],
+        ["court3Result", "3심 판결"],
       ];
       const now = new Date().toISOString().replace("T", " ").substring(0, 19);
       for (const [field, label] of trackFields) {
@@ -1277,21 +1293,54 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, async (req, res) => {
     console.warn("[case history write error]", e.message);
   }
 
+  const sujeNo =
+    c.sujeNo ||
+    (c.hyeongjeNo && c.hyeongjeNo.includes("수제") ? c.hyeongjeNo : "");
+  const hyeongjeNo =
+    c.hyeongjeNo && !c.hyeongjeNo.includes("수제") ? c.hyeongjeNo : "-";
+
   await db.execute({
     sql: `UPDATE cases SET
-            suje_no=?, hyeongje_no=?, prosecutor_name=?, prosecutor_id=?,
-            suspect_name=?, booking_status=?, disposition=?,
+            suje_no=?, hyeongje_no=?, latest_hyeongje_no=?,
+            prosecutor_name=?, prosecutor_id=?,
+            suspect_name=?, suspect_uuid=?,
+            booking_status=?, booking_date=?, incident_date=?, booking_basis=?, disposition=?,
+            re_appeal=?,
+            court1_no=?, court1_result=?, court1_doc=?, court1_appealed=?, court1_appellant=?,
+            court2_no=?, court2_dismissed=?, court2_result=?, court2_doc=?,
+            court3_appealed=?, court3_appellant=?, court3_no=?, court3_remanded=?, court3_result=?, court3_doc=?,
             charge_name=?, notes=?, content=?, confiscation=?,
             supervisor_designated=?, supervisor_id=?, supervisor_name=?
           WHERE id=?`,
     args: [
-      c.sujeNo || (c.hyeongjeNo && c.hyeongjeNo.includes("수제") ? c.hyeongjeNo : ""),
-      c.hyeongjeNo || "-",
+      sujeNo,
+      hyeongjeNo,
+      c.latestHyeongjeNo || hyeongjeNo,
       assignedName,
       assignedId,
       c.suspectName || "",
+      c.suspectUuid || "",
       c.bookingStatus || "",
+      c.bookingDate || "",
+      c.incidentDate || "",
+      c.bookingBasis || "",
       c.disposition || "",
+      c.reAppeal || "-",
+      c.court1No || "",
+      c.court1Result || "",
+      c.court1Doc || "",
+      c.court1Appealed || "",
+      c.court1Appellant || "",
+      c.court2No || "",
+      c.court2Dismissed || "",
+      c.court2Result || "",
+      c.court2Doc || "",
+      c.court3Appealed || "",
+      c.court3Appellant || "",
+      c.court3No || "",
+      c.court3Remanded || "",
+      c.court3Result || "",
+      c.court3Doc || "",
       c.chargeName || "",
       c.notes || "",
       c.content || "",

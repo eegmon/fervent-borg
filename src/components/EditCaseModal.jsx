@@ -77,6 +77,7 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
       ...formData,
       suspectName: displaySuspectName,
       suspectUuid: primarySuspect.uuid || '',
+      bookingStatus: primarySuspect.bookingStatus || formData.bookingStatus || '',
       suspects: validSuspects
     });
 

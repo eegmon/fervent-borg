@@ -87,6 +87,7 @@ export async function initDb() {
       suspect_uuid        TEXT,
       booking_status      TEXT,
       booking_date        TEXT,
+      incident_date       TEXT,
       booking_basis       TEXT,
       disposition         TEXT,
       re_appeal           TEXT,
@@ -126,6 +127,7 @@ export async function initDb() {
     "is_archived INTEGER DEFAULT 0",
     "archived_at TEXT DEFAULT ''",
     "archived_by TEXT DEFAULT ''",
+    "incident_date TEXT DEFAULT ''",
   ]) {
     try {
       await db.execute(`ALTER TABLE cases ADD COLUMN ${column}`);
@@ -134,6 +136,13 @@ export async function initDb() {
         throw error;
     }
   }
+  // 기존 사건: 사건 발생일 미입력 시 접수일로 보정 (공소시효 기산일)
+  await db.execute(`
+    UPDATE cases
+    SET incident_date = booking_date
+    WHERE (incident_date IS NULL OR incident_date = '')
+      AND booking_date IS NOT NULL AND booking_date != ''
+  `);
 
   // ── system_settings ───────────────────────────────────────────
   await db.execute(`

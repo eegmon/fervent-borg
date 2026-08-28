@@ -316,6 +316,85 @@ export const NON_INDICTMENT_REASONS = [
   },
 ];
 
+export const NON_INDICTMENT_REASON_COLORS = {
+  NO_SUSPICION_NO_CRIME: "#34d399",
+  NO_SUSPICION_NO_EVIDENCE: "#6ee7b7",
+  NOT_A_CRIME: "#2dd4bf",
+  NO_PROSECUTION_RIGHT: "#93c5fd",
+  SUSPENSION_PROSECUTION: "#fcd34d",
+  DISMISSAL: "#94a3b8",
+  STAY_PROSECUTION: "#c4b5fd",
+  UNKNOWN: "#64748b",
+};
+
+function getCaseDispositionText(caseItem) {
+  return (caseItem?.disposition || caseItem?.bookingStatus || "").trim();
+}
+
+/** 불기소·기소유예 등 불기소 결정 사건 여부 */
+export function isNonIndictmentCase(caseItem) {
+  return resolveNonIndictmentReasonId(caseItem) !== null;
+}
+
+/** 사건의 불기소 사유 ID 반환 (해당 없으면 null) */
+export function resolveNonIndictmentReasonId(caseItem) {
+  if (!caseItem) return null;
+
+  if (caseItem.nonIndictReasonId) {
+    const matched = NON_INDICTMENT_REASONS.find((r) => r.id === caseItem.nonIndictReasonId);
+    if (matched) return matched.id;
+  }
+
+  const disp = getCaseDispositionText(caseItem);
+  if (!disp || isCaseIndicted(caseItem)) return null;
+
+  const matchers = [
+    { id: "NO_SUSPICION_NO_CRIME", test: (d) => d.includes("범죄인정안됨") },
+    { id: "NO_SUSPICION_NO_EVIDENCE", test: (d) => d.includes("증거불충분") },
+    { id: "NOT_A_CRIME", test: (d) => d.includes("죄가안됨") },
+    { id: "NO_PROSECUTION_RIGHT", test: (d) => d.includes("공소권없음") },
+    { id: "SUSPENSION_PROSECUTION", test: (d) => d.includes("기소유예") },
+    { id: "DISMISSAL", test: (d) => d.includes("각하") },
+    { id: "STAY_PROSECUTION", test: (d) => d.includes("기소중지") || d.includes("참고인중지") },
+  ];
+
+  for (const m of matchers) {
+    if (m.test(disp)) return m.id;
+  }
+
+  for (const r of NON_INDICTMENT_REASONS) {
+    if (disp.includes(r.label)) return r.id;
+  }
+
+  if (
+    disp.includes("불기소") ||
+    disp.includes("무혐의") ||
+    (disp.includes("혐의없음") && !disp.includes("기소"))
+  ) {
+    return "UNKNOWN";
+  }
+
+  return null;
+}
+
+/** 불기소 사유별 건수 집계 */
+export function buildNonIndictmentBreakdown(cases = []) {
+  const byReason = { UNKNOWN: 0 };
+  NON_INDICTMENT_REASONS.forEach((r) => {
+    byReason[r.id] = 0;
+  });
+
+  let total = 0;
+  cases.forEach((c) => {
+    const reasonId = resolveNonIndictmentReasonId(c);
+    if (!reasonId) return;
+    byReason[reasonId] = (byReason[reasonId] || 0) + 1;
+    total += 1;
+  });
+
+  return { total, byReason };
+}
+
 export const DOCUMENT_TYPES = [
   {
     id: "GIAN",

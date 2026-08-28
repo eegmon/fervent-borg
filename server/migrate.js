@@ -89,17 +89,17 @@ async function run() {
       sql: `INSERT INTO cases (
               id, suje_no, hyeongje_no, latest_hyeongje_no,
               prosecutor_name, prosecutor_id, suspect_name, suspect_uuid,
-              booking_status, booking_date, booking_basis, disposition,
+              booking_status, booking_date, incident_date, booking_basis, disposition,
               re_appeal, court1_no, court1_result, court1_doc,
               court1_appealed, court1_appellant, court2_no, court2_dismissed,
               court2_result, court2_doc, court3_appealed, court3_appellant,
               court3_no, court3_remanded, court3_result, court3_doc,
               notes, content, confiscation, charge_name
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
         str(c.id), str(c.sujeNo || c.hyeongjeNo), str(c.hyeongjeNo || '-'), str(c.latestHyeongjeNo),
         str(c.prosecutorName), str(c.prosecutorId), str(c.suspectName), str(c.suspectUuid),
-        str(c.bookingStatus), str(c.bookingDate), str(c.bookingBasis), str(c.disposition),
+        str(c.bookingStatus), str(c.bookingDate), str(c.incidentDate || c.bookingDate), str(c.bookingBasis), str(c.disposition),
         str(c.reAppeal || '-'),
         str(c.court1No), str(c.court1Result), str(c.court1Doc),
         str(c.court1Appealed), str(c.court1Appellant),
