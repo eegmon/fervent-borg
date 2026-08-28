@@ -6,6 +6,7 @@ import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { timingSafeEqual, randomUUID } from "crypto";
 import "dotenv/config";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -121,6 +122,9 @@ app.use(
       cb(new Error(`CORS: ${origin} 은 허용되지 않는 출처입니다.`));
     },
     credentials: true,
+    // OPTIONS 프리플라이트 자동 처리 (200 응답)
+    preflightContinue: false,
+    optionsSuccessStatus: 200,
   }),
 );
 app.use(express.json({ limit: "10mb" }));
@@ -129,6 +133,30 @@ app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
+  // HSTS: 1년, includeSubDomains
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains",
+    );
+  }
+  // CSP: 동일 출처 스크립트만 허용, 인라인 스크립트 차단 기본값
+  // Vite 번들은 모두 같은 도메인에서 제공되므로 self 허용으로 충분
+  res.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",   // CSS-in-JS 대응
+      "img-src 'self' data: https:",
+      "font-src 'self' data:",
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; "),
+  );
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   next();
 });
 
@@ -486,6 +514,27 @@ function parseJsonArray(value) {
   } catch {
     return [];
   }
+}
+
+// 증거자료 URL/base64 검증 헬퍼
+// - http/https URL은 그대로 허용
+// - base64는 허용된 MIME 타입(이미지, PDF)만 허용
+const ALLOWED_EVIDENCE_MIME = /^data:(image\/(png|jpeg|gif|webp)|application\/pdf);base64,/i;
+const EVIDENCE_MAX_BYTES = 5 * 1024 * 1024; // 5MB
+const EVIDENCE_MAX_PER_CASE = 50;           // 사건당 증거자료 최대 건수
+
+function validateEvidenceUrl(urlTrimmed) {
+  if (!urlTrimmed) return "URL 또는 파일 데이터를 입력해주세요.";
+  const isUrl = /^https?:\/\//i.test(urlTrimmed);
+  const isBase64 = urlTrimmed.startsWith("data:");
+  if (!isUrl && !isBase64) return "http/https URL 또는 파일 데이터를 입력해주세요.";
+  if (isBase64) {
+    if (!ALLOWED_EVIDENCE_MIME.test(urlTrimmed))
+      return "허용되지 않는 파일 형식입니다. PNG/JPEG/GIF/WEBP 이미지 또는 PDF만 업로드할 수 있습니다.";
+    if (urlTrimmed.length > EVIDENCE_MAX_BYTES)
+      return "파일 크기는 5MB 이하만 허용됩니다.";
+  }
+  return null; // 통과
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -859,7 +908,8 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
             item &&
             typeof item.url === "string" &&
             item.url.startsWith("data:") &&
-            item.url.length <= 3 * 1024 * 1024,
+            ALLOWED_EVIDENCE_MIME.test(item.url) &&
+            item.url.length <= EVIDENCE_MAX_BYTES,
         )
         .slice(0, 10)
     : [];
@@ -994,11 +1044,14 @@ app.post("/api/cases/intake-bundle", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/cases/bulk-import — 엑셀 일괄 등록 DB 저장
-app.post("/api/cases/bulk-import", requireAuth, async (req, res) => {
+// POST /api/cases/bulk-import — 엑셀 일괄 등록 DB 저장 (검찰사무국 전용)
+app.post("/api/cases/bulk-import", requireAuth, requireSecretariat, async (req, res) => {
   const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
   if (rows.length === 0) {
     return res.status(400).json({ success: false, message: "일괄 등록할 사건 데이터가 없습니다." });
+  }
+  if (rows.length > 500) {
+    return res.status(400).json({ success: false, message: "한 번에 최대 500건까지 등록할 수 있습니다." });
   }
 
   try {
@@ -1009,11 +1062,30 @@ app.post("/api/cases/bulk-import", requireAuth, async (req, res) => {
 
     const now = new Date();
 
+    // 엑셀에 기재된 검사명으로 prosecutors 테이블에서 id를 조회
+    // 없으면 name을 임시 id로 사용하되 경고 플래그
+    const prosecutorNameSet = new Set(
+      rows.map((r) => String(r["검사명"] || "").trim()).filter(Boolean),
+    );
+    const prosecutorMap = new Map(); // name → id
+    if (prosecutorNameSet.size > 0) {
+      const placeholders = [...prosecutorNameSet].map(() => "?").join(",");
+      const prosResult = await db.execute({
+        sql: `SELECT id, name FROM prosecutors WHERE name IN (${placeholders})`,
+        args: [...prosecutorNameSet],
+      });
+      for (const row of prosResult.rows) {
+        prosecutorMap.set(row.name, row.id);
+      }
+    }
+
     rows.forEach((r, i) => {
-      const caseId = String(now.getTime() + i);
+      // 충돌 없는 고유 ID 생성 (타임스탬프 + 인덱스 + 랜덤)
+      const caseId = `BULK-${now.getTime()}-${i}-${randomUUID().slice(0, 8)}`;
       const hyeongjeNo = String(r["형제번호"] || r["수제번호"] || "").trim() || "-";
       const prosecutorName = String(r["검사명"] || "").trim();
-      const prosecutorId = prosecutorName;
+      // 검사 계정이 존재하면 실제 id 사용, 없으면 이름을 임시 id로
+      const prosecutorId = prosecutorMap.get(prosecutorName) || prosecutorName;
       const suspectName = String(r["피고인명"] || r["피의자명"] || "").trim();
       const suspectUuid = String(r["UUID"] || "").trim();
       const bookingStatus = String(r["현재 상황"] || "접수").trim();
@@ -1116,10 +1188,10 @@ app.post("/api/cases/bulk-import", requireAuth, async (req, res) => {
       });
 
       // Report
-      const reportId = String(now.getTime() + 1000 + i);
+      const reportId = `BULK-REP-${now.getTime()}-${i}-${randomUUID().slice(0, 8)}`;
       const reportObj = {
         id: reportId,
-        reportNo: `접수-${now.getTime() + i}`,
+        reportNo: `접수-${now.getTime()}-${i}`,
         hyeongjeNo,
         title: `${chargeName || '사건'} 접수 건`,
         prosecutorName,
@@ -1153,7 +1225,7 @@ app.post("/api/cases/bulk-import", requireAuth, async (req, res) => {
       });
 
       // Booking
-      const bookingId = String(now.getTime() + 2000 + i);
+      const bookingId = `BULK-BKG-${now.getTime()}-${i}-${randomUUID().slice(0, 8)}`;
       const bookingObj = {
         id: bookingId,
         hyeongjeNo,
@@ -1809,6 +1881,15 @@ app.put(
     }
 
     const doc = toCamel(docRes.rows[0]);
+
+    // 이미 최종승인된 문서는 중복 결재 차단 (TOCTOU 방지)
+    if (doc.status === "최종승인") {
+      return res.status(409).json({
+        success: false,
+        message: "이미 최종승인된 문서입니다.",
+      });
+    }
+
     if (req.body?.mode === "ARBITRARY") {
       const caseRes = await db.execute({
         sql: `SELECT supervisor_designated FROM cases
@@ -1830,16 +1911,26 @@ app.put(
       date: now,
     }));
 
-    await db.execute({
-      sql: `UPDATE approvals SET status='최종승인', approvals_json=? WHERE id=?`,
-      args: [JSON.stringify(updatedApprovals), docId],
-    });
+    // approvals + cases 업데이트를 하나의 batch로 원자화
+    // approvals 업데이트 시 status != '최종승인' 조건을 추가해 중복 결재 방지
+    const batchResult = await db.batch([
+      {
+        sql: `UPDATE approvals SET status='최종승인', approvals_json=? WHERE id=? AND status != '최종승인'`,
+        args: [JSON.stringify(updatedApprovals), docId],
+      },
+      {
+        sql: `UPDATE cases SET disposition=? WHERE hyeongje_no=? AND deleted_at=''`,
+        args: [`${doc.dispositionType} (결재완료)`, doc.hyeongjeNo],
+      },
+    ], "write");
 
-    // 관련 사건 처분 상태 업데이트
-    await db.execute({
-      sql: `UPDATE cases SET disposition=? WHERE hyeongje_no=?`,
-      args: [`${doc.dispositionType} (결재완료)`, doc.hyeongjeNo],
-    });
+    // 첫 번째 쿼리의 rowsAffected가 0이면 다른 요청이 먼저 결재한 것
+    if (Number(batchResult[0]?.rowsAffected ?? 1) === 0) {
+      return res.status(409).json({
+        success: false,
+        message: "이미 다른 결재권자가 최종승인한 문서입니다.",
+      });
+    }
 
     await writeAuditLog({
       action: "APPROVE",
@@ -1865,10 +1956,24 @@ app.get("/api/prosecutors", requireAuth, async (req, res) => {
   const visibleRows = canViewManagementAccounts
     ? result.rows
     : result.rows.filter((row) => !isManagementAccount(toCamel(row)));
-  // 비밀번호 필드 제외 후 반환
+
+  // 민감 필드 노출 수준 결정
+  // - SUPER_ADMIN / 사무국: 모든 필드 (단, 비밀번호 제외)
+  // - 그 외: discordId, note, 직무대리 상세(delegateTo, delegateReason) 제거
+  const canViewSensitive =
+    req.user.isSuperAdmin ||
+    SECRETARIAT_ROLES.has(effectiveRoleLevel(req.user)) ||
+    hasSecretariatWorkAccess(req.user);
+
   res.json(
     visibleRows.map((row) => {
       const { password: _pw, ...safe } = toCamel(row);
+      if (!canViewSensitive) {
+        delete safe.discordId;
+        delete safe.note;
+        delete safe.delegateTo;
+        delete safe.delegateReason;
+      }
       return safe;
     }),
   );
@@ -1997,7 +2102,45 @@ async function requireProsecutorAccountManager(req, res, next) {
 app.patch(
   "/api/prosecutors/:id",
   requireAuth,
-  requireProsecutorAccountManager,
+  async (req, res, next) => {
+    const isSelf = req.user.id === req.params.id;
+    const isSuperAdmin = req.user.isSuperAdmin;
+    const isSecretariat =
+      SECRETARIAT_ROLES.has(effectiveRoleLevel(req.user)) ||
+      hasSecretariatWorkAccess(req.user);
+
+    // 본인이 자기 프로필(제한 필드 제외)을 수정하는 경우는 허용
+    // 타인 계정 수정은 사무국/SUPER_ADMIN만 허용
+    if (!isSelf && !isSuperAdmin && !isSecretariat) {
+      return res.status(403).json({
+        success: false,
+        message: "본인 계정 또는 관리자만 계정 정보를 수정할 수 있습니다.",
+      });
+    }
+
+    // 본인이 수정할 때는 관리 전용 필드(status, roleLevel, rank, 직무대리 등) 차단
+    if (isSelf && !isSuperAdmin && !isSecretariat) {
+      const adminOnlyFields = [
+        "status", "roleLevel", "rank", "dept",
+        "dualRoleLevel", "dualDept", "actingTitle", "actingStart", "actingEnd",
+        "delegateTo", "delegateReason", "dualSecretariatWork",
+        "isAutoAssignExcluded", "canArbitraryApprove",
+      ];
+      const forbidden = adminOnlyFields.filter((f) => req.body[f] !== undefined);
+      if (forbidden.length > 0) {
+        return res.status(403).json({
+          success: false,
+          message: `다음 필드는 관리자만 변경할 수 있습니다: ${forbidden.join(", ")}`,
+        });
+      }
+    }
+
+    // 사무국/관리자 경로는 기존 requireProsecutorAccountManager 로직 적용
+    if (!isSelf || isSuperAdmin || isSecretariat) {
+      return requireProsecutorAccountManager(req, res, next);
+    }
+    next();
+  },
   async (req, res) => {
     const allowedFields = {
       status: "status",
@@ -2018,6 +2161,7 @@ app.patch(
       position: "position",
       title: "title",
       discordId: "discord_id",
+      note: "note",
     };
     const updates = Object.entries(allowedFields)
       .filter(([field]) => req.body[field] !== undefined)
@@ -2058,7 +2202,9 @@ app.patch(
         .json({ success: false, message: "승진·직급 변경 권한이 필요합니다." });
     }
     const canChangeOwnRole =
-      req.user.isSuperAdmin || SELF_ROLE_CHANGE_ROLES.has(effectiveRoleLevel(req.user));
+      // 직무대리 권한(effectiveRoleLevel)이 아닌 실제 roleLevel만 기준으로 판단
+      // — 직무대리로 임시 승격된 상태에서 본계정을 영구 승격하는 것을 방지
+      req.user.isSuperAdmin || SELF_ROLE_CHANGE_ROLES.has(req.user.roleLevel);
     if (
       (req.body.roleLevel !== undefined || req.body.rank !== undefined) &&
       req.params.id === req.user.id &&
@@ -2185,10 +2331,20 @@ app.post("/api/auth/register", authRateLimit, async (req, res) => {
     const accountCount = await db.execute(
       "SELECT COUNT(*) AS count FROM prosecutors",
     );
-    const isBootstrap =
-      Number(accountCount.rows[0]?.count || 0) === 0 &&
-      process.env.BOOTSTRAP_SECRET &&
-      bootstrapSecret === process.env.BOOTSTRAP_SECRET;
+    const isBootstrap = (() => {
+      if (Number(accountCount.rows[0]?.count || 0) !== 0) return false;
+      if (!process.env.BOOTSTRAP_SECRET || !bootstrapSecret) return false;
+      try {
+        // 타이밍 공격 방지: 상수 시간 비교
+        const a = Buffer.from(String(bootstrapSecret));
+        const b = Buffer.from(String(process.env.BOOTSTRAP_SECRET));
+        // 길이가 다르면 timingSafeEqual이 throw하므로 미리 false 반환
+        if (a.length !== b.length) return false;
+        return timingSafeEqual(a, b);
+      } catch {
+        return false;
+      }
+    })();
 
     if (isBootstrap) {
       await db.execute({
@@ -2508,6 +2664,16 @@ app.delete(
               sql: "UPDATE approvals SET deleted_at = ? WHERE hyeongje_no = ? AND deleted_at = ''",
               args: [deletedAt, hyeongjeNo],
             },
+            // case_memos 연쇄 삭제 (사건 ID 기준)
+            {
+              sql: "UPDATE case_memos SET deleted_at = ? WHERE case_id = ? AND deleted_at = ''",
+              args: [deletedAt, id],
+            },
+            // case_history 연쇄 삭제 (사건 ID 기준)
+            {
+              sql: "UPDATE case_history SET deleted_at = ? WHERE case_id = ? AND deleted_at = ''",
+              args: [deletedAt, id],
+            },
             {
               sql: "UPDATE cases SET deleted_at = ? WHERE id = ? AND deleted_at = ''",
               args: [deletedAt, id],
@@ -2657,30 +2823,16 @@ app.delete(
 app.patch("/api/prosecutors/:id/password", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { currentPassword, newPassword } = req.body || {};
-  if (id !== req.user.id && !hasGlobalDataAccess(req.user)) {
+  const isSelf = req.user.id === id;
+  const isSuperAdmin = req.user.isSuperAdmin;
+
+  // 본인도 아니고 SUPER_ADMIN도 아니면 즉시 거부
+  // (hasGlobalDataAccess는 DEPUTY_CHIEF까지 포함하므로 사용하지 않음)
+  if (!isSelf && !isSuperAdmin) {
     return res.status(403).json({
       success: false,
       message: "본인 계정의 비밀번호만 변경할 수 있습니다.",
     });
-  }
-
-  // 본인 또는 사무국 관리자만 변경 가능
-  const isAdmin =
-    SECRETARIAT_ROLES.has(effectiveRoleLevel(req.user)) ||
-    hasSecretariatWorkAccess(req.user);
-  const isSelf = req.user.id === id;
-
-  if (!isSelf && !isAdmin) {
-    return res.status(403).json({
-      success: false,
-      message: "본인 또는 관리자만 비밀번호를 변경할 수 있습니다.",
-    });
-  }
-
-  if (isSelf && !currentPassword) {
-    return res
-      .status(400)
-      .json({ success: false, message: "현재 비밀번호가 필요합니다." });
   }
 
   if (!newPassword || newPassword.length < 10) {
@@ -2690,27 +2842,51 @@ app.patch("/api/prosecutors/:id/password", requireAuth, async (req, res) => {
   }
 
   try {
+    const account = await db.execute({
+      sql: "SELECT password FROM prosecutors WHERE id = ?",
+      args: [id],
+    });
+    if (account.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "계정을 찾을 수 없습니다." });
+    }
+
+    // 본인 변경: 현재 비밀번호 반드시 검증
     if (isSelf) {
-      const account = await db.execute({
-        sql: "SELECT password FROM prosecutors WHERE id = ? AND status = 'ACTIVE'",
-        args: [id],
-      });
-      const storedPassword = account.rows[0]?.password;
-      if (
-        !storedPassword ||
-        !(await bcrypt.compare(currentPassword, storedPassword))
-      ) {
+      if (!currentPassword) {
+        return res
+          .status(400)
+          .json({ success: false, message: "현재 비밀번호가 필요합니다." });
+      }
+      const storedPassword = account.rows[0].password;
+      if (!(await bcrypt.compare(currentPassword, storedPassword))) {
         return res.status(401).json({
           success: false,
           message: "현재 비밀번호가 일치하지 않습니다.",
         });
       }
     }
-    const hashed = await bcrypt.hash(newPassword, 10);
+    // SUPER_ADMIN에 의한 강제 재설정: currentPassword 불필요, 감사 로그 기록
+
+    const hashed = await bcrypt.hash(newPassword, 12);
     await db.execute({
       sql: "UPDATE prosecutors SET password = ? WHERE id = ?",
       args: [hashed, id],
     });
+
+    if (!isSelf) {
+      await writeAuditLog({
+        action: "UPDATE",
+        entityType: "prosecutor",
+        entityId: id,
+        entityLabel: id,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        detail: "SUPER_ADMIN에 의한 비밀번호 강제 재설정",
+      });
+    }
+
     res.json({ success: true, message: "비밀번호가 변경되었습니다." });
   } catch (err) {
     console.error("[PATCH /prosecutors/password]", err);
@@ -2794,14 +2970,28 @@ app.post(
       "LOGIN",
       "LOGOUT",
     ]);
+    const allowedEntityTypes = new Set([
+      "case", "report", "appeal", "booking", "approval",
+      "prosecutor", "system", "warrant", "evidence",
+    ]);
     if (!allowedActions.has(action)) {
       return res.status(400).json({
         success: false,
         message: "감사 로그 행위가 올바르지 않습니다.",
       });
     }
+    if (!allowedEntityTypes.has(entityType)) {
+      return res.status(400).json({
+        success: false,
+        message: "허용되지 않는 엔티티 타입입니다.",
+      });
+    }
+    // 길이 제한으로 DB 오염 방지
+    const safeEntityId    = String(entityId).slice(0, 200);
+    const safeEntityLabel = String(entityLabel).slice(0, 200);
+    const safeDetail      = String(detail).slice(0, 1000);
     try {
-      const id = `AL-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const id = `AL-${Date.now()}-${randomUUID().slice(0, 6)}`;
       const now = new Date().toISOString().replace("T", " ").substring(0, 19);
       await db.execute({
         sql: `INSERT INTO audit_logs (id, action, entity_type, entity_id, entity_label, actor_id, actor_name, detail, created_at)
@@ -2810,11 +3000,11 @@ app.post(
           id,
           action,
           entityType,
-          String(entityId),
-          String(entityLabel),
+          safeEntityId,
+          safeEntityLabel,
           req.user.id,
           req.user.name,
-          String(detail),
+          safeDetail,
           now,
         ],
       });
@@ -2824,11 +3014,11 @@ app.post(
           id,
           action,
           entityType,
-          entityId: String(entityId),
-          entityLabel: String(entityLabel),
+          entityId: safeEntityId,
+          entityLabel: safeEntityLabel,
           actorId: req.user.id,
           actorName: req.user.name,
-          detail: String(detail),
+          detail: safeDetail,
           createdAt: now,
         },
       });
@@ -2886,17 +3076,9 @@ app.get("/api/cases/:caseNo/evidence", requireAuth, async (req, res) => {
 app.post("/api/cases/:caseNo/evidence", requireAuth, async (req, res) => {
   const { title = "", url = "", type = "DOCUMENT", record = "" } = req.body;
   const urlTrimmed = String(url).trim();
-  const isUrl = /^https?:\/\//i.test(urlTrimmed);
-  const isBase64 = urlTrimmed.startsWith("data:");
-  if (!urlTrimmed || (!isUrl && !isBase64)) {
-    return res
-      .status(400)
-      .json({ success: false, message: "http/https URL 또는 파일 데이터를 입력해주세요." });
-  }
-  if (isBase64 && urlTrimmed.length > 5 * 1024 * 1024) {
-    return res
-      .status(400)
-      .json({ success: false, message: "파일 크기는 5MB 이하만 허용됩니다." });
+  const urlError = validateEvidenceUrl(urlTrimmed);
+  if (urlError) {
+    return res.status(400).json({ success: false, message: urlError });
   }
   try {
     const caseItem = await findCaseForEvidence(req.params.caseNo, req.user);
@@ -2905,7 +3087,18 @@ app.post("/api/cases/:caseNo/evidence", requireAuth, async (req, res) => {
         success: false,
         message: "해당 사건에 접근할 권한이 없습니다.",
       });
-    const id = `EVD-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    // 사건당 증거자료 건수 제한
+    const countRes = await db.execute({
+      sql: "SELECT COUNT(*) AS cnt FROM evidence WHERE case_no = ? AND deleted_at = ''",
+      args: [req.params.caseNo],
+    });
+    if (Number(countRes.rows[0]?.cnt || 0) >= EVIDENCE_MAX_PER_CASE) {
+      return res.status(400).json({
+        success: false,
+        message: `사건당 증거자료는 최대 ${EVIDENCE_MAX_PER_CASE}건까지 등록할 수 있습니다.`,
+      });
+    }
+    const id = `EVD-${Date.now()}-${randomUUID().slice(0, 7)}`;
     const now = new Date().toISOString();
     await db.execute({
       sql: `INSERT INTO evidence (id, case_no, title, url, evidence_type, record, created_by, created_at, deleted_at)
@@ -2971,17 +3164,9 @@ app.patch("/api/evidence/:id", requireAuth, async (req, res) => {
   const { url } = req.body || {};
   if (url !== undefined) {
     const urlTrimmed = String(url).trim();
-    const isUrl = /^https?:\/\//i.test(urlTrimmed);
-    const isBase64 = urlTrimmed.startsWith("data:");
-    if (!urlTrimmed || (!isUrl && !isBase64)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "http/https URL 또는 파일 데이터를 입력해주세요." });
-    }
-    if (isBase64 && urlTrimmed.length > 5 * 1024 * 1024) {
-      return res
-        .status(400)
-        .json({ success: false, message: "파일 크기는 5MB 이하만 허용됩니다." });
+    const urlError = validateEvidenceUrl(urlTrimmed);
+    if (urlError) {
+      return res.status(400).json({ success: false, message: urlError });
     }
   }
   try {
@@ -3254,7 +3439,7 @@ app.patch(
 // ════════════════════════════════════════════════════════════════════
 
 // GET /api/cases/:id/memos — 해당 사건 메모 목록
-app.get("/api/cases/:id/memos", requireAuth, async (req, res) => {
+app.get("/api/cases/:id/memos", requireAuth, requireCaseScope, async (req, res) => {
   try {
     const result = await db.execute({
       sql: "SELECT * FROM case_memos WHERE case_id = ? AND deleted_at = '' ORDER BY created_at ASC",
@@ -3276,7 +3461,7 @@ app.get("/api/cases/:id/memos", requireAuth, async (req, res) => {
 });
 
 // POST /api/cases/:id/memos — 메모 작성
-app.post("/api/cases/:id/memos", requireAuth, async (req, res) => {
+app.post("/api/cases/:id/memos", requireAuth, requireCaseScope, async (req, res) => {
   const content = String(req.body?.content || "").trim();
   const isPrivate = req.body?.isPrivate ? 1 : 0;
   if (!content || content.length > 2000) {
@@ -3285,18 +3470,13 @@ app.post("/api/cases/:id/memos", requireAuth, async (req, res) => {
       .json({ success: false, message: "메모 내용은 1~2000자여야 합니다." });
   }
   try {
-    // 사건이 접근 가능한지 확인
+    // requireCaseScope가 이미 사건 존재·접근 권한을 검증했으므로 형제번호만 조회
     const caseRes = await db.execute({
-      sql: "SELECT id, hyeongje_no FROM cases WHERE id = ? AND deleted_at = ''",
+      sql: "SELECT hyeongje_no FROM cases WHERE id = ? AND deleted_at = ''",
       args: [req.params.id],
     });
-    if (!caseRes.rows.length) {
-      return res
-        .status(404)
-        .json({ success: false, message: "사건을 찾을 수 없습니다." });
-    }
-    const caseRow = toCamel(caseRes.rows[0]);
-    const id = `MEMO-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const hyeongjeNo = toCamel(caseRes.rows[0] || {}).hyeongjeNo || "";
+    const id = `MEMO-${Date.now()}-${randomUUID().slice(0, 6)}`;
     const now = new Date().toISOString().replace("T", " ").substring(0, 19);
     await db.execute({
       sql: `INSERT INTO case_memos (id, case_id, hyeongje_no, author_id, author_name, content, is_private, created_at, deleted_at)
@@ -3304,7 +3484,7 @@ app.post("/api/cases/:id/memos", requireAuth, async (req, res) => {
       args: [
         id,
         req.params.id,
-        caseRow.hyeongjeNo || "",
+        hyeongjeNo,
         req.user.id,
         req.user.name,
         content,
@@ -3317,7 +3497,7 @@ app.post("/api/cases/:id/memos", requireAuth, async (req, res) => {
       memo: {
         id,
         caseId: req.params.id,
-        hyeongjeNo: caseRow.hyeongjeNo || "",
+        hyeongjeNo,
         authorId: req.user.id,
         authorName: req.user.name,
         content,
@@ -3401,8 +3581,36 @@ app.get("/api/suspects/:uuid/profile", requireAuth, async (req, res) => {
           : [uuid, req.user.id, req.user.id],
       }),
       db.execute({
-        sql: "SELECT * FROM bookings WHERE suspect_uuid = ? ORDER BY rowid DESC",
-        args: [uuid],
+        // 전역 접근 계정: 전체 조회
+        // 일반 계정: 본인 부서 담당 입건 기록 OR 종결된 처분(공개 처분 키워드)은 부서 무관 열람
+        sql: hasGlobalDataAccess(req.user)
+          ? "SELECT * FROM bookings WHERE suspect_uuid = ? ORDER BY rowid DESC"
+          : `SELECT b.* FROM bookings b
+             LEFT JOIN cases c ON c.hyeongje_no = b.hyeongje_no AND c.deleted_at = ''
+             LEFT JOIN prosecutors p ON c.prosecutor_id = p.id
+             WHERE b.suspect_uuid = ?
+               AND (
+                 p.dept = (SELECT dept FROM prosecutors WHERE id = ?)
+                 OR b.disposition_status LIKE '%불기소%'
+                 OR b.disposition_status LIKE '%혐의없음%'
+                 OR b.disposition_status LIKE '%무혐의%'
+                 OR b.disposition_status LIKE '%기소유예%'
+                 OR b.disposition_status LIKE '%공소권없음%'
+                 OR b.disposition_status LIKE '%죄가안됨%'
+                 OR b.disposition_status LIKE '%각하%'
+                 OR b.disposition_status LIKE '%기소중지%'
+                 OR b.disposition_status LIKE '%타관송치%'
+                 OR b.disposition_status LIKE '%처분완료%'
+                 OR b.disposition_status LIKE '%구속기소%'
+                 OR b.disposition_status LIKE '%불구속기소%'
+                 OR b.disposition_status LIKE '%약식기소%'
+                 OR b.disposition_status LIKE '%구공판%'
+                 OR b.indictment_decision LIKE '%종국%'
+               )
+             ORDER BY b.rowid DESC`,
+        args: hasGlobalDataAccess(req.user)
+          ? [uuid]
+          : [uuid, req.user.id],
       }),
       db.execute({
         sql: hasGlobalDataAccess(req.user)

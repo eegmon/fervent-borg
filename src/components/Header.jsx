@@ -17,6 +17,8 @@ import {
   UserCheck,
   ClipboardList,
   Archive,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 const TABS = [
@@ -48,6 +50,8 @@ export default function Header({
   totalAlertsCount = 0,
   isGlobalAdmin = false,
   canViewLoginRecords = false,
+  theme = "dark",
+  onToggleTheme,
 }) {
   return (
     <header
@@ -116,6 +120,39 @@ export default function Header({
           className="site-header-actions"
           style={{ display: "flex", alignItems: "center", gap: 8 }}
         >
+          {/* Theme Toggle */}
+          <button
+            onClick={onToggleTheme}
+            title={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
+            style={{
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
+              cursor: "pointer",
+              padding: "6px 10px",
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              transition: "background 0.15s",
+              color: "var(--text-muted)",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "var(--btn-secondary-hover)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "var(--bg-elevated)")
+            }
+          >
+            {theme === "dark" ? (
+              <Sun size={15} color="var(--primary-amber)" />
+            ) : (
+              <Moon size={15} color="var(--primary-blue)" />
+            )}
+            <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>
+              {theme === "dark" ? "라이트" : "다크"}
+            </span>
+          </button>
+
           {/* Template Copy */}
           <button
             onClick={onOpenTemplateModal}

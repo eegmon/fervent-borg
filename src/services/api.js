@@ -62,7 +62,12 @@ async function apiFetch(path, options = {}) {
         `[API] ${options.method || "GET"} ${path} → ${res.status}`,
         text,
       );
-      return null;
+      // 에러 응답의 JSON을 파싱해서 반환 — success: false + message 포함 가능
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { success: false, message: text || "서버 오류" };
+      }
     }
 
     return await res.json();

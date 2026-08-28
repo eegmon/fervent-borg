@@ -130,6 +130,17 @@ import {
 export default function App() {
   const [activeTab, setActiveTab] = useState("ledger");
 
+  // Theme State (light / dark) — localStorage 영속화
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("dose_theme") || "dark",
+  );
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("dose_theme", theme);
+  }, [theme]);
+  const toggleTheme = () =>
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+
   // Auth Session State (Commercial Security Gate - Defaults to null with sessionStorage persistence)
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -916,6 +927,19 @@ export default function App() {
     setDepartmentsData(next);
   };
 
+  // Handler: Update Department (부서장 변경 등)
+  const handleUpdateDepartment = async (updatedDept) => {
+    const next = departmentsData.map((d) =>
+      d.id === updatedDept.id ? updatedDept : d,
+    );
+    const res = await saveDepartmentsApi(next);
+    if (!res?.success) {
+      showToast(`❌ 부서 저장 실패: ${res?.message || "서버 오류"}`, "error");
+      return;
+    }
+    setDepartmentsData(next);
+  };
+
   // Handler: Toggle Department Intake Permission
   const handleToggleDeptIntake = async (deptId) => {
     const next = departmentsData.map((d) => {
@@ -1305,7 +1329,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#090e1a] text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-dark)", color: "var(--text-main)" }}>
       {/* Header Bar */}
       <Header
         activeTab={activeTab}
@@ -1321,6 +1345,8 @@ export default function App() {
         totalAlertsCount={totalDeadlineAlertsCount}
         isGlobalAdmin={isGlobalAdmin}
         canViewLoginRecords={canViewLoginRecords}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       {/* Main Container */}
@@ -1762,6 +1788,7 @@ export default function App() {
                 onAddDepartment={handleAddDepartment}
                 onDeleteDepartment={handleDeleteDepartment}
                 onToggleDeptIntake={handleToggleDeptIntake}
+                onUpdateDepartment={handleUpdateDepartment}
                 onUpdateUserDept={handleUpdateUserDept}
                 docNoCounter={docNoCounter}
                 setDocNoCounter={setDocNoCounter}
@@ -2081,7 +2108,16 @@ export default function App() {
       />
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-500">
+      <footer
+        style={{
+          borderTop: "1px solid var(--border-subtle)",
+          background: "var(--bg-card)",
+          padding: "16px",
+          textAlign: "center",
+          fontSize: "0.75rem",
+          color: "var(--text-muted)",
+        }}
+      >
         도스온라인 검찰청 (Dose Online Prosecution Office) · 검찰사무국 총괄
         관리 포털 v4.0
       </footer>

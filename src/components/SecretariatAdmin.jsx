@@ -2357,6 +2357,7 @@ export default function SecretariatAdmin({
   onAddDepartment,
   onDeleteDepartment,
   onToggleDeptIntake,
+  onUpdateDepartment,
   onUpdateUserDept,
   docNoCounter,
   setDocNoCounter,
@@ -4566,12 +4567,73 @@ export default function SecretariatAdmin({
                           fontSize: "0.72rem",
                           color: "var(--text-muted)",
                           lineHeight: 1.4,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
                         }}
                       >
-                        부서장:{" "}
-                        <strong style={{ color: "var(--text-main)" }}>
-                          {d.headName || headUser?.name || "미지정"}
-                        </strong>
+                        <span style={{ flexShrink: 0 }}>부서장:</span>
+                        <select
+                          className="select-field"
+                          style={{
+                            fontSize: "0.68rem",
+                            padding: "2px 4px",
+                            flex: 1,
+                            minWidth: 0,
+                            background: "var(--bg-card)",
+                            color: "var(--text-main)",
+                            border: "1px solid var(--border-subtle)",
+                            borderRadius: 4,
+                          }}
+                          value={d.headId || ""}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            const selected = prosecutorsList.find(
+                              (p) => p.id === e.target.value,
+                            );
+                            const updated = {
+                              ...d,
+                              headId: e.target.value,
+                              headName: selected?.name || "미지정",
+                            };
+                            if (onUpdateDepartment) onUpdateDepartment(updated);
+                            addLog(
+                              "부서장 지정",
+                              `'${d.name}' 부서장 → ${selected?.name || "미지정"}`,
+                            );
+                          }}
+                        >
+                          <option value="">미지정</option>
+                          {(() => {
+                            const members = prosecutorsList.filter(
+                              (p) => p.dept === d.name,
+                            );
+                            const others = prosecutorsList.filter(
+                              (p) => p.dept !== d.name,
+                            );
+                            return (
+                              <>
+                                {members.length > 0 && (
+                                  <optgroup label={`${d.name} 소속`}>
+                                    {members.map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.name} ({p.title || p.roleLevel})
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                                <optgroup label="타 부서">
+                                  {others.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name} · {p.dept || "미배속"}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              </>
+                            );
+                          })()}
+                        </select>
                       </div>
                       <div
                         style={{

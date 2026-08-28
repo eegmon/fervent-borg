@@ -320,9 +320,16 @@ export async function initDb() {
       field_name   TEXT NOT NULL,
       old_value    TEXT DEFAULT '',
       new_value    TEXT DEFAULT '',
-      created_at   TEXT DEFAULT (datetime('now'))
+      created_at   TEXT DEFAULT (datetime('now')),
+      deleted_at   TEXT DEFAULT ''
     )
   `);
+  // 기존 case_history 테이블에 deleted_at 컬럼 추가 (없는 경우)
+  try {
+    await db.execute("ALTER TABLE case_history ADD COLUMN deleted_at TEXT DEFAULT ''");
+  } catch (error) {
+    if (!String(error.message || error).includes("duplicate column")) throw error;
+  }
 
   // ── evidence (사건 증거자료 및 사건기록) ─────────────────────────
   await db.execute(`
