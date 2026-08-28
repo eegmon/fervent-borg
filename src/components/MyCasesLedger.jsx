@@ -1,5 +1,9 @@
 import React, { useState } from "react";
-import { getDisplayCaseNumber, getMasterCaseNumber, matchesCaseNumber } from "../services/caseUtils";
+import {
+  getDisplayCaseNumber,
+  getMasterCaseNumber,
+  matchesCaseNumber,
+} from "../services/caseUtils";
 import {
   UserCheck,
   Search,
@@ -81,15 +85,18 @@ function ApprovalModal({
     },
     {
       role: "부장검사",
-      name: prosecutorsList.find((p) => p.roleLevel === "SENIOR_PROSECUTOR")?.name || "",
+      name:
+        prosecutorsList.find((p) => p.roleLevel === "SENIOR_PROSECUTOR")
+          ?.name || "",
       status: "결재대기",
       date: "-",
     },
     {
       role: "지검장",
-      name: prosecutorsList.find((p) =>
-        ["CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(p.roleLevel),
-      )?.name || "",
+      name:
+        prosecutorsList.find((p) =>
+          ["CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(p.roleLevel),
+        )?.name || "",
       status: "결재대기",
       date: "-",
     },
@@ -111,12 +118,15 @@ function ApprovalModal({
   const handleApplyTemplate = (tpl) => {
     const now = new Date().toISOString().replace("T", " ").substring(0, 16);
     const newLine = tpl.steps.map((step, idx) => {
-      const matched = prosecutorsList.find((p) => p.roleLevel === step.roleLevel);
+      const matched = prosecutorsList.find(
+        (p) => p.roleLevel === step.roleLevel,
+      );
       return {
         role: step.role,
-        name: idx === 0
-          ? (currentUser?.name || matched?.name || step.name || "")
-          : (matched?.name || step.name || ""),
+        name:
+          idx === 0
+            ? currentUser?.name || matched?.name || step.name || ""
+            : matched?.name || step.name || "",
         status: idx === 0 ? "상신완료" : "결재대기",
         date: idx === 0 ? now : "-",
       };
@@ -130,7 +140,8 @@ function ApprovalModal({
     const steps = approvalLine.map((step) => ({
       role: step.role,
       name: step.name,
-      roleLevel: prosecutorsList.find((p) => p.name === step.name)?.roleLevel || "",
+      roleLevel:
+        prosecutorsList.find((p) => p.name === step.name)?.roleLevel || "",
     }));
     const res = await createApprovalTemplateApi({
       name: newTemplateName.trim(),
@@ -646,14 +657,30 @@ function ApprovalModal({
                       📋 표준라인
                     </button>
                     {showTemplateDropdown && (
-                      <div style={{
-                        position: "absolute", top: "100%", right: 0, zIndex: 100,
-                        background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
-                        borderRadius: 8, minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                        padding: "6px 0",
-                      }}>
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          right: 0,
+                          zIndex: 100,
+                          background: "var(--bg-elevated)",
+                          border: "1px solid var(--border-subtle)",
+                          borderRadius: 8,
+                          minWidth: 220,
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                          padding: "6px 0",
+                        }}
+                      >
                         {templates.length === 0 ? (
-                          <div style={{ padding: "10px 14px", fontSize: "0.78rem", color: "var(--text-muted)" }}>저장된 표준라인 없음</div>
+                          <div
+                            style={{
+                              padding: "10px 14px",
+                              fontSize: "0.78rem",
+                              color: "var(--text-muted)",
+                            }}
+                          >
+                            저장된 표준라인 없음
+                          </div>
                         ) : (
                           templates.map((t) => (
                             <button
@@ -661,25 +688,53 @@ function ApprovalModal({
                               type="button"
                               onClick={() => handleApplyTemplate(t)}
                               style={{
-                                display: "block", width: "100%", textAlign: "left",
-                                padding: "8px 14px", background: "none", border: "none",
-                                cursor: "pointer", fontSize: "0.8rem", color: "var(--text-main)",
+                                display: "block",
+                                width: "100%",
+                                textAlign: "left",
+                                padding: "8px 14px",
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: "0.8rem",
+                                color: "var(--text-main)",
                               }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-card)"}
-                              onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.background =
+                                  "var(--bg-card)")
+                              }
+                              onMouseLeave={(e) =>
+                                (e.currentTarget.style.background = "none")
+                              }
                             >
-                              {t.isShared ? "🌐 " : "🔒 "}{t.name}
+                              {t.isShared ? "🌐 " : "🔒 "}
+                              {t.name}
                             </button>
                           ))
                         )}
-                        <div style={{ borderTop: "1px solid var(--border-subtle)", marginTop: 4, paddingTop: 4 }}>
+                        <div
+                          style={{
+                            borderTop: "1px solid var(--border-subtle)",
+                            marginTop: 4,
+                            paddingTop: 4,
+                          }}
+                        >
                           <button
                             type="button"
-                            onClick={() => { setShowSaveTemplateForm(true); setShowTemplateDropdown(false); }}
+                            onClick={() => {
+                              setShowSaveTemplateForm(true);
+                              setShowTemplateDropdown(false);
+                            }}
                             style={{
-                              display: "block", width: "100%", textAlign: "left",
-                              padding: "8px 14px", background: "none", border: "none",
-                              cursor: "pointer", fontSize: "0.78rem", color: "var(--primary-amber)", fontWeight: 700,
+                              display: "block",
+                              width: "100%",
+                              textAlign: "left",
+                              padding: "8px 14px",
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              fontSize: "0.78rem",
+                              color: "var(--primary-amber)",
+                              fontWeight: 700,
                             }}
                           >
                             + 현재 라인 저장
@@ -693,7 +748,12 @@ function ApprovalModal({
                     onClick={() =>
                       setApprovalLine((prev) => [
                         ...prev,
-                        { role: "차장검사", name: "", status: "결재대기", date: "-" },
+                        {
+                          role: "차장검사",
+                          name: "",
+                          status: "결재대기",
+                          date: "-",
+                        },
                       ])
                     }
                     className="btn btn-outline"
@@ -705,7 +765,15 @@ function ApprovalModal({
               </div>
               {/* 템플릿 저장 폼 */}
               {showSaveTemplateForm && (
-                <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 6,
+                    alignItems: "center",
+                    marginBottom: 6,
+                    flexWrap: "wrap",
+                  }}
+                >
                   <input
                     className="input-field"
                     placeholder="표준라인 이름"
@@ -713,12 +781,39 @@ function ApprovalModal({
                     onChange={(e) => setNewTemplateName(e.target.value)}
                     style={{ flex: 1, minWidth: 130 }}
                   />
-                  <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.75rem", color: "var(--text-muted)", cursor: "pointer" }}>
-                    <input type="checkbox" checked={newTemplateShared} onChange={(e) => setNewTemplateShared(e.target.checked)} />
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: "0.75rem",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={newTemplateShared}
+                      onChange={(e) => setNewTemplateShared(e.target.checked)}
+                    />
                     공유
                   </label>
-                  <button type="button" onClick={handleSaveTemplate} className="btn btn-gold" style={{ fontSize: "0.72rem", padding: "4px 10px" }}>저장</button>
-                  <button type="button" onClick={() => setShowSaveTemplateForm(false)} className="btn btn-secondary" style={{ fontSize: "0.72rem", padding: "4px 10px" }}>취소</button>
+                  <button
+                    type="button"
+                    onClick={handleSaveTemplate}
+                    className="btn btn-gold"
+                    style={{ fontSize: "0.72rem", padding: "4px 10px" }}
+                  >
+                    저장
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveTemplateForm(false)}
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.72rem", padding: "4px 10px" }}
+                  >
+                    취소
+                  </button>
                 </div>
               )}
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -729,10 +824,17 @@ function ApprovalModal({
                   >
                     <span
                       style={{
-                        width: 22, height: 22, borderRadius: "50%",
-                        background: "rgba(245,158,11,0.2)", color: "var(--primary-amber)",
-                        fontSize: "0.72rem", fontWeight: 800,
-                        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: "rgba(245,158,11,0.2)",
+                        color: "var(--primary-amber)",
+                        fontSize: "0.72rem",
+                        fontWeight: 800,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
                       }}
                     >
                       {idx + 1}
@@ -769,9 +871,17 @@ function ApprovalModal({
                       <button
                         type="button"
                         onClick={() =>
-                          setApprovalLine(approvalLine.filter((_, i) => i !== idx))
+                          setApprovalLine(
+                            approvalLine.filter((_, i) => i !== idx),
+                          )
                         }
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#f87171", flexShrink: 0 }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          color: "#f87171",
+                          flexShrink: 0,
+                        }}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -938,10 +1048,7 @@ export default function MyCasesLedger({
     // targetProsecutorName이 비어 있으면 본인 사건만
     const target = targetProsecutorName || currentUser.name;
     const pName = item.prosecutorName || "";
-    return (
-      pName.includes(target) ||
-      target.includes(pName)
-    );
+    return pName.includes(target) || target.includes(pName);
   });
 
   // 현재 처리중 사건 = 보존 제외
@@ -1222,7 +1329,13 @@ export default function MyCasesLedger({
       </div>
 
       {/* 현재 처리중 사건만 표시 — 보존기록은 검찰사무국에서 관리 */}
-      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", padding: "2px 0 6px 0" }}>
+      <div
+        style={{
+          fontSize: "0.75rem",
+          color: "var(--text-muted)",
+          padding: "2px 0 6px 0",
+        }}
+      >
         📂 현재 처리중 {myActiveCases.length}건 (보존사건 제외)
       </div>
 
@@ -1469,7 +1582,11 @@ export default function MyCasesLedger({
                       <>
                         <button
                           onClick={() =>
-                            onSelectSuspect && onSelectSuspect({ name: item.suspectName, uuid: item.suspectUuid || null })
+                            onSelectSuspect &&
+                            onSelectSuspect({
+                              name: item.suspectName,
+                              uuid: item.suspectUuid || null,
+                            })
                           }
                           style={{
                             background: "none",
@@ -1489,19 +1606,21 @@ export default function MyCasesLedger({
                             {item.suspectName}
                           </strong>
                         </button>
-                        {item.suspectUuid && item.suspectUuid !== "-" && item.suspectUuid !== "00" && (
-                          <div
-                            style={{
-                              fontSize: "0.68rem",
-                              color: "var(--text-muted)",
-                              fontFamily: "monospace",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {item.suspectUuid}
-                          </div>
-                        )}
+                        {item.suspectUuid &&
+                          item.suspectUuid !== "-" &&
+                          item.suspectUuid !== "00" && (
+                            <div
+                              style={{
+                                fontSize: "0.68rem",
+                                color: "var(--text-muted)",
+                                fontFamily: "monospace",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {item.suspectUuid}
+                            </div>
+                          )}
                       </>
                     )}
                   </div>
@@ -1747,25 +1866,25 @@ export default function MyCasesLedger({
                     </button>
 
                     <button
-                        onClick={() =>
-                          onSelectEvidence &&
-                          onSelectEvidence(
-                            item.bookingBasis || "",
-                            getMasterCaseNumber(item),
-                            item.suspectName,
-                          )
-                        }
-                        className="btn btn-outline"
-                        style={{
-                          fontSize: "0.78rem",
-                          padding: "5px 12px",
-                          color: "#60a5fa",
-                          border: "1px solid rgba(96,165,250,0.3)",
-                          gap: 5,
-                        }}
-                      >
-                        <ExternalLink size={13} /> 증거 보관함
-                      </button>
+                      onClick={() =>
+                        onSelectEvidence &&
+                        onSelectEvidence(
+                          item.bookingBasis || "",
+                          getMasterCaseNumber(item),
+                          item.suspectName,
+                        )
+                      }
+                      className="btn btn-outline"
+                      style={{
+                        fontSize: "0.78rem",
+                        padding: "5px 12px",
+                        color: "#60a5fa",
+                        border: "1px solid rgba(96,165,250,0.3)",
+                        gap: 5,
+                      }}
+                    >
+                      <ExternalLink size={13} /> 증거 보관함
+                    </button>
 
                     {/* 결재 필수 지정/해제 — 수사지휘 라인(부장검사 이상)만 표시 */}
                     {canDesignate &&
@@ -1869,8 +1988,10 @@ export default function MyCasesLedger({
                 marginBottom: 16,
               }}
             >
-              {statusChangeCase.hyeongjeNo}호 | 피의자:{" "}
-              {statusChangeCase.suspectName}
+              {getDisplayCaseNumber(statusChangeCase) ||
+                getMasterCaseNumber(statusChangeCase) ||
+                "번호미부여"}{" "}
+              | 피의자: {statusChangeCase.suspectName}
             </div>
             {!!statusChangeCase.supervisorDesignated &&
               !isCaseApprovalComplete(statusChangeCase) && (
