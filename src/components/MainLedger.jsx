@@ -550,7 +550,7 @@ export default function MainLedger({
                             key={sIdx}
                             onClick={(e) => {
                               e.stopPropagation();
-                              onSelectSuspect(s.name);
+                              onSelectSuspect({ name: s.name, uuid: s.uuid || null });
                             }}
                             style={{
                               background: "none",
@@ -587,7 +587,7 @@ export default function MainLedger({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            onSelectSuspect(item.suspectName);
+                            onSelectSuspect({ name: item.suspectName, uuid: item.suspectUuid || null });
                           }}
                           style={{
                             background: "none",

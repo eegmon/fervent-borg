@@ -39,7 +39,7 @@ export default function ReportLedger({ reports, onSelectEvidence, onSelectSuspec
                   <td style={{ maxWidth: 200 }}><div style={{ whiteSpace: 'normal', lineHeight: 1.4 }}>{r.title}</div></td>
                   <td style={{ fontWeight: 700 }}>{r.prosecutorName}</td>
                   <td>
-                    <button onClick={() => onSelectSuspect(r.suspectName)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', fontWeight: 700, textDecoration: 'underline dotted' }}>
+                    <button onClick={() => onSelectSuspect && onSelectSuspect({ name: r.suspectName, uuid: r.suspectUuid || null })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', fontWeight: 700, textDecoration: 'underline dotted' }}>
                       {r.suspectName}
                     </button>
                   </td>

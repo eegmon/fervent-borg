@@ -449,7 +449,7 @@ export default function AppealLedger({
                         <td style={{ fontSize: "0.78rem" }}>
                           <button
                             onClick={() =>
-                              onSelectSuspect && onSelectSuspect(a.suspectName)
+                              onSelectSuspect && onSelectSuspect({ name: a.suspectName, uuid: a.suspectUuid || null })
                             }
                             style={{
                               background: "none",

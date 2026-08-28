@@ -344,7 +344,17 @@ async function requireCaseScope(req, res, next) {
           WHERE c.id = ? AND
             (p.dept = (SELECT dept FROM prosecutors WHERE id = ?)
               OR c.created_by = ? OR c.prosecutor_id = ?
-              OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0)`,
+              OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0
+              OR (c.visibility = 'PUBLIC' AND (
+                c.disposition LIKE '%불기소%' OR c.disposition LIKE '%종국%' OR
+                c.disposition LIKE '%기소유예%' OR c.disposition LIKE '%혐의없음%' OR
+                c.disposition LIKE '%무혐의%' OR c.disposition LIKE '%죄가안됨%' OR
+                c.disposition LIKE '%공소권없음%' OR c.disposition LIKE '%각하%' OR
+                c.disposition LIKE '%기소중지%' OR c.disposition LIKE '%타관송치%' OR
+                c.disposition LIKE '%처분완료%' OR c.disposition LIKE '%구속기소%' OR
+                c.disposition LIKE '%불구속기소%' OR c.disposition LIKE '%약식기소%' OR
+                c.disposition LIKE '%구공판%'
+              )))`,
     args: [req.params.id, uid, uid, uid, uid],
   });
   if (scopeResult.rows.length === 0) {
@@ -397,15 +407,28 @@ function scopedQuery(table, user, orderBy = "rowid DESC") {
       };
     }
     // 일반 계정: PUBLIC 사건 중 동일 부서 + 본인 담당/작성 + 명시 허용
+    // 일반 계정: PUBLIC 사건 중 동일 부서 + 본인 담당/작성 + 명시 허용
+    // + 종국·기소 완료 사건은 부서 무관하게 전 부서 열람 가능 (투명성 원칙)
+    const CLOSED_KEYWORDS = [
+      "불기소", "종국", "기소유예", "혐의없음", "무혐의", "죄가안됨",
+      "공소권없음", "각하", "기소중지", "참고인중지", "타관송치", "처분완료",
+      "구속기소", "불구속기소", "약식기소", "구공판",
+    ];
+    const closedCondition = CLOSED_KEYWORDS
+      .map(() => `(c.disposition LIKE ? OR c.booking_status LIKE ?)`)
+      .join(" OR ");
+    const closedArgs = CLOSED_KEYWORDS.flatMap((k) => [`%${k}%`, `%${k}%`]);
+
     return {
       sql: `SELECT c.* FROM cases c
             JOIN prosecutors p ON c.prosecutor_id = p.id
             WHERE c.deleted_at = '' AND
               ((c.visibility = 'PUBLIC' AND p.dept = (SELECT dept FROM prosecutors WHERE id = ?))
                 OR c.created_by = ? OR c.prosecutor_id = ?
-                OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0)
+                OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0
+                OR (c.visibility = 'PUBLIC' AND (${closedCondition})))
             ORDER BY c.${orderBy}`,
-      args: [user.id, user.id, user.id, user.id],
+      args: [user.id, user.id, user.id, user.id, ...closedArgs],
     };
   }
   // cases 외 테이블: 사무국이면 전체, 아니면 부서 한정
@@ -3312,7 +3335,17 @@ app.get("/api/suspects/:uuid/profile", requireAuth, async (req, res) => {
           ? "SELECT * FROM cases WHERE suspect_uuid = ? AND deleted_at = '' ORDER BY rowid DESC"
           : `SELECT c.* FROM cases c JOIN prosecutors p ON c.prosecutor_id = p.id
              WHERE c.suspect_uuid = ? AND c.deleted_at = ''
-               AND (c.visibility = 'PUBLIC' OR c.prosecutor_id = ? OR c.created_by = ?)
+               AND (c.visibility = 'PUBLIC' OR c.prosecutor_id = ? OR c.created_by = ?
+                 OR (c.visibility = 'PUBLIC' AND (
+                   c.disposition LIKE '%불기소%' OR c.disposition LIKE '%종국%' OR
+                   c.disposition LIKE '%기소유예%' OR c.disposition LIKE '%혐의없음%' OR
+                   c.disposition LIKE '%무혐의%' OR c.disposition LIKE '%죄가안됨%' OR
+                   c.disposition LIKE '%공소권없음%' OR c.disposition LIKE '%각하%' OR
+                   c.disposition LIKE '%기소중지%' OR c.disposition LIKE '%타관송치%' OR
+                   c.disposition LIKE '%처분완료%' OR c.disposition LIKE '%구속기소%' OR
+                   c.disposition LIKE '%불구속기소%' OR c.disposition LIKE '%약식기소%' OR
+                   c.disposition LIKE '%구공판%'
+                 )))
              ORDER BY c.rowid DESC`,
         args: hasGlobalDataAccess(req.user)
           ? [uuid]

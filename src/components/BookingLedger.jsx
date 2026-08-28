@@ -37,7 +37,7 @@ export default function BookingLedger({ bookings, onSelectEvidence, onSelectSusp
                   <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-amber)' }}>{b.hyeongjeNo}</td>
                   <td style={{ fontWeight: 700 }}>{b.prosecutorName}</td>
                   <td>
-                    <button onClick={() => onSelectSuspect(b.suspectName)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', fontWeight: 700, textDecoration: 'underline dotted' }}>
+                    <button onClick={() => onSelectSuspect && onSelectSuspect({ name: b.suspectName, uuid: b.suspectUuid || null })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', fontWeight: 700, textDecoration: 'underline dotted' }}>
                       {b.suspectName}
                     </button>
                   </td>

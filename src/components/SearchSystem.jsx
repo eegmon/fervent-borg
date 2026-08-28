@@ -208,7 +208,7 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
                   <div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>피의자 닉네임 / UUID</div>
                     <button
-                      onClick={() => onSelectSuspect && onSelectSuspect(item.suspectName)}
+                      onClick={() => onSelectSuspect && onSelectSuspect({ name: item.suspectName, uuid: item.suspectUuid || null })}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
                     >
                       <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.85rem', textDecoration: 'underline dotted' }}>

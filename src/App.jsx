@@ -180,6 +180,7 @@ export default function App() {
   const [isIntakeModalOpen, setIsIntakeModalOpen] = useState(false);
   const [evidenceModalInfo, setEvidenceModalInfo] = useState(null);
   const [suspectHistoryName, setSuspectHistoryName] = useState(null);
+  // suspectHistoryName: { name: string, uuid: string | null } 또는 문자열(하위호환)
   const [timelineCaseItem, setTimelineCaseItem] = useState(null);
   const [memoCaseItem, setMemoCaseItem] = useState(null);
   const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
@@ -1619,9 +1620,7 @@ export default function App() {
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
-                onSelectSuspect={(suspectName) =>
-                  setSuspectHistoryName(suspectName)
-                }
+                onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
                 onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
                 onOpenMemo={(caseItem) => setMemoCaseItem(caseItem)}
                 onOpenApprovalForCase={handleCreateApprovalForCase}
@@ -1644,9 +1643,7 @@ export default function App() {
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
-                onSelectSuspect={(suspectName) =>
-                  setSuspectHistoryName(suspectName)
-                }
+                onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
               />
             )}
 
@@ -1659,9 +1656,7 @@ export default function App() {
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
-                onSelectSuspect={(suspectName) =>
-                  setSuspectHistoryName(suspectName)
-                }
+                onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
                 onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
                 onOpenMemo={(caseItem) => setMemoCaseItem(caseItem)}
                 onCreateApproval={handleCreateApprovalForCase}
@@ -1742,9 +1737,7 @@ export default function App() {
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
-                onSelectSuspect={(suspectName) =>
-                  setSuspectHistoryName(suspectName)
-                }
+                onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
               />
             )}
 
@@ -1759,9 +1752,7 @@ export default function App() {
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
-                onSelectSuspect={(suspectName) =>
-                  setSuspectHistoryName(suspectName)
-                }
+                onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
               />
             )}
 
@@ -1771,9 +1762,7 @@ export default function App() {
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
-                onSelectSuspect={(suspectName) =>
-                  setSuspectHistoryName(suspectName)
-                }
+                onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
               />
             )}
 
@@ -1783,9 +1772,7 @@ export default function App() {
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
-                onSelectSuspect={(suspectName) =>
-                  setSuspectHistoryName(suspectName)
-                }
+                onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
               />
             )}
 
@@ -1837,7 +1824,8 @@ export default function App() {
 
       <SuspectHistoryModal
         isOpen={!!suspectHistoryName}
-        suspectName={suspectHistoryName}
+        suspectName={suspectHistoryName?.name || suspectHistoryName}
+        suspectUuid={suspectHistoryName?.uuid || null}
         ledgerData={ledgerData}
         onClose={() => setSuspectHistoryName(null)}
       />
