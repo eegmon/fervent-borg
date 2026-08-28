@@ -337,9 +337,20 @@ export default function App() {
   const scopeRecords = (records, includeOwnRecord = false) => {
     if (isGlobalAdmin) return records;
     return records.filter(
-      (item) =>
-        isProsecutorInUserDept(item.prosecutorName) ||
-        (includeOwnRecord && item.prosecutorId === currentUser?.id),
+      (item) => {
+        // 본인 담당 사건 또는 본인 작성 사건
+        if (includeOwnRecord && item.prosecutorId === currentUser?.id) return true;
+        // 동일 부서 사건
+        if (isProsecutorInUserDept(item.prosecutorName)) return true;
+        // 종국·기소 완료 사건은 전 부서 열람 가능 (서버 정책과 동기화)
+        const disp = (item.disposition || "").toLowerCase();
+        const status = (item.bookingStatus || "").toLowerCase();
+        const CLOSED = ["불기소","종국","기소유예","혐의없음","무혐의","죄가안됨",
+          "공소권없음","각하","기소중지","타관송치","처분완료",
+          "구속기소","불구속기소","약식기소","구공판"];
+        if (CLOSED.some((k) => disp.includes(k) || status.includes(k))) return true;
+        return false;
+      },
     );
   };
 

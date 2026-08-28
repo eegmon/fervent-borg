@@ -22,6 +22,7 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
       if (!item) return false;
 
       const hNo = (item.hyeongjeNo || '').toLowerCase();
+      const sNo = (item.sujeNo || '').toLowerCase();
       const sName = (item.suspectName || '').toLowerCase();
       const pName = (item.prosecutorName || '').toLowerCase();
       const cName = (item.chargeName || '').toLowerCase();
@@ -36,7 +37,7 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
       let matchQuery = true;
       if (q) {
         if (searchType === 'case') {
-          matchQuery = hNo.includes(q) || gNo.includes(q) || c1No.includes(q) || c2No.includes(q) || c3No.includes(q);
+          matchQuery = hNo.includes(q) || sNo.includes(q) || c1No.includes(q) || c2No.includes(q) || c3No.includes(q);
         } else if (searchType === 'suspect') {
           matchQuery = sName.includes(q) || sUuid.includes(q);
         } else if (searchType === 'prosecutor') {
@@ -47,7 +48,7 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
           // 'all' - Deep integrated search
           matchQuery =
             hNo.includes(q) ||
-            gNo.includes(q) ||
+            sNo.includes(q) ||
             sName.includes(q) ||
             pName.includes(q) ||
             cName.includes(q) ||
