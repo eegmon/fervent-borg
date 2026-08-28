@@ -58,7 +58,7 @@ function formatIntakeNotice(data) {
 피의자명 ${data.suspectName || "-"} ( UUID: ${data.suspectUuid || "-"} )
 접수일시 ${date}
 접수근거 [관련 게시물](${data.bookingBasis || ""})
-담당검사 ${data.prosecutorName || "-"}${prosecutorContact}
+담당검사 ${data.prosecutorName || "-"}<@${prosecutorContact}>
 --- 이 하 여 백 ---`;
 }
 
@@ -337,24 +337,38 @@ export default function App() {
 
   const scopeRecords = (records, includeOwnRecord = false) => {
     if (isGlobalAdmin) return records;
-    return records.filter(
-      (item) => {
-        // 본인 담당 사건 또는 본인 작성 사건
-        if (includeOwnRecord && item.prosecutorId === currentUser?.id) return true;
-        // 동일 부서 사건
-        if (isProsecutorInUserDept(item.prosecutorName)) return true;
-        // 보존사건은 전 부서 열람 가능
-        if (item.isArchived) return true;
-        // 종국·기소 완료 사건은 전 부서 열람 가능 (서버 정책과 동기화)
-        const disp = (item.disposition || "").toLowerCase();
-        const status = (item.bookingStatus || "").toLowerCase();
-        const CLOSED = ["불기소","종국","기소유예","혐의없음","무혐의","죄가안됨",
-          "공소권없음","각하","기소중지","타관송치","처분완료",
-          "구속기소","불구속기소","약식기소","구공판"];
-        if (CLOSED.some((k) => disp.includes(k) || status.includes(k))) return true;
-        return false;
-      },
-    );
+    return records.filter((item) => {
+      // 본인 담당 사건 또는 본인 작성 사건
+      if (includeOwnRecord && item.prosecutorId === currentUser?.id)
+        return true;
+      // 동일 부서 사건
+      if (isProsecutorInUserDept(item.prosecutorName)) return true;
+      // 보존사건은 전 부서 열람 가능
+      if (item.isArchived) return true;
+      // 종국·기소 완료 사건은 전 부서 열람 가능 (서버 정책과 동기화)
+      const disp = (item.disposition || "").toLowerCase();
+      const status = (item.bookingStatus || "").toLowerCase();
+      const CLOSED = [
+        "불기소",
+        "종국",
+        "기소유예",
+        "혐의없음",
+        "무혐의",
+        "죄가안됨",
+        "공소권없음",
+        "각하",
+        "기소중지",
+        "타관송치",
+        "처분완료",
+        "구속기소",
+        "불구속기소",
+        "약식기소",
+        "구공판",
+      ];
+      if (CLOSED.some((k) => disp.includes(k) || status.includes(k)))
+        return true;
+      return false;
+    });
   };
 
   const scopedLedgerData = scopeRecords(ledgerData, true);
@@ -454,9 +468,7 @@ export default function App() {
     // 서버 저장 성공 후 화면 상태 갱신
     setLedgerData((prev) =>
       prev.map((item) =>
-        item.id === updatedCase.id
-          ? { ...item, ...updatedCase }
-          : item,
+        item.id === updatedCase.id ? { ...item, ...updatedCase } : item,
       ),
     );
     showToast(
@@ -809,16 +821,32 @@ export default function App() {
   };
 
   // Handler: Bulk Reassign Cases (Secretariat Action)
-  const handleBulkReassignCases = async (caseIds, toProsecutorId, toProsecutorName, reason) => {
-    const res = await bulkReassignApi({ caseIds, toProsecutorId, toProsecutorName, reason });
+  const handleBulkReassignCases = async (
+    caseIds,
+    toProsecutorId,
+    toProsecutorName,
+    reason,
+  ) => {
+    const res = await bulkReassignApi({
+      caseIds,
+      toProsecutorId,
+      toProsecutorName,
+      reason,
+    });
     if (!res?.success) {
-      showToast(`❌ 사건 일괄 재배당 저장 실패: ${res?.message || "서버 오류"}`, "error");
+      showToast(
+        `❌ 사건 일괄 재배당 저장 실패: ${res?.message || "서버 오류"}`,
+        "error",
+      );
       return false;
     }
     const targetSet = new Set(caseIds.map(String));
     setLedgerData((prev) =>
       prev.map((item) => {
-        if (targetSet.has(String(item.id)) || targetSet.has(String(item.hyeongjeNo))) {
+        if (
+          targetSet.has(String(item.id)) ||
+          targetSet.has(String(item.hyeongjeNo))
+        ) {
           return {
             ...item,
             prosecutorName: toProsecutorName,
@@ -828,7 +856,10 @@ export default function App() {
         return item;
       }),
     );
-    showToast(`🔄 사건 ${caseIds.length}건이 '${toProsecutorName}' 검사에게 일괄 재배당되었습니다.`, "success");
+    showToast(
+      `🔄 사건 ${caseIds.length}건이 '${toProsecutorName}' 검사에게 일괄 재배당되었습니다.`,
+      "success",
+    );
     return true;
   };
 
@@ -1864,7 +1895,9 @@ export default function App() {
         bookingsData={bookingsData}
         approvalsData={approvalsData}
         appealsData={appealsData}
-        onSelectEvidence={(url, caseNo, suspectName) => setEvidenceModalInfo({ url, caseNo, suspectName })}
+        onSelectEvidence={(url, caseNo, suspectName) =>
+          setEvidenceModalInfo({ url, caseNo, suspectName })
+        }
       />
 
       <CaseMemoModal
