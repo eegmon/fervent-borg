@@ -200,7 +200,7 @@ export async function initDb() {
     "law_article TEXT DEFAULT '소송법 제21조의2'",
     "category TEXT DEFAULT 'GENERAL'",
     "description TEXT DEFAULT ''",
-    "updated_at TEXT DEFAULT (datetime('now'))",
+    "updated_at TEXT DEFAULT ''",
     "updated_by TEXT DEFAULT ''",
     "deleted_by TEXT DEFAULT ''",
   ]) {
