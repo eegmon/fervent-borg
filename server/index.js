@@ -681,7 +681,7 @@ app.get("/api/cases", requireAuth, asyncWrap(async (req, res) => {
     return c;
   });
   res.json(rows);
-});
+}));
 
 // ── 사건번호 자동계산 시작값 (검찰사무국 전용 수정) ────────────────
 app.get("/api/settings/case-number", requireAuth, requireSecretariat, asyncWrap(async (req, res) => {
@@ -701,7 +701,7 @@ app.get("/api/settings/case-number", requireAuth, requireSecretariat, asyncWrap(
     apjeStart: getStart("case_number_apje_start"),
     naesaStart: getStart("case_number_naesa_start"),
   });
-});
+}));
 
 app.patch(
   "/api/settings/case-number",
@@ -1029,7 +1029,7 @@ app.post("/api/cases", requireAuth, asyncWrap(async (req, res) => {
     detail: `피의자: ${c.suspectName || ""}, 죄명: ${c.chargeName || ""}`,
   });
   res.json({ success: true, case: { ...c, id } });
-});
+}));
 
 app.post("/api/cases/intake-bundle", requireAuth, asyncWrap(async (req, res) => {
   const c = req.body || {};
@@ -1223,7 +1223,7 @@ app.post("/api/cases/intake-bundle", requireAuth, asyncWrap(async (req, res) => 
       .status(500)
       .json({ success: false, message: "사건 접수 중 저장에 실패했습니다." });
   }
-});
+}));
 
 // POST /api/cases/bulk-import — 엑셀 일괄 등록 DB 저장 (검찰사무국 전용)
 app.post("/api/cases/bulk-import", requireAuth, requireSecretariat, async (req, res) => {
@@ -1530,7 +1530,7 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, asyncWrap(async (req, r
           // 내용/비고는 너무 길 수 있으므로 길이 제한
           const oldDisp = oldVal.length > 30 ? oldVal.slice(0, 30) + "…" : oldVal;
           const newDisp = newVal.length > 30 ? newVal.slice(0, 30) + "…" : newVal;
-          changedDetails.push(`${label}: "${oldDisp || "(없음)"}" → "${newDisp || "(없음)")"`);
+          changedDetails.push(`${label}: "${oldDisp || "(없음)"}" → "${newDisp || "(없음)"}"`);
           const histId = `CH-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
           await db.execute({
             sql: `INSERT INTO case_history (id, case_id, hyeongje_no, actor_id, actor_name, field_name, old_value, new_value, created_at)
@@ -1655,7 +1655,7 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, asyncWrap(async (req, r
       : `처분: ${c.disposition || ""}, 상태: ${c.bookingStatus || ""}${changedSummary}`,
   });
   res.json({ success: true, id: req.params.id });
-});
+}));
 
 // PATCH /api/cases/:id/archive — 사건 보존 / 보존 해제 처리
 app.patch("/api/cases/:id/archive", requireAuth, requireSecretariat, requireCaseScope, async (req, res) => {
@@ -1694,7 +1694,7 @@ app.patch("/api/cases/:id/archive", requireAuth, requireSecretariat, requireCase
 app.get("/api/reports", requireAuth, asyncWrap(async (req, res) => {
   const result = await db.execute(scopedQuery("reports", req.user));
   res.json(result.rows.map(toCamel));
-});
+}));
 
 app.post("/api/reports", requireAuth, asyncWrap(async (req, res) => {
   const r = req.body;
@@ -1729,7 +1729,7 @@ app.post("/api/reports", requireAuth, asyncWrap(async (req, res) => {
     ],
   });
   res.json({ success: true, report: { ...r, id } });
-});
+}));
 
 app.patch(
   "/api/reports/:id",
@@ -1775,7 +1775,7 @@ app.patch(
 app.get("/api/appeals", requireAuth, asyncWrap(async (req, res) => {
   const result = await db.execute(scopedQuery("appeals", req.user));
   res.json(result.rows.map(toCamel));
-});
+}));
 
 app.post("/api/appeals", requireAuth, asyncWrap(async (req, res) => {
   const a = req.body;
@@ -1812,7 +1812,7 @@ app.post("/api/appeals", requireAuth, asyncWrap(async (req, res) => {
     ],
   });
   res.json({ success: true, appeal: { ...a, id } });
-});
+}));
 
 app.patch(
   "/api/appeals/:id",
@@ -1859,7 +1859,7 @@ app.patch(
 app.get("/api/bookings", requireAuth, asyncWrap(async (req, res) => {
   const result = await db.execute(scopedQuery("bookings", req.user));
   res.json(result.rows.map(toCamel));
-});
+}));
 
 app.post("/api/bookings", requireAuth, asyncWrap(async (req, res) => {
   const b = req.body;
@@ -1893,7 +1893,7 @@ app.post("/api/bookings", requireAuth, asyncWrap(async (req, res) => {
     ],
   });
   res.json({ success: true, booking: { ...b, id } });
-});
+}));
 
 app.patch(
   "/api/bookings/:id",
@@ -1935,7 +1935,7 @@ app.patch(
 app.get("/api/warrants", requireAuth, asyncWrap(async (req, res) => {
   const result = await db.execute(scopedQuery("warrants", req.user));
   res.json(result.rows.map(toCamel));
-});
+}));
 
 app.post("/api/warrants", requireAuth, async (req, res) => {
   const w = req.body || {};
@@ -2045,7 +2045,7 @@ app.get("/api/approvals", requireAuth, asyncWrap(async (req, res) => {
       attachments: parseJsonArray(row.attachments_json),
     })),
   );
-});
+}));
 
 app.post("/api/approvals", requireAuth, asyncWrap(async (req, res) => {
   const doc = req.body;
@@ -2109,7 +2109,7 @@ app.post("/api/approvals", requireAuth, asyncWrap(async (req, res) => {
     detail: `결재 문서 상신: ${doc.docTypeName || doc.docType || "서식"}`,
   });
   res.json({ success: true, doc: { ...doc, id: approvalId } });
-});
+}));
 
 app.put(
   "/api/approvals/:id",
@@ -2284,7 +2284,7 @@ app.get("/api/prosecutors", requireAuth, asyncWrap(async (req, res) => {
       );
     }),
   );
-});
+}));
 
 app.post(
   "/api/prosecutors",
@@ -2708,7 +2708,7 @@ app.post("/api/auth/register", authRateLimit, asyncWrap(async (req, res) => {
       .status(500)
       .json({ success: false, message: "서버 오류가 발생했습니다." });
   }
-});
+}));
 
 // ── 8-2. 가입 신청 목록 조회 (검찰사무국 전용) ──────────────────────
 app.get("/api/registrations", requireAuth, asyncWrap(async (req, res) => {
@@ -2740,7 +2740,7 @@ app.get("/api/registrations", requireAuth, asyncWrap(async (req, res) => {
       .status(500)
       .json({ success: false, message: "서버 오류가 발생했습니다." });
   }
-});
+}));
 
 // ── 8-3. 가입 신청 허가 ─────────────────────────────────────────────
 app.put(
@@ -2900,7 +2900,7 @@ app.put("/api/registrations/:id/reject", requireAuth, asyncWrap(async (req, res)
       .status(500)
       .json({ success: false, message: "서버 오류가 발생했습니다." });
   }
-});
+}));
 
 // ════════════════════════════════════════════════════════════════════
 // 9. DELETE 엔드포인트 (검찰사무국 전용)
@@ -3266,7 +3266,7 @@ app.patch("/api/prosecutors/:id/password", requireAuth, asyncWrap(async (req, re
       .status(500)
       .json({ success: false, message: "서버 오류가 발생했습니다." });
   }
-});
+}));
 
 // ════════════════════════════════════════════════════════════════════
 // 11. 감사 로그 (Audit Log)
@@ -3461,7 +3461,7 @@ app.get("/api/cases/:caseNo/evidence", requireAuth, asyncWrap(async (req, res) =
     console.error("[GET /evidence]", err);
     res.status(500).json({ success: false, message: "서버 오류" });
   }
-});
+}));
 
 app.post("/api/cases/:caseNo/evidence", requireAuth, asyncWrap(async (req, res) => {
   const { title = "", url = "", type = "DOCUMENT", record = "" } = req.body;
@@ -3521,7 +3521,7 @@ app.post("/api/cases/:caseNo/evidence", requireAuth, asyncWrap(async (req, res) 
     console.error("[POST /evidence]", err);
     res.status(500).json({ success: false, message: "서버 오류" });
   }
-});
+}));
 
 app.delete("/api/evidence/:id", requireAuth, async (req, res) => {
   try {
@@ -3599,7 +3599,7 @@ app.patch("/api/evidence/:id", requireAuth, asyncWrap(async (req, res) => {
     console.error("[PATCH /evidence]", err);
     res.status(500).json({ success: false, message: "서버 오류" });
   }
-});
+}));
 
 // ════════════════════════════════════════════════════════════════════
 // 13. 문서번호 채번
