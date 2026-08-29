@@ -1,18 +1,62 @@
 /**
  * Mojang Official & Fallback API Helper
- * Fetches Minecraft Player UUID & Profile from Mojang DB
- *
  * 호출 순서:
- *  1. ashcon.app   — UUID + 텍스처 통합 응답 (CORS 허용)
- *  2. crafthead.net — Minecraft 프로필 형식
- *  3. api.mojang.com — 공식 Mojang API (UUID만 반환)
+ *  1. 서버 프록시 (http://localhost:5000/api/mojang/uuid/nickname) — CORS 우회
+ *  2. ashcon.app — UUID + 텍스처 통합 응답 (CORS 허용)
+ *  3. crafthead.net — Minecraft 프로필 형식
+ *  4. api.mojang.com — 공식 Mojang API (UUID만 반환)
  */
+
+function formatRawUuid(raw) {
+  if (!raw) return "";
+  const cleaned = String(raw).replace(/-/g, "");
+  if (cleaned.length !== 32) return cleaned;
+  return [
+    cleaned.slice(0, 8),
+    cleaned.slice(8, 12),
+    cleaned.slice(12, 16),
+    cleaned.slice(16, 20),
+    cleaned.slice(20, 32),
+  ].join("-");
+}
 
 export async function fetchMojangUuid(username) {
   if (!username || !username.trim()) {
     return { success: false, message: '닉네임을 입력해주세요.' };
   }
   const cleanName = username.trim();
+
+  // 0) 서버 프록시 — CORS 우회 (권장)
+  try {
+    const serverUrl = (() => {
+      const loc = window.location;
+      // 개발: http://localhost:5173 → http://localhost:5000
+      // 운영: https://example.com → https://example.com (같은 오리진)
+      if (loc.port === "5173") {
+        return `http://${loc.hostname}:5000/api/mojang/uuid/${encodeURIComponent(cleanName)}`;
+      }
+      return `/api/mojang/uuid/${encodeURIComponent(cleanName)}`;
+    })();
+    
+    const res = await fetch(serverUrl, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.success && data?.uuid) {
+        return data;
+      }
+    }
+    // 서버도 404 반환하면 즉시 실패 처리
+    if (res.status === 404) {
+      return {
+        success: false,
+        message: `'${cleanName}' 닉네임을 Mojang DB에서 찾을 수 없습니다.`,
+      };
+    }
+  } catch (err) {
+    console.warn('[fetchMojangUuid] 서버 프록시 실패:', err?.message);
+  }
 
   // 1) ashcon.app — 통합 API
   try {
@@ -101,13 +145,4 @@ export async function fetchMojangUuid(username) {
     success: false,
     message: `'${cleanName}' 조회에 실패했습니다. 잠시 후 다시 시도해주세요.`,
   };
-}
-
-function formatRawUuid(rawId) {
-  if (!rawId) return '';
-  if (rawId.length === 36) return rawId;
-  if (rawId.length === 32) {
-    return `${rawId.slice(0, 8)}-${rawId.slice(8, 12)}-${rawId.slice(12, 16)}-${rawId.slice(16, 20)}-${rawId.slice(20)}`;
-  }
-  return rawId;
 }

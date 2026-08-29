@@ -5447,6 +5447,109 @@ async function runAutoArchiveScheduler() {
 // async 라우트에서 catch 되지 않은 에러가 Express로 전파될 때 처리.
 // 스택 트레이스를 클라이언트에 노출하지 않고 일반 메시지만 반환.
 // eslint-disable-next-line no-unused-vars
+// ════════════════════════════════════════════════════════════════════
+// 10. Mojang API Proxy — 클라이언트 CORS 우회
+// ════════════════════════════════════════════════════════════════════
+app.get("/api/mojang/uuid/:username", async (req, res) => {
+  const { username } = req.params;
+  const cleanName = String(username || "").trim();
+
+  if (!cleanName) {
+    return res.status(400).json({
+      success: false,
+      message: "닉네임을 입력해주세요.",
+    });
+  }
+
+  // 1) ashcon.app — 통합 API (권장)
+  try {
+    const ashconRes = await fetch(
+      `https://api.ashcon.app/mojang/v2/user/${encodeURIComponent(cleanName)}`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+    if (ashconRes.ok) {
+      const data = await ashconRes.json();
+      if (data?.uuid) {
+        return res.json({
+          success: true,
+          uuid: data.uuid,
+          name: data.username,
+          skinUrl:
+            data.textures?.skin?.url ||
+            `https://crafatar.com/avatars/${data.uuid}?overlay=true`,
+          avatarUrl: `https://crafatar.com/avatars/${data.uuid}?overlay=true`,
+        });
+      }
+      // 404 = 닉네임 미존재
+      if (ashconRes.status === 404) {
+        return res.status(404).json({
+          success: false,
+          message: `'${cleanName}' 닉네임을 찾을 수 없습니다.`,
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("[ashcon.app]", err?.message);
+  }
+
+  // 2) crafthead.net — 폴백
+  try {
+    const craftRes = await fetch(
+      `https://crafthead.net/profile/${encodeURIComponent(cleanName)}`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+    if (craftRes.ok) {
+      const data = await craftRes.json();
+      if (data?.id) {
+        return res.json({
+          success: true,
+          uuid: data.id,
+          name: data.name,
+          skinUrl: `https://crafthead.net/skin/${data.id}`,
+          avatarUrl: `https://crafthead.net/avatar/${data.id}`,
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("[crafthead.net]", err?.message);
+  }
+
+  // 3) api.mojang.com — 공식 API (마지막 폴백)
+  try {
+    const mojangRes = await fetch(
+      `https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(cleanName)}`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+    if (mojangRes.ok) {
+      const data = await mojangRes.json();
+      if (data?.id) {
+        return res.json({
+          success: true,
+          uuid: data.id,
+          name: data.name,
+          skinUrl: `https://crafatar.com/avatars/${data.id}?overlay=true`,
+          avatarUrl: `https://crafatar.com/avatars/${data.id}?overlay=true`,
+        });
+      }
+    }
+    if (mojangRes.status === 204 || mojangRes.status === 404) {
+      return res.status(404).json({
+        success: false,
+        message: `'${cleanName}' 닉네임을 찾을 수 없습니다.`,
+      });
+    }
+  } catch (err) {
+    console.warn("[api.mojang.com]", err?.message);
+  }
+
+  // 모든 API 실패
+  res.status(503).json({
+    success: false,
+    message:
+      "'AndyLab' 조회에 실패했습니다. Mojang 서비스가 일시적으로 사용 불가능합니다. 잠시 후 다시 시도해주세요.",
+  });
+});
+
 app.use((err, req, res, _next) => {
   console.error("[Unhandled Error]", req.method, req.path, err);
   if (res.headersSent) return;

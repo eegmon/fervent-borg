@@ -7,7 +7,11 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { isCaseConcluded } from "../data/prosecutionData";
-import { isArchivedCase, matchesCaseNumber } from "../services/caseUtils";
+import {
+  isArchivedCase,
+  matchesCaseNumber,
+  getDisplayCaseNumber,
+} from "../services/caseUtils";
 
 const STATUS_COLOR = (s) => {
   if (!s) return "#94a3b8";
@@ -372,9 +376,7 @@ export default function PreservedCasesLedger({
                         fontWeight: 700,
                       }}
                     >
-                      {c.hyeongjeNo && c.hyeongjeNo !== "-" && c.sujeNo
-                        ? `${c.hyeongjeNo}(${c.sujeNo})`
-                        : c.hyeongjeNo || c.sujeNo || "-"}
+                      {getDisplayCaseNumber(c) || "-"}
                     </td>
                     <td style={{ padding: "10px 14px" }}>
                       <button

@@ -48,7 +48,7 @@ export default function BookingLedger({
           : current;
       map.set(key, pick);
     }
-    
+
     // 1. 입건일자 기준 정렬 (최신순)
     const sorted = [...map.values()].sort((a, b) => {
       const dateA = new Date(`${a.bookingDate || ""}T00:00:00`).getTime();
@@ -109,18 +109,16 @@ export default function BookingLedger({
               alignItems: "center",
               gap: 6,
               cursor: "pointer",
-              color: showArchived ? "var(--primary-amber)" : "var(--text-muted)",
+              color: showArchived
+                ? "var(--primary-amber)"
+                : "var(--text-muted)",
               fontSize: "0.75rem",
               fontWeight: 600,
               transition: "all 0.2s ease",
             }}
             title={showArchived ? "보존사건 숨기기" : "보존사건 보이기"}
           >
-            {showArchived ? (
-              <Eye size={14} />
-            ) : (
-              <EyeOff size={14} />
-            )}
+            {showArchived ? <Eye size={14} /> : <EyeOff size={14} />}
             {showArchived ? "보존사건 표시" : "보존사건 숨김"}
           </button>
           <span className="badge badge-danger">{displayBookings.length}건</span>

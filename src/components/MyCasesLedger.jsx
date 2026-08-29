@@ -1097,7 +1097,7 @@ export default function MyCasesLedger({
     ].includes(currentUser.roleLevel);
 
   // 부서장(부장검사) 권한: 동일 부서 인원 휴직처리 + 부서 내 사건 재배당
-  // 지정된 부서장(직책/플래그 무관)도 접근 가능하도록 허용.
+  // 지정된 부서장만 접근 가능 (부장검사 제외)
   const isDeptHeadAssigned =
     !!currentUser?.isDeptHead ||
     !!currentUser?.isDepartmentHead ||
@@ -1106,12 +1106,7 @@ export default function MyCasesLedger({
     (typeof currentUser?.position === "string" &&
       currentUser.position.includes("부서장")) ||
     (typeof currentUser?.title === "string" &&
-      currentUser.title.includes("부서장")) ||
-    (typeof currentUser?.position === "string" &&
-      currentUser.position.includes("부장검사")) ||
-    (typeof currentUser?.title === "string" &&
-      currentUser.title.includes("부장검사")) ||
-    currentUser?.roleLevel === "SENIOR_PROSECUTOR";
+      currentUser.title.includes("부서장"));
 
   const isSeniorProsecutor = isDeptHeadAssigned;
   const [seniorTab, setSeniorTab] = useState("leave"); // "leave" | "reassign"
