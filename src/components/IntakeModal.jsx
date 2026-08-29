@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { fetchMojangUuid } from "../services/mojangApi";
 import { useDraft } from "../services/useDraft";
+import ChargeSearchInput from "./ChargeSearchInput";
 
 export default function IntakeModal({
   isOpen,
@@ -786,14 +787,11 @@ export default function IntakeModal({
                         </button>
                       ))}
                     </div>
-                    <input
-                      className="input-field"
+                    <ChargeSearchInput
                       value={row.name}
-                      onChange={(e) =>
-                        updateChargeRow(row.id, "name", e.target.value)
-                      }
-                      list="charge-options"
-                      placeholder="죄명 직접 입력 또는 목록 선택"
+                      onChange={(v) => updateChargeRow(row.id, "name", v)}
+                      chargesData={chargesData}
+                      placeholder="죄명 직접 입력 또는 검색"
                     />
                     {chargeRows.length > 1 && (
                       <button
@@ -822,14 +820,6 @@ export default function IntakeModal({
                   <Plus size={14} /> 죄명 추가
                 </button>
               </div>
-              <datalist id="charge-options">
-                {chargesData.map((charge) => (
-                  <option
-                    key={charge.id || charge}
-                    value={charge.name || charge}
-                  />
-                ))}
-              </datalist>
             </div>
             <div>
               <Label>담당 검사 배당</Label>

@@ -87,6 +87,25 @@ export default function MainLedger({
   const [archiveFilter, setArchiveFilter] = useState("ACTIVE");
   const [expandedId, setExpandedId] = useState(null);
   const [editingCase, setEditingCase] = useState(null);
+  // 정렬: field = "sujeNo" | "hyeongjeNo" | "bookingDate", dir = "desc" | "asc"
+  const [sortField, setSortField] = useState("sujeNo");
+  const [sortDir, setSortDir] = useState("desc");
+
+  const handleSortClick = (field) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortField(field);
+      setSortDir("desc");
+    }
+  };
+
+  // 수제번호/형제번호에서 숫자 부분만 추출 (예: "2026수제301" → 301)
+  const extractSeqNum = (str) => {
+    if (!str || str === "-") return 0;
+    const m = String(str).match(/(\d+)$/);
+    return m ? Number(m[1]) : 0;
+  };
 
   // 검사장 이상: 보존사건 포함 전체 원부 조회 가능
   const isChiefOrAbove =
@@ -224,6 +243,26 @@ export default function MainLedger({
       return matchQ && matchStatus && matchP && matchDept && matchArchive;
     });
   }, [ledgerData, searchTerm, statusFilter, prosecutorFilter, deptFilter, archiveFilter, isChiefOrAbove, prosecutorsList]);
+
+  // 정렬
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      let aVal, bVal;
+      if (sortField === "sujeNo") {
+        aVal = extractSeqNum(a.sujeNo || a.hyeongjeNo);
+        bVal = extractSeqNum(b.sujeNo || b.hyeongjeNo);
+      } else if (sortField === "hyeongjeNo") {
+        aVal = extractSeqNum(a.hyeongjeNo);
+        bVal = extractSeqNum(b.hyeongjeNo);
+      } else if (sortField === "bookingDate") {
+        aVal = a.bookingDate ? new Date(a.bookingDate).getTime() : 0;
+        bVal = b.bookingDate ? new Date(b.bookingDate).getTime() : 0;
+      } else {
+        return 0;
+      }
+      return sortDir === "desc" ? bVal - aVal : aVal - bVal;
+    });
+  }, [filtered, sortField, sortDir]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -407,11 +446,48 @@ export default function MainLedger({
             ))}
           </select>
         </div>
+
+        {/* Sort Bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 700, marginRight: 2 }}>
+            정렬:
+          </span>
+          {[
+            { field: "sujeNo",      label: "수제 번호" },
+            { field: "hyeongjeNo",  label: "형제 번호" },
+            { field: "bookingDate", label: "접수일"    },
+          ].map(({ field, label }) => {
+            const active = sortField === field;
+            const arrow = active ? (sortDir === "desc" ? " ↓" : " ↑") : "";
+            return (
+              <button
+                key={field}
+                onClick={() => handleSortClick(field)}
+                className="btn"
+                style={{
+                  padding: "4px 12px",
+                  fontSize: "0.74rem",
+                  fontWeight: active ? 800 : 500,
+                  background: active
+                    ? "rgba(245,158,11,0.18)"
+                    : "rgba(255,255,255,0.04)",
+                  color: active ? "var(--primary-amber)" : "var(--text-muted)",
+                  border: active
+                    ? "1px solid rgba(245,158,11,0.45)"
+                    : "1px solid var(--border-subtle)",
+                  borderRadius: 7,
+                }}
+              >
+                {label}{arrow}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Case List */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {filtered.length === 0 ? (
+        {sorted.length === 0 ? (
           <div
             className="glass-panel"
             style={{
@@ -424,7 +500,7 @@ export default function MainLedger({
             검색 조건에 해당하는 사건이 없습니다.
           </div>
         ) : (
-          filtered.map((item) => {
+          sorted.map((item) => {
             const isExpanded = expandedId === item.id;
             const pUser = prosecutorsList.find(
               (p) =>

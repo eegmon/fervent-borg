@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Edit, Scale, AlertCircle, Search, RefreshCw, Plus, Trash2, Users, Lock, Unlock } from 'lucide-react';
 import { fetchMojangUuid } from '../services/mojangApi';
 import { useDraft } from '../services/useDraft';
+import ChargeSearchInput from './ChargeSearchInput';
 
 export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prosecutorsList = [], chargesData = [], currentUser, onToast }) {
   // ── 임시저장 훅 (사건 ID별 독립 키) ─────────────────────────────
@@ -338,12 +339,13 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
 
             <div style={{ marginTop: 12 }}>
               <label className="input-label">적용 죄명</label>
-              <input className="input-field" name="chargeName" value={formData.chargeName || ''} onChange={handleChange} required list="edit-charge-options" placeholder="죄명 직접 입력 또는 목록 선택" />
-              <datalist id="edit-charge-options">
-                {chargesData.map((charge) => (
-                  <option key={charge.id || charge} value={charge.name || charge} />
-                ))}
-              </datalist>
+              <ChargeSearchInput
+                value={formData.chargeName || ''}
+                onChange={(v) => setFormData(prev => ({ ...prev, chargeName: v }))}
+                chargesData={chargesData}
+                placeholder="죄명 직접 입력 또는 검색"
+                required
+              />
             </div>
           </div>
 
