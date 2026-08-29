@@ -180,9 +180,17 @@ export async function initDb() {
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       name       TEXT NOT NULL UNIQUE,
       created_at TEXT DEFAULT (datetime('now')),
-      created_by TEXT DEFAULT ''
+      created_by TEXT DEFAULT '',
+      deleted_at TEXT DEFAULT ''
     )
   `);
+
+  // 기존 charges 테이블에 deleted_at 컬럼 추가 (없는 경우)
+  try {
+    await db.execute("ALTER TABLE charges ADD COLUMN deleted_at TEXT DEFAULT ''");
+  } catch (error) {
+    if (!String(error.message || error).includes("duplicate column")) throw error;
+  }
 
   // ── reports ────────────────────────────────────────────────────
   await db.execute(`

@@ -76,7 +76,9 @@ export default function CaseMemoModal({ isOpen, onClose, caseItem, currentUser, 
                   fontFamily: "monospace",
                 }}
               >
-                {caseItem.hyeongjeNo || caseItem.sujeNo} ·{" "}
+                {caseItem.hyeongjeNo && caseItem.hyeongjeNo !== "-" && caseItem.sujeNo
+                  ? `${caseItem.hyeongjeNo}(${caseItem.sujeNo})`
+                  : caseItem.hyeongjeNo || caseItem.sujeNo || "-"} ·{" "}
                 {caseItem.suspectName}
               </div>
             </div>

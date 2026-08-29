@@ -34,8 +34,11 @@ export default function PasswordChangeModal({
     }
 
     setError("");
-    const changed = await onChangePassword(currentUser.id, currentPwd, newPwd);
-    if (!changed) return;
+    const result = await onChangePassword(currentUser.id, currentPwd, newPwd);
+    if (result !== true) {
+      if (typeof result === "string") setError(result);
+      return;
+    }
     setCurrentPwd("");
     setNewPwd("");
     setConfirmPwd("");

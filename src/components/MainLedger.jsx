@@ -135,6 +135,13 @@ export default function MainLedger({
         "SENIOR_PROSECUTOR",
       ].includes(currentUser.roleLevel));
 
+  // 결재 상신 전역 권한 — 검찰총장·사무국 계정은 타 검사 사건에도 결재 상신 가능
+  const isGlobalApproval =
+    currentUser &&
+    (currentUser.isSuperAdmin ||
+      ["SUPER_ADMIN", "PROSECUTOR_GENERAL", "CHIEF_ADMINISTRATOR", "ADMINISTRATOR"].includes(currentUser.roleLevel) ||
+      String(currentUser.dept || "").includes("사무국"));
+
   // 헤더 통계 — ledgerData가 바뀔 때만 재계산
   const stats = useMemo(() => {
     const data = ledgerData || [];
@@ -868,6 +875,8 @@ export default function MainLedger({
                       메모
                     </button>
 
+                    {/* 결재 버튼 — 담당자 본인 또는 전역 권한 계정만 표시 */}
+                    {(isGlobalApproval || item.prosecutorId === currentUser?.id) && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -879,6 +888,7 @@ export default function MainLedger({
                       <FileCheck size={12} />
                       결재
                     </button>
+                    )}
 
                     {/* 지정/해제 버튼 — 상급자만 표시 */}
                     {canDesignate &&

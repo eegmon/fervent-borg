@@ -175,6 +175,13 @@ export function deleteChargeApi(id) {
   return apiFetch(`/charges/${id}`, { method: "DELETE" });
 }
 
+export function assignOfficialCaseNoApi({ caseId, prefix, manualNo, autoSeal }) {
+  return apiFetch("/cases/assign-official-no", {
+    method: "POST",
+    body: JSON.stringify({ caseId, prefix, manualNo, autoSeal }),
+  });
+}
+
 // ════════════════════════════════════════════════════════════════════
 // Reports
 // ════════════════════════════════════════════════════════════════════
@@ -367,6 +374,11 @@ export function createAuditLogApi(log) {
 // ════════════════════════════════════════════════════════════════════
 export function fetchCaseHistory(caseId) {
   return apiFetch(`/cases/${caseId}/history`);
+}
+
+// 전체 원부 수정 이력 (감사 로그 뷰어용)
+export function fetchAllCaseHistory() {
+  return apiFetch("/case-history");
 }
 
 export function fetchEvidence(caseNo) {

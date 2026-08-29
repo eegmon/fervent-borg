@@ -113,6 +113,7 @@ import {
   rejectDocApi,
   changePasswordApi,
   fetchAuditLogs,
+  fetchAllCaseHistory,
   fetchCaseHistory,
   fetchNextDocNo,
   fetchCaseNumberSettings,
@@ -178,7 +179,7 @@ export default function App() {
 
   // 감사 로그
   const [auditLogs, setAuditLogs] = useState([]);
-
+  const [allCaseHistory, setAllCaseHistory] = useState([]);
   // Toast
   const [toasts, setToasts] = useState([]);
   const showToast = (message, type = "success", duration = 4000) => {
@@ -260,6 +261,7 @@ export default function App() {
         serverAppeals,
         serverBookings,
         serverAuditLogs,
+        serverAllCaseHistory,
         nextDocNoRes,
         serverProsecutors,
         serverCaseNumberSettings,
@@ -273,10 +275,17 @@ export default function App() {
         fetchBookings(),
         currentUser.isSuperAdmin ||
         currentUser.dept?.includes("사무국") ||
-        ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY"].includes(
+        ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY", "CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(
           currentUser.roleLevel,
         )
           ? fetchAuditLogs()
+          : Promise.resolve([]),
+        currentUser.isSuperAdmin ||
+        currentUser.dept?.includes("사무국") ||
+        ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY", "CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(
+          currentUser.roleLevel,
+        )
+          ? fetchAllCaseHistory()
           : Promise.resolve([]),
         fetchNextDocNo(),
         fetchProsecutors(),
@@ -291,6 +300,7 @@ export default function App() {
       if (Array.isArray(serverAppeals)) setAppealsData(serverAppeals);
       if (Array.isArray(serverBookings)) setBookingsData(serverBookings);
       if (Array.isArray(serverAuditLogs)) setAuditLogs(serverAuditLogs);
+      if (Array.isArray(serverAllCaseHistory)) setAllCaseHistory(serverAllCaseHistory);
       if (serverProsecutors) setProsecutorsList(serverProsecutors);
       if (serverCaseNumberSettings)
         setCaseNumberSettings(serverCaseNumberSettings);
@@ -329,7 +339,7 @@ export default function App() {
     currentUser &&
     (currentUser.isSuperAdmin ||
       currentUser.dept?.includes("사무국") ||
-      ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY"].includes(
+      ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY", "CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(
         currentUser.roleLevel,
       )),
   );
@@ -451,12 +461,10 @@ export default function App() {
   // Handler: Change Password (서버 + 로컬 state 동시 반영)
   const handleChangePassword = async (userId, currentPassword, newPassword) => {
     const res = await changePasswordApi(userId, currentPassword, newPassword);
-    if (res && !res.success) {
-      showToast(
-        `❌ 비밀번호 변경 실패: ${res.message || "서버 오류"}`,
-        "error",
-      );
-      return false;
+    if (!res || !res.success) {
+      const msg = res?.message || "서버 오류가 발생했습니다.";
+      showToast(`❌ 비밀번호 변경 실패: ${msg}`, "error");
+      return msg;
     }
     showToast("🔑 비밀번호가 성공적으로 변경되었습니다.", "success");
     return true;
@@ -483,7 +491,7 @@ export default function App() {
       ),
     );
     showToast(
-      `✏️ ${updatedCase.hyeongjeNo || updatedCase.sujeNo || updatedCase.id}호 사건 원부가 수정되었습니다.`,
+      `✏️ ${updatedCase.sujeNo || updatedCase.hyeongjeNo || updatedCase.id}호 사건 원부가 수정되었습니다.`,
       "success",
     );
     return true;
@@ -546,10 +554,14 @@ export default function App() {
       );
     } else {
       // 서버 미연결 모드 또는 에러 시 폴백
-      const newCases = rows.map((r, i) => ({
+      const newCases = rows.map((r, i) => {
+        const rawSujeNo = String(r["수제번호"] || "").trim();
+        const rawHyeongjeNo = String(r["형제번호"] || "").trim();
+        return {
         id: Date.now() + i,
-        hyeongjeNo: r["형제번호"] || r["수제번호"] || "",
-        latestHyeongjeNo: r["형제번호"] || r["수제번호"] || "",
+        sujeNo: rawSujeNo || (rawHyeongjeNo.includes("수제") ? rawHyeongjeNo : ""),
+        hyeongjeNo: rawHyeongjeNo && !rawHyeongjeNo.includes("수제") ? rawHyeongjeNo : "-",
+        latestHyeongjeNo: rawHyeongjeNo && !rawHyeongjeNo.includes("수제") ? rawHyeongjeNo : rawSujeNo || "-",
         prosecutorName: r["검사명"] || "",
         prosecutorId: r["검사명"] || "",
         suspectName: r["피고인명"] || "",
@@ -578,7 +590,8 @@ export default function App() {
         notes: "",
         content: "",
         confiscation: "",
-      }));
+        };
+      });
 
       setLedgerData((prev) => [...newCases, ...prev]);
       showToast(
@@ -1271,6 +1284,14 @@ export default function App() {
 
   // Handler: Create Approval for specific Case from Ledger
   const handleCreateApprovalForCase = async (caseItem) => {
+    // 전역 권한이 없는 일반 검사는 본인 담당 사건에만 결재를 상신할 수 있다.
+    const isGlobal = currentUser?.isSuperAdmin ||
+      ["PROSECUTOR_GENERAL", "CHIEF_ADMINISTRATOR", "ADMINISTRATOR"].includes(currentUser?.roleLevel) ||
+      String(currentUser?.dept || "").includes("사무국");
+    if (!isGlobal && caseItem.prosecutorId !== currentUser?.id) {
+      showToast("⚠️ 담당 사건의 결재만 상신할 수 있습니다.", "error");
+      return;
+    }
     const seqNo = nextDocNo();
     const supervisor = prosecutorsList.find((prosecutor) =>
       ["SENIOR_PROSECUTOR", "DEPUTY_CHIEF"].includes(prosecutor.roleLevel),
@@ -1865,7 +1886,7 @@ export default function App() {
             )}
 
             {activeTab === "auditlog" && canViewLoginRecords && (
-              <AuditLogViewer auditLogs={auditLogs} />
+              <AuditLogViewer auditLogs={auditLogs} caseHistory={allCaseHistory} />
             )}
           </>
         )}

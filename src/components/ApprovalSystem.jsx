@@ -881,6 +881,21 @@ export default function ApprovalSystem({
 
   const handleCreateSubmit = (e) => {
     e.preventDefault();
+
+    // ── 전역 권한이 없으면 본인 담당 사건에만 결재 상신 가능 ──────────
+    const isGlobalApproval =
+      currentUser?.isSuperAdmin ||
+      ["SUPER_ADMIN", "PROSECUTOR_GENERAL", "CHIEF_ADMINISTRATOR", "ADMINISTRATOR"].includes(currentUser?.roleLevel) ||
+      String(currentUser?.dept || "").includes("사무국");
+    if (!isGlobalApproval && newDocData.hyeongjeNo) {
+      const ownerCase = ledgerData.find(
+        (l) => l.hyeongjeNo === newDocData.hyeongjeNo,
+      );
+      if (ownerCase && ownerCase.prosecutorId !== currentUser?.id) {
+        alert("담당 사건의 결재만 상신할 수 있습니다.");
+        return;
+      }
+    }
     const dt =
       DOCUMENT_TYPES.find((d) => d.id === newDocData.docType) ||
       DOCUMENT_TYPES[0];
@@ -1302,7 +1317,15 @@ export default function ApprovalSystem({
                         });
                       }}
                     >
-                      {ledgerData.map((l) => (
+                      {((() => {
+                        const isGlobalApproval =
+                          currentUser?.isSuperAdmin ||
+                          ["SUPER_ADMIN", "PROSECUTOR_GENERAL", "CHIEF_ADMINISTRATOR", "ADMINISTRATOR"].includes(currentUser?.roleLevel) ||
+                          String(currentUser?.dept || "").includes("사무국");
+                        return isGlobalApproval
+                          ? ledgerData
+                          : ledgerData.filter((l) => l.prosecutorId === currentUser?.id);
+                      })()).map((l) => (
                         <option key={l.id} value={l.hyeongjeNo}>
                           {l.hyeongjeNo} ({l.suspectName})
                         </option>

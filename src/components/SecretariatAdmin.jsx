@@ -54,6 +54,7 @@ import {
   createAuditLogApi,
   fetchAutoArchiveSettings,
   updateAutoArchiveSettings,
+  assignOfficialCaseNoApi,
 } from "../services/api";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -361,7 +362,10 @@ function DesignateApprovalPanel({
         ) : (
           filtered.map((c) => {
             const isDesignated = !!c.supervisorDesignated;
-            const label = `${c.hyeongjeNo || c.sujeNo} (피의자: ${c.suspectName})`;
+            const displayNo = c.hyeongjeNo && c.hyeongjeNo !== "-" && c.sujeNo
+              ? `${c.hyeongjeNo}(${c.sujeNo})`
+              : c.hyeongjeNo || c.sujeNo || "-";
+            const label = `${displayNo} (피의자: ${c.suspectName})`;
             return (
               <div
                 key={c.id}
@@ -903,7 +907,9 @@ function DeleteManagementPanel({
                       fontWeight: 700,
                     }}
                   >
-                    {c.sujeNo || c.hyeongjeNo}
+                    {c.hyeongjeNo && c.hyeongjeNo !== "-" && c.sujeNo
+                      ? `${c.hyeongjeNo}(${c.sujeNo})`
+                      : c.hyeongjeNo || c.sujeNo || "-"}
                   </span>
                   <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>
                     {c.suspectName}
@@ -2613,53 +2619,36 @@ export default function SecretariatAdmin({
     alert("사건번호 자동계산 시작값이 저장되었습니다.");
   };
 
-  const handleAssignOfficialCaseNo = (e) => {
+  const handleAssignOfficialCaseNo = async (e) => {
     e.preventDefault();
     if (!selectedCaseForAssign) {
       alert("사건을 먼저 선택해주세요.");
       return;
     }
 
-    const currentSuje =
-      selectedCaseForAssign.sujeNo ||
-      (selectedCaseForAssign.hyeongjeNo || "").replace("형제", "수제");
-    const currentYear = new Date().getFullYear();
+    const manualNo = assignNoInput.trim() || null;
 
-    // 유형별로 기존 사건번호 중 최대 일련번호를 찾아 +1 자동 부여
-    const getNextSeqNo = (prefix) => {
-      const regex = new RegExp(`^${currentYear}${prefix}(\\d+)$`);
-      const nums = ledgerData
-        .map((c) => {
-          const m =
-            (c.hyeongjeNo || "").match(regex) || (c.sujeNo || "").match(regex);
-          return m ? parseInt(m[1], 10) : 0;
-        })
-        .filter((n) => n > 0);
-      const settingKey = {
-        형제: "hyeongjeStart",
-        특공: "teuggongStart",
-        특형: "teughyeongStart",
-        특압제: "teugapjeStart",
-        압제: "apjeStart",
-      }[prefix];
-      const configuredStart = Number(caseNumberSettings[settingKey]) || 1;
-      return Math.max(
-        configuredStart,
-        nums.length > 0 ? Math.max(...nums) + 1 : configuredStart,
-      );
-    };
+    // 서버에서 원자적으로 채번 — 레이스 컨디션 방지
+    const result = await assignOfficialCaseNoApi({
+      caseId: selectedCaseForAssign.id,
+      prefix: assignPrefix,
+      manualNo,
+      autoSeal,
+    });
 
-    const numPart = assignNoInput.trim() || getNextSeqNo(assignPrefix);
-    const assignedNo = `${currentYear}${assignPrefix}${numPart}`;
+    if (!result?.success) {
+      alert(result?.message || "사건번호 배정에 실패했습니다.");
+      return;
+    }
+
+    const { assignedNo, sujeNo, disposition } = result;
 
     const updated = {
       ...selectedCaseForAssign,
-      sujeNo: currentSuje,
+      sujeNo,
       hyeongjeNo: assignedNo,
       latestHyeongjeNo: assignedNo,
-      disposition: autoSeal
-        ? `피의자(기소 - 사무국승인 [${assignedNo}])`
-        : selectedCaseForAssign.disposition,
+      disposition,
     };
 
     if (onUpdateCase) {
@@ -2667,10 +2656,10 @@ export default function SecretariatAdmin({
     }
     addLog(
       "검찰사무국 사건번호 공식 배정",
-      `${currentSuje}호 -> ${assignedNo}호 (${assignPrefix} 사건번호 공식 부여 완료)`,
+      `${sujeNo}호 -> ${assignedNo}호 (${assignPrefix} 사건번호 공식 부여 완료)`,
     );
     alert(
-      `[검찰사무국 관인 날인] 사건 ${currentSuje}호에 공식 사건번호 '${assignedNo}'가 배정되었습니다.`,
+      `[검찰사무국 관인 날인] 사건 ${sujeNo}호에 공식 사건번호 '${assignedNo}'가 배정되었습니다.`,
     );
   };
 

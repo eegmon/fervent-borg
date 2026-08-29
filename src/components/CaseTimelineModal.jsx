@@ -389,7 +389,9 @@ export default function CaseTimelineModal({
                     border: "1px solid rgba(245,158,11,0.3)",
                   }}
                 >
-                  {caseItem.hyeongjeNo || caseItem.sujeNo}
+                  {caseItem.hyeongjeNo && caseItem.hyeongjeNo !== "-" && caseItem.sujeNo
+                    ? `${caseItem.hyeongjeNo}(${caseItem.sujeNo})`
+                    : caseItem.hyeongjeNo || caseItem.sujeNo || "-"}
                 </span>
               </div>
               <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 2 }}>
