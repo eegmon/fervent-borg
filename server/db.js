@@ -178,19 +178,38 @@ export async function initDb() {
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS charges (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      name       TEXT NOT NULL UNIQUE,
-      created_at TEXT DEFAULT (datetime('now')),
-      created_by TEXT DEFAULT '',
-      deleted_at TEXT DEFAULT ''
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      name          TEXT NOT NULL UNIQUE,
+      statute_days  INTEGER NOT NULL DEFAULT 20,
+      is_unlimited  INTEGER NOT NULL DEFAULT 0,
+      law_article   TEXT DEFAULT '소송법 제21조의2',
+      category      TEXT DEFAULT 'GENERAL',
+      description   TEXT DEFAULT '',
+      created_at    TEXT DEFAULT (datetime('now')),
+      created_by    TEXT DEFAULT '',
+      updated_at    TEXT DEFAULT (datetime('now')),
+      updated_by    TEXT DEFAULT '',
+      deleted_at    TEXT DEFAULT '',
+      deleted_by    TEXT DEFAULT ''
     )
   `);
 
-  // 기존 charges 테이블에 deleted_at 컬럼 추가 (없는 경우)
-  try {
-    await db.execute("ALTER TABLE charges ADD COLUMN deleted_at TEXT DEFAULT ''");
-  } catch (error) {
-    if (!String(error.message || error).includes("duplicate column")) throw error;
+  for (const column of [
+    "statute_days INTEGER NOT NULL DEFAULT 20",
+    "is_unlimited INTEGER NOT NULL DEFAULT 0",
+    "law_article TEXT DEFAULT '소송법 제21조의2'",
+    "category TEXT DEFAULT 'GENERAL'",
+    "description TEXT DEFAULT ''",
+    "updated_at TEXT DEFAULT (datetime('now'))",
+    "updated_by TEXT DEFAULT ''",
+    "deleted_by TEXT DEFAULT ''",
+  ]) {
+    try {
+      await db.execute(`ALTER TABLE charges ADD COLUMN ${column}`);
+    } catch (error) {
+      if (!String(error.message || error).includes("duplicate column"))
+        throw error;
+    }
   }
 
   // ── reports ────────────────────────────────────────────────────
@@ -335,9 +354,12 @@ export async function initDb() {
   `);
   // 기존 case_history 테이블에 deleted_at 컬럼 추가 (없는 경우)
   try {
-    await db.execute("ALTER TABLE case_history ADD COLUMN deleted_at TEXT DEFAULT ''");
+    await db.execute(
+      "ALTER TABLE case_history ADD COLUMN deleted_at TEXT DEFAULT ''",
+    );
   } catch (error) {
-    if (!String(error.message || error).includes("duplicate column")) throw error;
+    if (!String(error.message || error).includes("duplicate column"))
+      throw error;
   }
 
   // ── evidence (사건 증거자료 및 사건기록) ─────────────────────────

@@ -169,10 +169,17 @@ export function fetchCharges() {
   return apiFetch("/charges");
 }
 
-export function createChargeApi(name) {
+export function createChargeApi(name, meta = {}) {
   return apiFetch("/charges", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, ...meta }),
+  });
+}
+
+export function updateChargeApi(id, name, meta = {}) {
+  return apiFetch(`/charges/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name, ...meta }),
   });
 }
 
@@ -180,7 +187,24 @@ export function deleteChargeApi(id) {
   return apiFetch(`/charges/${id}`, { method: "DELETE" });
 }
 
-export function assignOfficialCaseNoApi({ caseId, prefix, manualNo, autoSeal }) {
+export function restoreChargeApi(id) {
+  return apiFetch(`/charges/${id}/restore`, { method: "POST" });
+}
+
+export function fetchDeletedChargesApi() {
+  return apiFetch("/charges/deleted");
+}
+
+export function hardDeleteChargeApi(id) {
+  return apiFetch(`/charges/${id}/hard-delete`, { method: "POST" });
+}
+
+export function assignOfficialCaseNoApi({
+  caseId,
+  prefix,
+  manualNo,
+  autoSeal,
+}) {
   return apiFetch("/cases/assign-official-no", {
     method: "POST",
     body: JSON.stringify({ caseId, prefix, manualNo, autoSeal }),
@@ -503,7 +527,12 @@ export function fetchApprovalTemplates() {
   return apiFetch("/approval-templates");
 }
 
-export function createApprovalTemplateApi({ name, description, steps, isShared }) {
+export function createApprovalTemplateApi({
+  name,
+  description,
+  steps,
+  isShared,
+}) {
   return apiFetch("/approval-templates", {
     method: "POST",
     body: JSON.stringify({ name, description, steps, isShared }),
@@ -515,8 +544,6 @@ export function deleteApprovalTemplateApi(id) {
     method: "DELETE",
   });
 }
-
-
 
 // ════════════════════════════════════════════════════════════════════
 // System Settings — 자동보존 설정

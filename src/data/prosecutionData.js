@@ -21,16 +21,16 @@
 // 검찰사무관/관리관은 행정 보조직이므로 수사지휘 라인 검사보다 하위에 위치.
 // (검찰청법 제3조·제4조, ROLE_AUTHORITY 수치와 동기화)
 export const ROLE_HIERARCHY = [
-  "SUPER_ADMIN",            // 최고 시스템 관리자 (전체 퍼미션)
-  "PROSECUTOR_GENERAL",     // 검찰총장
-  "CHIEF_PROSECUTOR",       // 검사장
-  "DEPUTY_CHIEF",           // 차장검사
-  "CHIEF_ADMINISTRATOR",    // 검찰관리관 (차장검사 대우 — 행정직)
-  "SENIOR_PROSECUTOR",      // 부장검사
-  "PROSECUTOR",             // 평검사 (소추·수사 주체)
-  "ADMINISTRATOR",          // 검찰사무관 (평검사 대우 — 행정/수사보조)
-  "ADMIN_PROBATIONARY",     // 검찰사무관시보
-  "PROBATIONARY",           // 검사시보
+  "SUPER_ADMIN", // 최고 시스템 관리자 (전체 퍼미션)
+  "PROSECUTOR_GENERAL", // 검찰총장
+  "CHIEF_PROSECUTOR", // 검사장
+  "DEPUTY_CHIEF", // 차장검사
+  "CHIEF_ADMINISTRATOR", // 검찰관리관 (차장검사 대우 — 행정직)
+  "SENIOR_PROSECUTOR", // 부장검사
+  "PROSECUTOR", // 평검사 (소추·수사 주체)
+  "ADMINISTRATOR", // 검찰사무관 (평검사 대우 — 행정/수사보조)
+  "ADMIN_PROBATIONARY", // 검찰사무관시보
+  "PROBATIONARY", // 검사시보
 ];
 
 // 배열의 앞일수록 상위 직급이다. 권한 비교는 문자열 비교 대신 이 순서를 사용한다.
@@ -121,9 +121,20 @@ export function formatKSTDateStr(dateInput) {
 }
 
 const CONCLUDED_KEYWORDS = [
-  "불기소", "종국", "기소유예", "혐의없음", "무혐의", "죄가안됨",
-  "공소권없음", "각하", "기소중지", "참고인중지", "타관송치",
-  "종결", "처분완료", "결재완료",
+  "불기소",
+  "종국",
+  "기소유예",
+  "혐의없음",
+  "무혐의",
+  "죄가안됨",
+  "공소권없음",
+  "각하",
+  "기소중지",
+  "참고인중지",
+  "타관송치",
+  "종결",
+  "처분완료",
+  "결재완료",
 ];
 
 /** 종국 처분 여부 (불기소·기소유예·혐의없음 등, 기소 제외) */
@@ -152,7 +163,10 @@ export function isCaseIndicted(c) {
   const status = (c.status || "").trim();
 
   return (
-    (disp.includes("기소") || disp.includes("구공판") || bookingStatus.includes("기소") || status.includes("기소")) &&
+    (disp.includes("기소") ||
+      disp.includes("구공판") ||
+      bookingStatus.includes("기소") ||
+      status.includes("기소")) &&
     !disp.includes("불기소") &&
     !disp.includes("미기소") &&
     !disp.includes("기소유예") &&
@@ -182,52 +196,65 @@ export function isCaseClosedOrIndicted(c) {
 
 /**
  * 도스온라인 소송법 제21조의2 및 제21조의3(공소시효 특례) 기준 공소시효 자동 계산
- * - 제21조의2① 일반 범죄: 20일
- * - 제21조의3① 경제범죄(절도, 강도, 사기, 공갈, 횡령, 배임 등): 42일
- * - 제21조의3② 특정범죄가중처벌법 제8조~제10조 규정 죄: 공소시효 미적용 (무제한)
+ * - 사건 발생일(incidentDate)을 기준으로 시효를 계산한다.
+ * - incidentDate가 없으면 접수일(bookingDate)을 최종 fallback 로 사용한다.
+ * - 법정기한은 죄명별 규칙 테이블에서 관리하므로, 새로운 죄명을 추가해도 함수만 수정하면 된다.
  */
+export function getChargeStatuteRule(chargeName) {
+  const charge = (chargeName || "").toLowerCase();
+
+  // 법령별 예외 규칙: 죄명 키워드에 따라 시효 기간을 결정한다.
+  // 새 죄명을 추가하고 싶으면 아래 배열에 패턴과 기간만 추가하면 된다.
+  const specialRules = [
+    {
+      matches: ["특가법", "특정범죄가중"],
+      periodDays: Infinity,
+      lawArticle: "소송법 제21조의3 제2항",
+      expireDateStr: "시효 없음 (특가법 제8조~제10조)",
+      dDayText: "시효 무제한 (특가법 제8~10조)",
+      description: "특정범죄가중처벌법 제8조~제10조 등 특례 범죄",
+    },
+    {
+      matches: ["사기", "절도", "강도", "공갈", "횡령", "배임", "경제"],
+      periodDays: 42,
+      lawArticle: "소송법 제21조의3 (경제범죄 42일 특례)",
+      description: "경제범죄 특례",
+    },
+  ];
+
+  for (const rule of specialRules) {
+    if (rule.matches.some((keyword) => charge.includes(keyword))) {
+      return rule;
+    }
+  }
+
+  return {
+    periodDays: 20,
+    lawArticle: "소송법 제21조의2 (일반 20일)",
+    expireDateStr: "시효 없음 (기본값)",
+    dDayText: "시효 만료 D-",
+    description: "일반 범죄",
+  };
+}
+
 export function calculateStatuteOfLimitations(
   chargeName,
   incidentDateOrBookingDate,
 ) {
-  const charge = (chargeName || "").toLowerCase();
+  const rule = getChargeStatuteRule(chargeName);
+  const periodDays = rule.periodDays;
+  const lawArticle = rule.lawArticle;
 
   // 특가법 제8조 내지 제10조 규정 죄만 시효 미적용 (소송법 제21조의3 제2항)
-  const isSpecialArt8To10 =
-    (charge.includes("특가법") || charge.includes("특정범죄가중")) &&
-    (charge.includes("8조") ||
-      charge.includes("9조") ||
-      charge.includes("10조") ||
-      charge.includes("제8조") ||
-      charge.includes("제9조") ||
-      charge.includes("제10조"));
-
-  if (isSpecialArt8To10) {
+  if (periodDays === Infinity) {
     return {
       periodDays: Infinity,
       expireDateStr: "시효 없음 (특가법 제8조~제10조)",
       dDay: 9999,
       isExpired: false,
       dDayText: "시효 무제한 (특가법 제8~10조)",
-      lawArticle: "소송법 제21조의3 제2항",
+      lawArticle,
     };
-  }
-
-  // 1. 경제범죄 (형법 제13장~제15장: 절도, 강도, 사기, 공갈, 횡령, 배임 등) -> 42일
-  let periodDays = 20; // 기본 20일 (제21조의2 제1항)
-  let lawArticle = "소송법 제21조의2 (일반 20일)";
-
-  if (
-    charge.includes("사기") ||
-    charge.includes("절도") ||
-    charge.includes("강도") ||
-    charge.includes("공갈") ||
-    charge.includes("횡령") ||
-    charge.includes("배임") ||
-    charge.includes("경제")
-  ) {
-    periodDays = 42; // 경제범죄 42일 (제21조의3 제1항)
-    lawArticle = "소송법 제21조의3 (경제범죄 42일 특례)";
   }
 
   // KST Base date parsing
@@ -341,7 +368,9 @@ export function resolveNonIndictmentReasonId(caseItem) {
   if (!caseItem) return null;
 
   if (caseItem.nonIndictReasonId) {
-    const matched = NON_INDICTMENT_REASONS.find((r) => r.id === caseItem.nonIndictReasonId);
+    const matched = NON_INDICTMENT_REASONS.find(
+      (r) => r.id === caseItem.nonIndictReasonId,
+    );
     if (matched) return matched.id;
   }
 
@@ -355,7 +384,10 @@ export function resolveNonIndictmentReasonId(caseItem) {
     { id: "NO_PROSECUTION_RIGHT", test: (d) => d.includes("공소권없음") },
     { id: "SUSPENSION_PROSECUTION", test: (d) => d.includes("기소유예") },
     { id: "DISMISSAL", test: (d) => d.includes("각하") },
-    { id: "STAY_PROSECUTION", test: (d) => d.includes("기소중지") || d.includes("참고인중지") },
+    {
+      id: "STAY_PROSECUTION",
+      test: (d) => d.includes("기소중지") || d.includes("참고인중지"),
+    },
   ];
 
   for (const m of matchers) {

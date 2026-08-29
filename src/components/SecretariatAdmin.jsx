@@ -51,6 +51,10 @@ import {
   updateOfficeDocumentApi,
   createChargeApi,
   deleteChargeApi,
+  updateChargeApi,
+  restoreChargeApi,
+  fetchDeletedChargesApi,
+  hardDeleteChargeApi,
   createAuditLogApi,
   fetchAutoArchiveSettings,
   updateAutoArchiveSettings,
@@ -1579,11 +1583,13 @@ function ActingOrderPanel({
                     setForm({ ...form, originalUserId: e.target.value })
                   }
                 >
-                  {prosecutorsList.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.position || p.title} / {p.dept})
-                    </option>
-                  ))}
+                  {prosecutorsList
+                    .filter((p) => p.status !== "RETIRED")
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.position || p.title} / {p.dept})
+                      </option>
+                    ))}
                 </select>
               )}
             </div>
@@ -1597,11 +1603,13 @@ function ActingOrderPanel({
                   setForm({ ...form, actingUserId: e.target.value })
                 }
               >
-                {prosecutorsList.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.position || p.title} / {p.dept})
-                  </option>
-                ))}
+                {prosecutorsList
+                  .filter((p) => p.status !== "RETIRED")
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.position || p.title} / {p.dept})
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -2569,9 +2577,37 @@ export default function SecretariatAdmin({
   const [rejectReason, setRejectReason] = useState("");
   const [regFilter, setRegFilter] = useState("PENDING"); // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
   const [newCharge, setNewCharge] = useState("");
+  const [newChargeMeta, setNewChargeMeta] = useState({
+    statuteDays: 20,
+    lawArticle: "소송법 제21조의2",
+    isUnlimited: false,
+    category: "GENERAL",
+    description: "",
+  });
   const [chargeMessage, setChargeMessage] = useState("");
+  const [chargeEditId, setChargeEditId] = useState(null);
+  const [chargeEditName, setChargeEditName] = useState("");
+  const [chargeEditMeta, setChargeEditMeta] = useState({
+    statuteDays: 20,
+    lawArticle: "소송법 제21조의2",
+    isUnlimited: false,
+    category: "GENERAL",
+    description: "",
+  });
+  const [deletedCharges, setDeletedCharges] = useState([]);
   const [prosecutorStatusFilter, setProsecutorStatusFilter] =
     useState("ACTIVE"); // 'ACTIVE' (재직자) | 'RETIRED' (퇴직자) | 'ALL'
+
+  const loadDeletedCharges = async () => {
+    const result = await fetchDeletedChargesApi();
+    if (Array.isArray(result)) setDeletedCharges(result);
+  };
+
+  useEffect(() => {
+    if (activeSubTab === "charges") {
+      loadDeletedCharges();
+    }
+  }, [activeSubTab]);
 
   useEffect(() => {
     if (Array.isArray(initialAuditLogs)) setAuditLogs(initialAuditLogs);
@@ -2912,7 +2948,7 @@ export default function SecretariatAdmin({
     e.preventDefault();
     const name = newCharge.trim();
     if (!name) return;
-    const result = await createChargeApi(name);
+    const result = await createChargeApi(name, newChargeMeta);
     if (!result?.success) {
       setChargeMessage(result?.message || "죄명 등록에 실패했습니다.");
       return;
@@ -2923,20 +2959,122 @@ export default function SecretariatAdmin({
       ),
     );
     setNewCharge("");
+    setNewChargeMeta({
+      statuteDays: 20,
+      lawArticle: "소송법 제21조의2",
+      isUnlimited: false,
+      category: "GENERAL",
+      description: "",
+    });
     setChargeMessage("죄명이 등록되었습니다.");
-    addLog("죄명 등록", name);
+    addLog("죄명 등록", `${name} (${newChargeMeta.lawArticle})`);
+  };
+
+  const handleUpdateCharge = async (charge) => {
+    const name = chargeEditName.trim();
+    if (!name) return;
+    const result = await updateChargeApi(charge.id, name, chargeEditMeta);
+    if (!result?.success) {
+      setChargeMessage(result?.message || "죄명 수정에 실패했습니다.");
+      return;
+    }
+    onUpdateCharges?.(
+      chargesData
+        .map((item) =>
+          item.id === charge.id
+            ? {
+                ...item,
+                name: result.charge.name,
+                statuteDays: result.charge.statuteDays,
+                isUnlimited: result.charge.isUnlimited,
+                lawArticle: result.charge.lawArticle,
+                category: result.charge.category,
+                description: result.charge.description,
+              }
+            : item,
+        )
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    );
+    setChargeEditId(null);
+    setChargeEditName("");
+    setChargeEditMeta({
+      statuteDays: 20,
+      lawArticle: "소송법 제21조의2",
+      isUnlimited: false,
+      category: "GENERAL",
+      description: "",
+    });
+    setChargeMessage("죄명이 수정되었습니다.");
+    addLog("죄명 수정", `${charge.name} → ${name}`);
   };
 
   const handleDeleteCharge = async (charge) => {
-    if (!window.confirm(`'${charge.name}' 죄명을 삭제하시겠습니까?`)) return;
+    if (
+      !window.confirm(
+        `'${charge.name}' 죄명을 소프트 삭제하시겠습니까?\n\n삭제 후에는 기본 목록에서 숨겨지지만 완전 삭제는 별도 권한이 필요합니다.`,
+      )
+    )
+      return;
     const result = await deleteChargeApi(charge.id);
     if (!result?.success) {
       setChargeMessage(result?.message || "죄명 삭제에 실패했습니다.");
       return;
     }
     onUpdateCharges?.(chargesData.filter((item) => item.id !== charge.id));
-    setChargeMessage("죄명이 삭제되었습니다.");
-    addLog("죄명 삭제", charge.name);
+    await loadDeletedCharges();
+    setChargeMessage("죄명이 소프트 삭제되었습니다.");
+    addLog("죄명 삭제", `${charge.name} (소프트 삭제)`);
+  };
+
+  const handleRestoreCharge = async (charge) => {
+    const result = await restoreChargeApi(charge.id);
+    if (!result?.success) {
+      setChargeMessage(result?.message || "죄명 복구에 실패했습니다.");
+      return;
+    }
+    setDeletedCharges((prev) => prev.filter((item) => item.id !== charge.id));
+    const refreshedList = chargesData.some((item) => item.id === charge.id)
+      ? chargesData
+      : [...chargesData, charge];
+    onUpdateCharges?.(
+      refreshedList.sort((a, b) => a.name.localeCompare(b.name)),
+    );
+    setChargeMessage("죄명이 복구되었습니다.");
+    addLog("죄명 복구", charge.name);
+  };
+
+  const handleHardDeleteCharge = async (charge) => {
+    const canHardDelete =
+      currentUser?.isSuperAdmin ||
+      [
+        "SUPER_ADMIN",
+        "PROSECUTOR_GENERAL",
+        "CHIEF_PROSECUTOR",
+        "DEPUTY_CHIEF",
+        "CHIEF_ADMINISTRATOR",
+      ].includes(currentUser?.roleLevel);
+
+    if (!canHardDelete) {
+      setChargeMessage(
+        "완전 삭제는 최고 관리자 또는 검사장급 이상만 가능합니다.",
+      );
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `'${charge.name}' 죄명을 완전히 삭제하시겠습니까?\n\n이 작업은 복구할 수 없습니다.`,
+      )
+    )
+      return;
+    const result = await hardDeleteChargeApi(charge.id);
+    if (!result?.success) {
+      setChargeMessage(result?.message || "하드 삭제에 실패했습니다.");
+      return;
+    }
+    setDeletedCharges((prev) => prev.filter((item) => item.id !== charge.id));
+    setChargeMessage("죄명이 완전히 삭제되었습니다.");
+    addLog("죄명 하드 삭제", charge.name);
   };
 
   const hasSecretariatAccess =
@@ -3087,7 +3225,6 @@ export default function SecretariatAdmin({
           </span>
         </div>
       )}
-
       {/* Header */}
       <div
         className="glass-panel gold-border"
@@ -3123,7 +3260,6 @@ export default function SecretariatAdmin({
           SECRETARIAT ADMIN
         </span>
       </div>
-
       {/* Category Group Filter Bar (메뉴 간소화) */}
       <div
         style={{
@@ -3186,7 +3322,6 @@ export default function SecretariatAdmin({
           );
         })}
       </div>
-
       {/* Sub Tab Bar */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {visibleSubTabs.map((t) => {
@@ -3235,7 +3370,6 @@ export default function SecretariatAdmin({
           );
         })}
       </div>
-
       {/* Sub Tab Content */}
       {activeSubTab === "acting" && (
         <ActingOrderPanel
@@ -3244,7 +3378,6 @@ export default function SecretariatAdmin({
           addLog={addLog}
         />
       )}
-
       {/* ─── 기록 삭제 탭 ─────────────────────────────────────── */}
       {activeSubTab === "delete" && hasHighLevelAdminAccess && (
         <DeleteManagementPanel
@@ -3261,7 +3394,6 @@ export default function SecretariatAdmin({
           addLog={addLog}
         />
       )}
-
       {activeSubTab === "casenos" && (
         <div
           style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 16 }}
@@ -3657,7 +3789,6 @@ export default function SecretariatAdmin({
           </div>
         </div>
       )}
-
       {/* Sub Tab Content */}
       {activeSubTab === "prosecutors" && (
         <div
@@ -4519,7 +4650,11 @@ export default function SecretariatAdmin({
                                 >
                                   <option value="">대결자 선택...</option>
                                   {prosecutorsList
-                                    .filter((p) => p.id !== statusModalUser.id)
+                                    .filter(
+                                      (p) =>
+                                        p.id !== statusModalUser.id &&
+                                        p.status !== "RETIRED",
+                                    )
                                     .map((p) => (
                                       <option key={p.id} value={p.name}>
                                         {p.name} ({p.title} / {p.dept})
@@ -4589,7 +4724,6 @@ export default function SecretariatAdmin({
           </div>
         </div>
       )}
-
       {activeSubTab === "charges" && (
         <div className="glass-panel" style={{ padding: 24 }}>
           <div
@@ -4613,25 +4747,116 @@ export default function SecretariatAdmin({
           </div>
           <form
             onSubmit={handleCreateCharge}
-            style={{ display: "flex", gap: 8, marginBottom: 16 }}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              marginBottom: 16,
+            }}
           >
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                className="input-field"
+                value={newCharge}
+                onChange={(e) => {
+                  setNewCharge(e.target.value);
+                  setChargeMessage("");
+                }}
+                placeholder="추가할 죄명 입력"
+                maxLength={120}
+                style={{ flex: 1 }}
+              />
+              <button
+                type="submit"
+                className="btn btn-gold"
+                style={{ flexShrink: 0 }}
+              >
+                <Plus size={15} /> 추가
+              </button>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 8,
+              }}
+            >
+              <input
+                className="input-field"
+                type="number"
+                min={1}
+                value={newChargeMeta.statuteDays}
+                onChange={(e) =>
+                  setNewChargeMeta((prev) => ({
+                    ...prev,
+                    statuteDays: Number(e.target.value || 20),
+                  }))
+                }
+                placeholder="시효일수"
+              />
+              <input
+                className="input-field"
+                value={newChargeMeta.lawArticle}
+                onChange={(e) =>
+                  setNewChargeMeta((prev) => ({
+                    ...prev,
+                    lawArticle: e.target.value,
+                  }))
+                }
+                placeholder="법적 근거"
+              />
+              <select
+                className="input-field"
+                value={newChargeMeta.category}
+                onChange={(e) =>
+                  setNewChargeMeta((prev) => ({
+                    ...prev,
+                    category: e.target.value,
+                  }))
+                }
+              >
+                <option value="GENERAL">GENERAL</option>
+                <option value="ECONOMIC">ECONOMIC</option>
+                <option value="SPECIAL">SPECIAL</option>
+                <option value="OTHER">OTHER</option>
+              </select>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: "0.75rem",
+                  color: "var(--text-muted)",
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 8,
+                  padding: "0 10px",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={newChargeMeta.isUnlimited}
+                  onChange={(e) =>
+                    setNewChargeMeta((prev) => ({
+                      ...prev,
+                      isUnlimited: e.target.checked,
+                    }))
+                  }
+                />
+                시효 없음
+              </label>
+            </div>
             <input
               className="input-field"
-              value={newCharge}
-              onChange={(e) => {
-                setNewCharge(e.target.value);
-                setChargeMessage("");
-              }}
-              placeholder="추가할 죄명 입력"
-              maxLength={120}
+              value={newChargeMeta.description}
+              onChange={(e) =>
+                setNewChargeMeta((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
+              }
+              placeholder="설명(선택)"
             />
-            <button
-              type="submit"
-              className="btn btn-gold"
-              style={{ flexShrink: 0 }}
-            >
-              <Plus size={15} /> 추가
-            </button>
           </form>
           {chargeMessage && (
             <div
@@ -4645,40 +4870,278 @@ export default function SecretariatAdmin({
             </div>
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {chargesData.map((charge) => (
+            {chargesData.map((charge) => {
+              const isEditing = chargeEditId === charge.id;
+              return (
+                <div
+                  key={charge.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: "10px 12px",
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 8,
+                  }}
+                >
+                  {isEditing ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                        flex: 1,
+                      }}
+                    >
+                      <input
+                        className="input-field"
+                        value={chargeEditName}
+                        onChange={(e) => setChargeEditName(e.target.value)}
+                        maxLength={120}
+                      />
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(140px, 1fr))",
+                          gap: 8,
+                        }}
+                      >
+                        <input
+                          className="input-field"
+                          type="number"
+                          min={1}
+                          value={chargeEditMeta.statuteDays}
+                          onChange={(e) =>
+                            setChargeEditMeta((prev) => ({
+                              ...prev,
+                              statuteDays: Number(e.target.value || 20),
+                            }))
+                          }
+                          placeholder="시효일수"
+                        />
+                        <input
+                          className="input-field"
+                          value={chargeEditMeta.lawArticle}
+                          onChange={(e) =>
+                            setChargeEditMeta((prev) => ({
+                              ...prev,
+                              lawArticle: e.target.value,
+                            }))
+                          }
+                          placeholder="법적 근거"
+                        />
+                        <select
+                          className="input-field"
+                          value={chargeEditMeta.category}
+                          onChange={(e) =>
+                            setChargeEditMeta((prev) => ({
+                              ...prev,
+                              category: e.target.value,
+                            }))
+                          }
+                        >
+                          <option value="GENERAL">GENERAL</option>
+                          <option value="ECONOMIC">ECONOMIC</option>
+                          <option value="SPECIAL">SPECIAL</option>
+                          <option value="OTHER">OTHER</option>
+                        </select>
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            fontSize: "0.75rem",
+                            color: "var(--text-muted)",
+                            background: "var(--bg-elevated)",
+                            border: "1px solid var(--border-subtle)",
+                            borderRadius: 8,
+                            padding: "0 10px",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={chargeEditMeta.isUnlimited}
+                            onChange={(e) =>
+                              setChargeEditMeta((prev) => ({
+                                ...prev,
+                                isUnlimited: e.target.checked,
+                              }))
+                            }
+                          />
+                          시효 없음
+                        </label>
+                      </div>
+                      <input
+                        className="input-field"
+                        value={chargeEditMeta.description}
+                        onChange={(e) =>
+                          setChargeEditMeta((prev) => ({
+                            ...prev,
+                            description: e.target.value,
+                          }))
+                        }
+                        placeholder="설명(선택)"
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        flex: 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "var(--text-main)",
+                        }}
+                      >
+                        {charge.name || charge}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        {charge.isUnlimited
+                          ? "시효 없음"
+                          : `${charge.statuteDays ?? 20}일`}{" "}
+                        · {charge.lawArticle || "소송법 제21조의2"}
+                      </span>
+                    </div>
+                  )}
+
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    {isEditing ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-gold"
+                          onClick={() => handleUpdateCharge(charge)}
+                          style={{ padding: "4px 8px" }}
+                        >
+                          <Save size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => {
+                            setChargeEditId(null);
+                            setChargeEditName("");
+                            setChargeEditMeta({
+                              statuteDays: 20,
+                              lawArticle: "소송법 제21조의2",
+                              isUnlimited: false,
+                              category: "GENERAL",
+                              description: "",
+                            });
+                          }}
+                          style={{ padding: "4px 8px" }}
+                        >
+                          <X size={13} />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => {
+                          setChargeEditId(charge.id);
+                          setChargeEditName(charge.name || "");
+                          setChargeEditMeta({
+                            statuteDays: charge.statuteDays ?? 20,
+                            lawArticle: charge.lawArticle || "소송법 제21조의2",
+                            isUnlimited: Boolean(charge.isUnlimited),
+                            category: charge.category || "GENERAL",
+                            description: charge.description || "",
+                          });
+                        }}
+                        style={{ padding: "4px 8px" }}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCharge(charge)}
+                      className="btn btn-outline"
+                      style={{ padding: "4px 8px", color: "#f87171" }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {deletedCharges.length > 0 && (
+            <div style={{ marginTop: 20 }}>
               <div
-                key={charge.id}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  padding: "10px 12px",
-                  background: "var(--bg-elevated)",
-                  border: "1px solid var(--border-subtle)",
-                  borderRadius: 8,
+                  fontWeight: 800,
+                  fontSize: "0.8rem",
+                  color: "var(--text-muted)",
+                  marginBottom: 10,
                 }}
               >
-                <span
-                  style={{ fontSize: "0.85rem", color: "var(--text-main)" }}
-                >
-                  {charge.name || charge}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteCharge(charge)}
-                  className="btn btn-outline"
-                  style={{ padding: "4px 8px", color: "#f87171" }}
-                >
-                  <Trash2 size={13} />
-                </button>
+                소프트 삭제된 죄명
               </div>
-            ))}
-          </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {deletedCharges.map((charge) => (
+                  <div
+                    key={charge.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      padding: "10px 12px",
+                      background: "rgba(248,113,113,0.05)",
+                      border: "1px solid rgba(248,113,113,0.2)",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <span
+                      style={{ fontSize: "0.8rem", color: "var(--text-main)" }}
+                    >
+                      {charge.name}
+                    </span>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreCharge(charge)}
+                        className="btn btn-outline"
+                        style={{ padding: "4px 8px", color: "#34d399" }}
+                      >
+                        복구
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleHardDeleteCharge(charge)}
+                        className="btn btn-outline"
+                        style={{ padding: "4px 8px", color: "#fca5a5" }}
+                      >
+                        <Trash2 size={13} /> 완전 삭제
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
-
-      {/* ─── 가입 신청 허가 탭 ─────────────────────────────────── */}
+      {/* ─── 가입 신청 허가 탭 ─────────────────────────────────── */}닫{" "}
       {activeSubTab === "registrations" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* 안내 배너 */}
@@ -4972,7 +5435,6 @@ export default function SecretariatAdmin({
           </div>
         </div>
       )}
-
       {/* ─── 거부 사유 입력 모달 ──────────────────────────────── */}
       {rejectModal && (
         <div className="modal-overlay" style={{ zIndex: 9999 }}>
@@ -5038,7 +5500,6 @@ export default function SecretariatAdmin({
           </div>
         </div>
       )}
-
       {activeSubTab === "designate" && (
         <DesignateApprovalPanel
           ledgerData={ledgerData}
@@ -5049,7 +5510,6 @@ export default function SecretariatAdmin({
           addLog={(log) => addLog(log, "결재 필수 지정 상태 변경")}
         />
       )}
-
       {activeSubTab === "audit" && (
         <div className="glass-panel" style={{ overflow: "hidden" }}>
           <div
@@ -5122,11 +5582,9 @@ export default function SecretariatAdmin({
           </div>
         </div>
       )}
-
       {activeSubTab === "autoarchive" && (
         <AutoArchiveSettingsPanel addLog={addLog} />
       )}
-
       {activeSubTab === "archivestore" && (
         <ArchiveStoragePanel
           ledgerData={ledgerData}

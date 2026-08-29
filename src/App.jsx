@@ -278,16 +278,24 @@ export default function App() {
         fetchBookings(),
         currentUser.isSuperAdmin ||
         currentUser.dept?.includes("사무국") ||
-        ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY", "CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(
-          clientEffectiveRoleLevel(currentUser),
-        )
+        [
+          "CHIEF_ADMINISTRATOR",
+          "ADMINISTRATOR",
+          "ADMIN_PROBATIONARY",
+          "CHIEF_PROSECUTOR",
+          "PROSECUTOR_GENERAL",
+        ].includes(clientEffectiveRoleLevel(currentUser))
           ? fetchAuditLogs()
           : Promise.resolve([]),
         currentUser.isSuperAdmin ||
         currentUser.dept?.includes("사무국") ||
-        ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY", "CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(
-          clientEffectiveRoleLevel(currentUser),
-        )
+        [
+          "CHIEF_ADMINISTRATOR",
+          "ADMINISTRATOR",
+          "ADMIN_PROBATIONARY",
+          "CHIEF_PROSECUTOR",
+          "PROSECUTOR_GENERAL",
+        ].includes(clientEffectiveRoleLevel(currentUser))
           ? fetchAllCaseHistory()
           : Promise.resolve([]),
         fetchNextDocNo(),
@@ -303,7 +311,8 @@ export default function App() {
       if (Array.isArray(serverAppeals)) setAppealsData(serverAppeals);
       if (Array.isArray(serverBookings)) setBookingsData(serverBookings);
       if (Array.isArray(serverAuditLogs)) setAuditLogs(serverAuditLogs);
-      if (Array.isArray(serverAllCaseHistory)) setAllCaseHistory(serverAllCaseHistory);
+      if (Array.isArray(serverAllCaseHistory))
+        setAllCaseHistory(serverAllCaseHistory);
       if (serverProsecutors) setProsecutorsList(serverProsecutors);
       if (serverCaseNumberSettings)
         setCaseNumberSettings(serverCaseNumberSettings);
@@ -320,7 +329,11 @@ export default function App() {
   }, [currentUser]);
 
   const operationalProsecutorsList = useMemo(
-    () => prosecutorsList.filter((prosecutor) => !isManagementAccount(prosecutor)),
+    () =>
+      prosecutorsList.filter(
+        (prosecutor) =>
+          !isManagementAccount(prosecutor) && prosecutor.status !== "RETIRED",
+      ),
     [prosecutorsList],
   );
 
@@ -352,9 +365,9 @@ export default function App() {
     // 기간 체크: acting_start ~ acting_end 범위 내에만 대리 권한 유효
     const now = new Date();
     const start = user.actingStart ? new Date(user.actingStart) : null;
-    const end   = user.actingEnd   ? new Date(user.actingEnd)   : null;
+    const end = user.actingEnd ? new Date(user.actingEnd) : null;
     if (start && now < start) return base;
-    if (end   && now > end)   return base;
+    if (end && now > end) return base;
 
     const baseAuth = ROLE_AUTHORITY_CLIENT[base] || 0;
     const dualAuth = ROLE_AUTHORITY_CLIENT[dual] || 0;
@@ -376,7 +389,7 @@ export default function App() {
         effectiveRole === "CHIEF_PROSECUTOR" ||
         effectiveRole === "DEPUTY_CHIEF" ||
         effectiveRole === "CHIEF_ADMINISTRATOR" ||
-        (currentUser.dept && currentUser.dept.includes("사무국")))
+        (currentUser.dept && currentUser.dept.includes("사무국"))),
     );
   }, [currentUser, effectiveRole]);
 
@@ -385,15 +398,19 @@ export default function App() {
       currentUser &&
       (currentUser.isSuperAdmin ||
         currentUser.dept?.includes("사무국") ||
-        ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY", "CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(
-          effectiveRole,
-        ))
+        [
+          "CHIEF_ADMINISTRATOR",
+          "ADMINISTRATOR",
+          "ADMIN_PROBATIONARY",
+          "CHIEF_PROSECUTOR",
+          "PROSECUTOR_GENERAL",
+        ].includes(effectiveRole)),
     );
   }, [currentUser, effectiveRole]);
 
   // 읽기 전용 여부: 휴가 또는 직무대리 위임 중
   const isReadOnly = Boolean(
-    currentUser && ["ON_LEAVE", "DELEGATED"].includes(currentUser.status)
+    currentUser && ["ON_LEAVE", "DELEGATED"].includes(currentUser.status),
   );
 
   // 본인 복귀 핸들러
@@ -447,20 +464,35 @@ export default function App() {
   };
 
   const CLOSED_KEYWORDS = [
-    "불기소", "종국", "기소유예", "혐의없음", "무혐의",
-    "죄가안됨", "공소권없음", "각하", "기소중지", "타관송치",
-    "처분완료", "구속기소", "불구속기소", "약식기소", "구공판",
+    "불기소",
+    "종국",
+    "기소유예",
+    "혐의없음",
+    "무혐의",
+    "죄가안됨",
+    "공소권없음",
+    "각하",
+    "기소중지",
+    "타관송치",
+    "처분완료",
+    "구속기소",
+    "불구속기소",
+    "약식기소",
+    "구공판",
   ];
 
   const scopeRecords = (records, includeOwnRecord = false) => {
     if (isGlobalAdmin) return records;
     return records.filter((item) => {
-      if (includeOwnRecord && item.prosecutorId === currentUser?.id) return true;
+      if (includeOwnRecord && item.prosecutorId === currentUser?.id)
+        return true;
       if (isProsecutorInUserDept(item.prosecutorName)) return true;
       if (item.isArchived) return true;
       const disp = (item.disposition || "").toLowerCase();
       const status = (item.bookingStatus || "").toLowerCase();
-      return CLOSED_KEYWORDS.some((k) => disp.includes(k) || status.includes(k));
+      return CLOSED_KEYWORDS.some(
+        (k) => disp.includes(k) || status.includes(k),
+      );
     });
   };
 
@@ -496,6 +528,16 @@ export default function App() {
       return;
     }
     const loggedUser = res.user;
+    if (loggedUser?.status === "RETIRED") {
+      logoutApi();
+      try {
+        sessionStorage.removeItem("dose_pros_session");
+      } catch {}
+      setCurrentUser(null);
+      showToast("🚫 퇴직 처리된 계정입니다. 로그인이 불가능합니다.", "error");
+      return;
+    }
+
     // 비밀번호 필드를 세션에 저장하지 않음
     const { password: _pw, ...safeUser } = loggedUser;
     setCurrentUser(safeUser);
@@ -645,38 +687,45 @@ export default function App() {
         const rawSujeNo = String(r["수제번호"] || "").trim();
         const rawHyeongjeNo = String(r["형제번호"] || "").trim();
         return {
-        id: Date.now() + i,
-        sujeNo: rawSujeNo || (rawHyeongjeNo.includes("수제") ? rawHyeongjeNo : ""),
-        hyeongjeNo: rawHyeongjeNo && !rawHyeongjeNo.includes("수제") ? rawHyeongjeNo : "-",
-        latestHyeongjeNo: rawHyeongjeNo && !rawHyeongjeNo.includes("수제") ? rawHyeongjeNo : rawSujeNo || "-",
-        prosecutorName: r["검사명"] || "",
-        prosecutorId: r["검사명"] || "",
-        suspectName: r["피고인명"] || "",
-        suspectUuid: r["UUID"] || "",
-        bookingStatus: r["현재 상황"] || "접수",
-        bookingDate: r["접수일시"] || "",
-        bookingBasis: r["접수근거"] || "",
-        disposition: r["처분내용"] || "",
-        chargeName: r["죄명"] || "",
-        court1No: r["1심 사건번호"] || "",
-        court1Result: r["1심 결과"] || "",
-        court1Doc: r["판결문"] || "",
-        court1Appealed: r["항소 여부"] || "",
-        court1Appellant: r["항소장"] || "",
-        court2No: r["2심 사건번호"] || "",
-        court2Dismissed: r["항소기각"] || "",
-        court2Result: r["2심 결과"] || "",
-        court2Doc: r["판결문(항소)"] || "",
-        court3Appealed: r["상고 여부"] || "",
-        court3Appellant: r["상고장"] || "",
-        court3No: r["3심 사건번호"] || "",
-        court3Remanded: r["파기환송"] || "",
-        court3Result: r["3심 결과"] || "",
-        court3Doc: r["판결문(상고)"] || "",
-        reAppeal: "-",
-        notes: "",
-        content: "",
-        confiscation: "",
+          id: Date.now() + i,
+          sujeNo:
+            rawSujeNo || (rawHyeongjeNo.includes("수제") ? rawHyeongjeNo : ""),
+          hyeongjeNo:
+            rawHyeongjeNo && !rawHyeongjeNo.includes("수제")
+              ? rawHyeongjeNo
+              : "-",
+          latestHyeongjeNo:
+            rawHyeongjeNo && !rawHyeongjeNo.includes("수제")
+              ? rawHyeongjeNo
+              : rawSujeNo || "-",
+          prosecutorName: r["검사명"] || "",
+          prosecutorId: r["검사명"] || "",
+          suspectName: r["피고인명"] || "",
+          suspectUuid: r["UUID"] || "",
+          bookingStatus: r["현재 상황"] || "접수",
+          bookingDate: r["접수일시"] || "",
+          bookingBasis: r["접수근거"] || "",
+          disposition: r["처분내용"] || "",
+          chargeName: r["죄명"] || "",
+          court1No: r["1심 사건번호"] || "",
+          court1Result: r["1심 결과"] || "",
+          court1Doc: r["판결문"] || "",
+          court1Appealed: r["항소 여부"] || "",
+          court1Appellant: r["항소장"] || "",
+          court2No: r["2심 사건번호"] || "",
+          court2Dismissed: r["항소기각"] || "",
+          court2Result: r["2심 결과"] || "",
+          court2Doc: r["판결문(항소)"] || "",
+          court3Appealed: r["상고 여부"] || "",
+          court3Appellant: r["상고장"] || "",
+          court3No: r["3심 사건번호"] || "",
+          court3Remanded: r["파기환송"] || "",
+          court3Result: r["3심 결과"] || "",
+          court3Doc: r["판결문(상고)"] || "",
+          reAppeal: "-",
+          notes: "",
+          content: "",
+          confiscation: "",
         };
       });
 
@@ -1007,9 +1056,26 @@ export default function App() {
       );
       return;
     }
-    setProsecutorsList((prev) =>
-      prev.map((p) => (p.id === userId ? { ...p, ...statusData } : p)),
-    );
+
+    const nextStatus = statusData?.status || "ACTIVE";
+    const patchedList = (prev) =>
+      prev.map((p) => (p.id === userId ? { ...p, ...statusData } : p));
+    setProsecutorsList(patchedList);
+
+    if (nextStatus === "RETIRED" && userId === currentUser?.id) {
+      setCurrentUser(null);
+      logoutApi();
+      try {
+        sessionStorage.removeItem("dose_pros_session");
+      } catch {}
+      setIsLoginModalOpen(true);
+      showToast(
+        "🚫 퇴직 처리로 인해 현재 계정이 즉시 로그아웃되고, 재로그인이 불가능합니다.",
+        "error",
+      );
+      return;
+    }
+
     showToast(
       "👤 검사 신분 상태 및 결재 위임 권한이 설정되었습니다.",
       "success",
@@ -1379,8 +1445,11 @@ export default function App() {
   // Handler: Create Approval for specific Case from Ledger
   const handleCreateApprovalForCase = async (caseItem) => {
     // 전역 권한이 없는 일반 검사는 본인 담당 사건에만 결재를 상신할 수 있다.
-    const isGlobal = currentUser?.isSuperAdmin ||
-      ["PROSECUTOR_GENERAL", "CHIEF_ADMINISTRATOR", "ADMINISTRATOR"].includes(currentUser?.roleLevel) ||
+    const isGlobal =
+      currentUser?.isSuperAdmin ||
+      ["PROSECUTOR_GENERAL", "CHIEF_ADMINISTRATOR", "ADMINISTRATOR"].includes(
+        currentUser?.roleLevel,
+      ) ||
       String(currentUser?.dept || "").includes("사무국");
     if (!isGlobal && caseItem.prosecutorId !== currentUser?.id) {
       showToast("⚠️ 담당 사건의 결재만 상신할 수 있습니다.", "error");
@@ -1444,7 +1513,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-dark)", color: "var(--text-main)" }}>
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ background: "var(--bg-dark)", color: "var(--text-main)" }}
+    >
       {/* Header Bar */}
       <Header
         activeTab={activeTab}
@@ -2000,7 +2072,10 @@ export default function App() {
             )}
 
             {activeTab === "auditlog" && canViewLoginRecords && (
-              <AuditLogViewer auditLogs={auditLogs} caseHistory={allCaseHistory} />
+              <AuditLogViewer
+                auditLogs={auditLogs}
+                caseHistory={allCaseHistory}
+              />
             )}
           </>
         )}
