@@ -22,7 +22,7 @@ function formatRawUuid(raw) {
 
 export async function fetchMojangUuid(username) {
   if (!username || !username.trim()) {
-    return { success: false, message: '닉네임을 입력해주세요.' };
+    return { success: false, message: "닉네임을 입력해주세요." };
   }
   const cleanName = username.trim();
 
@@ -37,7 +37,7 @@ export async function fetchMojangUuid(username) {
       }
       return `/api/mojang/uuid/${encodeURIComponent(cleanName)}`;
     })();
-    
+
     const res = await fetch(serverUrl, {
       signal: AbortSignal.timeout(5000),
     });
@@ -55,7 +55,7 @@ export async function fetchMojangUuid(username) {
       };
     }
   } catch (err) {
-    console.warn('[fetchMojangUuid] 서버 프록시 실패:', err?.message);
+    console.warn("[fetchMojangUuid] 서버 프록시 실패:", err?.message);
   }
 
   // 1) ashcon.app — 통합 API
@@ -86,7 +86,7 @@ export async function fetchMojangUuid(username) {
       }
     }
   } catch (err) {
-    console.warn('[fetchMojangUuid] ashcon.app 실패:', err?.message);
+    console.warn("[fetchMojangUuid] ashcon.app 실패:", err?.message);
   }
 
   // 2) crafthead.net — 폴백
@@ -109,7 +109,7 @@ export async function fetchMojangUuid(username) {
       }
     }
   } catch (err) {
-    console.warn('[fetchMojangUuid] crafthead.net 실패:', err?.message);
+    console.warn("[fetchMojangUuid] crafthead.net 실패:", err?.message);
   }
 
   // 3) 공식 Mojang API — UUID만 반환하는 최소 폴백
@@ -138,7 +138,7 @@ export async function fetchMojangUuid(username) {
       };
     }
   } catch (err) {
-    console.warn('[fetchMojangUuid] api.mojang.com 실패:', err?.message);
+    console.warn("[fetchMojangUuid] api.mojang.com 실패:", err?.message);
   }
 
   return {
