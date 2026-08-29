@@ -1487,10 +1487,15 @@ export default function MyCasesLedger({
                 <select className="select-field" style={{ width: 200 }} value={reassignFromId} onChange={(e) => setReassignFromId(e.target.value)}>
                   <option value="">-- 선택 --</option>
                   {deptMembers.map((p) => {
-                    const cnt = ledgerData.filter((c) => c.prosecutorId === p.id && !c.isArchived).length;
+                    const cases = ledgerData.filter((c) => c.prosecutorId === p.id && !c.isArchived);
+                    const caseNos = cases
+                      .slice(0, 3)
+                      .map((c) => (c.hyeongjeNo && c.hyeongjeNo !== '-' ? c.hyeongjeNo : c.sujeNo) || '번호미부여')
+                      .join(', ');
+                    const more = cases.length > 3 ? ` 외 ${cases.length - 3}건` : '';
                     return (
                       <option key={p.id} value={p.id}>
-                        {p.name} ({p.position || p.title}) · {cnt}건
+                        {p.name} ({p.position || p.title}) · {cases.length}건{cases.length > 0 ? ` [${caseNos}${more}]` : ''}
                       </option>
                     );
                   })}
