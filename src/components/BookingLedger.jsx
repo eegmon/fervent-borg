@@ -8,14 +8,22 @@ function getBookingElapsedDays(booking) {
     if (!Number.isNaN(date.getTime())) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const diff = Math.max(
+      return Math.max(
         0,
         Math.floor((today.getTime() - date.getTime()) / 86400000),
       );
-      return Number.isFinite(raw) && raw > 0 ? Math.max(raw, diff) : diff;
     }
   }
   return Number.isFinite(raw) ? raw : 0;
+}
+
+function getBookingDisplayKey(booking) {
+  return [
+    booking?.hyeongjeNo || "",
+    booking?.suspectName || "",
+    booking?.suspectUuid || "",
+    booking?.prosecutorName || "",
+  ].join("|");
 }
 
 export default function BookingLedger({
@@ -23,6 +31,24 @@ export default function BookingLedger({
   onSelectEvidence,
   onSelectSuspect,
 }) {
+  const displayBookings = React.useMemo(() => {
+    const map = new Map();
+    for (const booking of bookings || []) {
+      const key = getBookingDisplayKey(booking);
+      if (!map.has(key)) {
+        map.set(key, booking);
+        continue;
+      }
+      const current = map.get(key);
+      const pick =
+        (current?.bookingDate || "") < (booking?.bookingDate || "")
+          ? booking
+          : current;
+      map.set(key, pick);
+    }
+    return [...map.values()];
+  }, [bookings]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div
@@ -51,7 +77,7 @@ export default function BookingLedger({
             </div>
           </div>
         </div>
-        <span className="badge badge-danger">{bookings.length}건</span>
+        <span className="badge badge-danger">{displayBookings.length}건</span>
       </div>
 
       <div className="glass-panel" style={{ overflow: "hidden" }}>
@@ -71,7 +97,7 @@ export default function BookingLedger({
               </tr>
             </thead>
             <tbody>
-              {bookings.map((b) => {
+              {displayBookings.map((b) => {
                 const elapsedDays = getBookingElapsedDays(b);
                 return (
                   <tr key={b.id}>

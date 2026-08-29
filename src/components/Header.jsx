@@ -29,7 +29,6 @@ const TABS = [
   { id: "warrants", label: "영장 관리", icon: ShieldAlert },
   { id: "approvals", label: "전자 결재함", icon: FileCheck },
   { id: "secretariat", label: "검찰사무국", icon: Building2 },
-  { id: "reports", label: "사건 신고", icon: FileText },
   { id: "appeals", label: "항고 관리", icon: ShieldAlert },
   { id: "bookings", label: "입건 현황", icon: AlertOctagon },
   { id: "search", label: "사건 조회", icon: Search },
@@ -288,8 +287,11 @@ export default function Header({
                 >
                   {currentUser.position || currentUser.title}
                   {currentUser.actingTitle && (
-                    <span style={{ color: "var(--primary-amber)", fontWeight: 700 }}>
-                      {" | "}{currentUser.actingTitle}
+                    <span
+                      style={{ color: "var(--primary-amber)", fontWeight: 700 }}
+                    >
+                      {" | "}
+                      {currentUser.actingTitle}
                     </span>
                   )}
                 </div>
@@ -363,8 +365,7 @@ export default function Header({
         >
           <span
             style={{
-              color:
-                currentUser.status === "ON_LEAVE" ? "#f59e0b" : "#f97316",
+              color: currentUser.status === "ON_LEAVE" ? "#f59e0b" : "#f97316",
               fontWeight: 700,
             }}
           >

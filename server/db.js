@@ -220,6 +220,7 @@ export async function initDb() {
       id              TEXT PRIMARY KEY,
       report_no       TEXT,
       hyeongje_no     TEXT,
+      suje_no         TEXT DEFAULT '',
       title           TEXT,
       prosecutor_name TEXT,
       suspect_name    TEXT,
@@ -228,9 +229,21 @@ export async function initDb() {
       created_at      TEXT,
       basis_url       TEXT,
       period          TEXT,
-      confiscation    TEXT
+      confiscation    TEXT,
+      deleted_at      TEXT DEFAULT ''
     )
   `);
+  for (const column of [
+    "suje_no TEXT DEFAULT ''",
+    "deleted_at TEXT DEFAULT ''",
+  ]) {
+    try {
+      await db.execute(`ALTER TABLE reports ADD COLUMN ${column}`);
+    } catch (error) {
+      if (!String(error.message || error).includes("duplicate column"))
+        throw error;
+    }
+  }
 
   // ── appeals ────────────────────────────────────────────────────
   await db.execute(`

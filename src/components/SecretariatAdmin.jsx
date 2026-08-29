@@ -3987,7 +3987,8 @@ export default function SecretariatAdmin({
                                 const pCases = ledgerData.filter(
                                   (c) =>
                                     c.prosecutorName &&
-                                    c.prosecutorName.includes(p.name),
+                                    c.prosecutorName.includes(p.name) &&
+                                    !Boolean(c.isArchived),
                                 );
                                 return (
                                   <tr key={p.id}>

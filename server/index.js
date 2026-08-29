@@ -1725,10 +1725,11 @@ app.post(
             args: caseArgs,
           },
           {
-            sql: `INSERT INTO reports (id,report_no,hyeongje_no,title,prosecutor_name,suspect_name,suspect_uuid,status,created_at,basis_url,period,confiscation) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+            sql: `INSERT INTO reports (id,report_no,hyeongje_no,suje_no,title,prosecutor_name,suspect_name,suspect_uuid,status,created_at,basis_url,period,confiscation,deleted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             args: [
               reportId,
               `접수-${Date.now()}`,
+              intakeCaseNo,
               intakeCaseNo,
               `${c.chargeName || ""} 사건 접수 건`,
               assignedName,
@@ -1739,6 +1740,7 @@ app.post(
               c.bookingBasis || "",
               `${c.bookingDate || ""} ~ 수사중`,
               c.confiscation || "-",
+              "",
             ],
           },
           {
@@ -1972,6 +1974,7 @@ app.post(
           id: reportId,
           reportNo: `접수-${now.getTime()}-${i}`,
           hyeongjeNo: caseObj.hyeongjeNo,
+          sujeNo: caseObj.sujeNo || caseObj.hyeongjeNo || "",
           title: `${chargeName || "사건"} 접수 건`,
           prosecutorName,
           suspectName,
@@ -1985,12 +1988,13 @@ app.post(
         insertedReports.push(reportObj);
 
         txStatements.push({
-          sql: `INSERT INTO reports (id, report_no, hyeongje_no, title, prosecutor_name, suspect_name, suspect_uuid, status, created_at, basis_url, period, confiscation)
-              VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          sql: `INSERT INTO reports (id, report_no, hyeongje_no, suje_no, title, prosecutor_name, suspect_name, suspect_uuid, status, created_at, basis_url, period, confiscation, deleted_at)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           args: [
             reportObj.id,
             reportObj.reportNo,
             reportObj.hyeongjeNo,
+            reportObj.sujeNo || reportObj.hyeongjeNo || "",
             reportObj.title,
             reportObj.prosecutorName,
             reportObj.suspectName,
@@ -2000,11 +2004,13 @@ app.post(
             reportObj.basisUrl,
             reportObj.period,
             reportObj.confiscation,
+            "",
           ],
         });
 
         // Booking
         const bookingId = `BULK-BKG-${now.getTime()}-${i}-${randomUUID().slice(0, 8)}`;
+        const computedDaysElapsed = calculateDaysElapsedFromDate(bookingDate);
         const bookingObj = {
           id: bookingId,
           hyeongjeNo: caseObj.hyeongjeNo,
@@ -2014,7 +2020,7 @@ app.post(
           dispositionStatus: bookingStatus,
           bookingDate,
           basisUrl: bookingBasis,
-          daysElapsed: 0,
+          daysElapsed: computedDaysElapsed,
           indictmentDecision: disposition || "수사 진행 중",
         };
         insertedBookings.push(bookingObj);
@@ -2481,13 +2487,14 @@ app.post(
     // 클라이언트 제공 ID 무시 — 서버에서 항상 UUID 생성
     const id = `RPT-${Date.now()}-${randomUUID().slice(0, 8)}`;
     await db.execute({
-      sql: `INSERT INTO reports (id, report_no, hyeongje_no, title, prosecutor_name,
-            suspect_name, suspect_uuid, status, created_at, basis_url, period, confiscation)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      sql: `INSERT INTO reports (id, report_no, hyeongje_no, suje_no, title, prosecutor_name,
+            suspect_name, suspect_uuid, status, created_at, basis_url, period, confiscation, deleted_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
         id,
         r.reportNo || "",
         r.hyeongjeNo || "",
+        r.sujeNo || r.hyeongjeNo || "",
         r.title || "",
         assignedName,
         r.suspectName || "",
@@ -2497,6 +2504,7 @@ app.post(
         r.basisUrl || "",
         r.period || "",
         r.confiscation || "",
+        "",
       ],
     });
     res.json({ success: true, report: { ...r, id } });
@@ -2512,6 +2520,7 @@ app.patch(
     const fields = {
       reportNo: "report_no",
       hyeongjeNo: "hyeongje_no",
+      sujeNo: "suje_no",
       title: "title",
       prosecutorName: "prosecutor_name",
       suspectName: "suspect_name",

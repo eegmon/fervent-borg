@@ -15,7 +15,6 @@ import MainLedger from "./components/MainLedger";
 import MyCasesLedger from "./components/MyCasesLedger";
 import WarrantLedger from "./components/WarrantLedger";
 import ApprovalSystem from "./components/ApprovalSystem";
-import ReportLedger from "./components/ReportLedger";
 import AppealLedger from "./components/AppealLedger";
 import BookingLedger from "./components/BookingLedger";
 import SearchSystem from "./components/SearchSystem";
@@ -1997,17 +1996,6 @@ export default function App() {
                 chargesData={chargesData}
                 onUpdateCharges={setChargesData}
                 auditLogs={auditLogs}
-              />
-            )}
-
-            {activeTab === "reports" && (
-              <ReportLedger
-                reports={scopedReportsData}
-                onSelectEvidence={(url, caseNo, suspectName) =>
-                  setEvidenceModalInfo({ url, caseNo, suspectName })
-                }
-                onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
-                onOpenSuspectProfile={(uuid) => setSuspectProfileUuid(uuid)}
               />
             )}
 
