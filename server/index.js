@@ -693,6 +693,7 @@ app.get("/api/cases", requireAuth, asyncWrap(async (req, res) => {
     const c = toCamel(row);
     if (
       c.visibility === "PRIVATE" &&
+      !c.isArchived &&
       isSecretariat &&
       !canViewPrivate &&
       c.prosecutorId !== req.user.id &&
@@ -1593,16 +1594,19 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, asyncWrap(async (req, r
     c.hyeongjeNo && !c.hyeongjeNo.includes("수제") ? c.hyeongjeNo : "-";
 
   // visibility / privateViewerIds 변경 권한 체크
-  // — 검찰총장 또는 사건 담당/작성자만 공개범위를 변경할 수 있다.
+  // — 담당검사·작성자·검찰총장만 공개범위를 변경할 수 있다.
   const newVisibility = c.visibility === "PRIVATE" ? "PRIVATE" : "PUBLIC";
   const newPrivateViewerIds = normalizePrivateViewerIds(c.privateViewerIds);
   if (c.visibility !== undefined && !isProsecutorGeneral(req.user)) {
     const visCheck = await db.execute({
-      sql: "SELECT created_by, prosecutor_id FROM cases WHERE id = ? AND deleted_at = ''",
+      sql: "SELECT created_by, prosecutor_id, visibility FROM cases WHERE id = ? AND deleted_at = ''",
       args: [req.params.id],
     });
     const vrow = visCheck.rows[0];
-    if (vrow && vrow.created_by !== req.user.id && vrow.prosecutor_id !== req.user.id) {
+    // 실제로 공개범위가 변경될 때만 권한 체크 — 기존 값과 동일하면 통과
+    const oldVisibility = vrow?.visibility || "PUBLIC";
+    const visibilityChanged = oldVisibility !== newVisibility;
+    if (visibilityChanged && vrow && vrow.created_by !== req.user.id && vrow.prosecutor_id !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: "사건의 공개범위는 담당검사 또는 작성자만 변경할 수 있습니다.",
@@ -4387,7 +4391,7 @@ app.patch("/api/settings/auto-archive", requireAuth, requireSecretariat, async (
 // 불기소처분 후 설정된 기간(auto_archive_days) 동안 항고가 없으면 자동 보존.
 // 서버 시작 후 1분 뒤 최초 실행, 이후 1시간마다 반복.
 // ════════════════════════════════════════════════════════════════════
-const NON_INDICT_KEYWORDS = ["불기소", "혐의없음", "무혐의", "기소유예", "공소권없음", "기소중지", "죄가안됨"];
+const NON_INDICT_KEYWORDS = ["불기소", "혐의없음", "무혐의", "기소유예", "공소권없음", "죄가안됨"];
 
 function isNonIndictDisposition(disposition) {
   if (!disposition) return false;

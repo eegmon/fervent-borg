@@ -1,11 +1,31 @@
 import React, { useState } from 'react';
-import { X, Save, Edit, Scale, AlertCircle, Search, RefreshCw, Plus, Trash2, Users } from 'lucide-react';
+import { X, Save, Edit, Scale, AlertCircle, Search, RefreshCw, Plus, Trash2, Users, Lock, Unlock } from 'lucide-react';
 import { fetchMojangUuid } from '../services/mojangApi';
 
 export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prosecutorsList = [], chargesData = [], currentUser, onToast }) {
   if (!isOpen || !caseItem) return null;
 
+  // 공개 범위 변경 권한: 담당검사·작성자·검찰총장만
+  const isOwner = Boolean(
+    currentUser && (
+      currentUser.id === caseItem.prosecutorId ||
+      currentUser.id === caseItem.createdBy
+    )
+  );
+  const isProsecutorGeneral = Boolean(currentUser?.isSuperAdmin || currentUser?.roleLevel === 'PROSECUTOR_GENERAL');
+  const canEditVisibility = isOwner || isProsecutorGeneral;
+
   const [formData, setFormData] = useState({ ...caseItem });
+  // privateViewerIds: caseItem에서 파싱 (서버에서 JSON 문자열로 올 수 있음)
+  const [privateViewerIds, setPrivateViewerIds] = useState(() => {
+    const raw = caseItem.privateViewerIds;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw); } catch { return []; }
+    }
+    return [];
+  });
+
   const [suspectsList, setSuspectsList] = useState(() => {
     if (caseItem.suspects && caseItem.suspects.length > 0) {
       return caseItem.suspects;
@@ -78,7 +98,8 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
       suspectName: displaySuspectName,
       suspectUuid: primarySuspect.uuid || '',
       bookingStatus: primarySuspect.bookingStatus || formData.bookingStatus || '',
-      suspects: validSuspects
+      suspects: validSuspects,
+      privateViewerIds,
     });
 
     setSaving(false);
@@ -292,7 +313,53 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
             </div>
           </div>
 
-          {/* Section 5: Notes */}
+          {/* Section 5: Visibility */}
+          {canEditVisibility && (
+            <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 16, border: `1px solid ${formData.visibility === 'PRIVATE' ? 'rgba(239,68,68,0.35)' : 'var(--border-subtle)'}` }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: formData.visibility === 'PRIVATE' ? '#f87171' : 'var(--primary-amber)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {formData.visibility === 'PRIVATE' ? <Lock size={14} /> : <Unlock size={14} />}
+                5. 사건 공개 범위
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                <div>
+                  <label className="input-label">공개 범위</label>
+                  <select
+                    className="select-field"
+                    value={formData.visibility || 'PUBLIC'}
+                    onChange={e => setFormData(prev => ({ ...prev, visibility: e.target.value }))}
+                  >
+                    <option value="PUBLIC">공개 사건</option>
+                    <option value="PRIVATE">비공개 사건 (담당자·생성자·검찰총장만 열람)</option>
+                  </select>
+                </div>
+              </div>
+              {formData.visibility === 'PRIVATE' && (
+                <div style={{ marginTop: 12 }}>
+                  <label className="input-label">추가 열람 허용 검사 (검찰총장·담당검사·작성자는 자동 포함)</label>
+                  <select
+                    className="select-field"
+                    multiple
+                    value={privateViewerIds}
+                    onChange={e => setPrivateViewerIds(Array.from(e.target.selectedOptions, o => o.value))}
+                    style={{ minHeight: 100 }}
+                  >
+                    {prosecutorsList
+                      .filter(p => !p.dept?.includes('사무국') && p.roleLevel !== 'CHIEF_ADMINISTRATOR')
+                      .map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.position || p.title})
+                        </option>
+                      ))}
+                  </select>
+                  <div style={{ marginTop: 4, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    Ctrl 또는 Shift를 사용해 여러 명을 선택할 수 있습니다.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Section 6: Notes */}
           <div>
             <label className="input-label">특이사항 및 비고</label>
             <textarea className="textarea-field" name="notes" rows={2} value={formData.notes || ''} onChange={handleChange} placeholder="추가 메모 또는 수사 참고사항 기입..." />

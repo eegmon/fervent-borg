@@ -2086,6 +2086,7 @@ export default function MyCasesLedger({
           }}
           prosecutorsList={prosecutorsList}
           chargesData={chargesData}
+          currentUser={currentUser}
         />
       )}
     </div>

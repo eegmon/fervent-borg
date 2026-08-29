@@ -1142,6 +1142,7 @@ export default function MainLedger({
         onSave={handleSaveGuarded}
         prosecutorsList={prosecutorsList}
         chargesData={chargesData}
+        currentUser={currentUser}
       />
     </div>
   );
