@@ -1,0 +1,303 @@
+
+                          borderRadius: 8,
+                          background: "var(--bg-elevated)",
+                          border: "1px solid var(--border-subtle)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          id="autoAssignExCheck"
+                          checked={!!statusForm.isAutoAssignExcluded}
+                          onChange={(e) =>
+                            setStatusForm({
+                              ...statusForm,
+                              isAutoAssignExcluded: e.target.checked,
+                            })
+                          }
+                        />
+                        <label
+                          htmlFor="autoAssignExCheck"
+                          style={{
+                            fontSize: "0.78rem",
+                            color: "var(--text-main)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          ?슟 ?좉퇋 ?ш굔 ?먮룞 諛곗젙 ??곸뿉???쒖쇅?섍린 (怨좎쐞 愿由ъ옄 /
+                          ?꾨떞 ?쒖쇅)
+                        </label>
+                      </div>
+  
+                      <div
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 8,
+                          background: "var(--bg-elevated)",
+                          border: "1px solid var(--border-subtle)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          id="arbitraryApproveCheck"
+                          checked={!!statusForm.canArbitraryApprove}
+                          onChange={(e) =>
+                            setStatusForm({
+                              ...statusForm,
+                              canArbitraryApprove: e.target.checked,
+                            })
+                          }
+                        />
+                        <label
+                          htmlFor="arbitraryApproveCheck"
+                          style={{
+                            fontSize: "0.78rem",
+                            color: "var(--text-main)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          ???꾧껐 ?뱀씤 沅뚰븳 ?덉슜
+                        </label>
+                      </div>
+  
+                      {statusForm.status !== "ACTIVE" && (
+                        <>
+                          <div>
+                            <Label>?寃곗옄 (?由?寃곗옱 ?뱀씤?? 吏??*</Label>
+                            <select
+                              className="select-field"
+                              value={statusForm.delegateTo}
+                              onChange={(e) =>
+                                setStatusForm({
+                                  ...statusForm,
+                                  delegateTo: e.target.value,
+                                })
+                              }
+                            >
+                              <option value="">?寃곗옄 ?좏깮...</option>
+                              {prosecutorsList
+                                .filter((p) => p.id !== statusModalUser.id)
+                                .map((p) => (
+                                  <option key={p.id} value={p.name}>
+                                    {p.name} ({p.title} / {p.dept})
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                          <div>
+                            <Label>?댁쭅 / ?꾩엫 ?ъ쑀</Label>
+                            <input
+                              className="input-field"
+                              placeholder="?? ?곌?, ?댁쇅 異쒖옣, ?≪븘 ?댁쭅"
+                              value={statusForm.delegateReason}
+                              onChange={(e) =>
+                                setStatusForm({
+                                  ...statusForm,
+                                  delegateReason: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
+  
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          justifyContent: "flex-end",
+                          marginTop: 10,
+                        }}
+                      >
+                        <button
+                          onClick={() => setStatusModalUser(null)}
+                          className="btn btn-secondary"
+                          style={{ padding: "8px 16px" }}
+                        >
+                          痍⑥냼
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (onUpdateProsecutorStatus) {
+                              onUpdateProsecutorStatus(
+                                statusModalUser.id,
+                                statusForm,
+                              );
+                            }
+                            addLog(
+                              "寃???좊텇/?꾩엫 ?ㅼ젙",
+                              `'${statusModalUser.name}' 寃???곹깭 蹂寃?(${statusForm.status}, ?寃곗옄: ${statusForm.delegateTo || "?놁쓬"})`,
+                            );
+                            setStatusModalUser(null);
+                          }}
+                          className="btn btn-gold"
+                          style={{ padding: "8px 16px" }}
+                        >
+                          ?ㅼ젙 ???                      </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+  
+        {/* 遺??& 遺??愿由???*/}
+>       {activeSubTab === "depts" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* ?곷떒 ?듯빀 ?덈궡 */}
+            <div
+              className="glass-panel"
+              style={{
+                padding: "16px 20px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 10,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontWeight: 800,
+                    fontSize: "0.95rem",
+                    color: "var(--text-main)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Building2 size={16} color="var(--primary-amber)" />
+                  寃李?遺???좎꽕쨌??젣 & 遺?쒖옣 遺??吏곸쐞 愿由?              </div>
+                <div
+                  style={{
+                    fontSize: "0.72rem",
+                    color: "var(--text-muted)",
+                    marginTop: 2,
+                  }}
+                >
+                  遺?쒕? ?좎꽕/??젣?섍퀬 ?대떦 遺?쒖옣??遺?먯쓣 諛곗튂?섎ŉ, ?뚯냽 遺??                蹂寃???吏곸쐞媛 遺?쒕챸??留욎떠 ?먮룞?쇰줈 ?곕룞?⑸땲??
+                </div>
+              </div>
+            </div>
+  
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "320px 1fr",
+                gap: 16,
+              }}
+            >
+              {/* ?쇱そ: 遺??紐⑸줉 諛??좎꽕 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {/* 1. ?좉퇋 遺???깅줉 ??*/}
+                <div className="glass-panel" style={{ padding: 18 }}>
+                  <div
+                    style={{
+                      fontWeight: 800,
+                      fontSize: "0.85rem",
+                      color: "var(--text-main)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Plus size={14} color="var(--primary-amber)" />
+                    ?좉퇋 遺???좎꽕
+                  </div>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newDeptForm.name) {
+                        alert("遺?쒕챸???낅젰?섏꽭??");
+                        return;
+                      }
+                      const selectedHead = prosecutorsList.find(
+                        (p) => p.id === newDeptForm.headId,
+                      );
+                      const newDept = {
+                        id: `dept_${Date.now()}`,
+                        name: newDeptForm.name,
+                        desc: newDeptForm.desc || "寃李??섏궗 諛??щТ ?대떦 遺??,
+                        headId: newDeptForm.headId || "",
+                        headName: selectedHead ? selectedHead.name : "誘몄???,
+                        canIntake: newDeptForm.canIntake !== false,
+                      };
+                      if (onAddDepartment) onAddDepartment(newDept);
+                      addLog(
+                        "遺???좎꽕",
+                        `'${newDept.name}' ?좎꽕 (遺?쒖옣: ${newDept.headName}, ?ш굔?묒닔: ${newDept.canIntake ? "?덉슜" : "李⑤떒"})`,
+                      );
+                      setNewDeptForm({
+                        name: "",
+                        desc: "",
+                        headId: "",
+                        canIntake: true,
+                      });
+                      alert(
+                        `'${newDept.name}' 遺?쒓? ?깃났?곸쑝濡??좎꽕?섏뿀?듬땲??`,
+                      );
+                    }}
+                    style={{ display: "flex", flexDirection: "column", gap: 10 }}
+                  >
+                    <div>
+                      <Label>遺??紐낆묶 *</Label>
+                      <input
+                        className="input-field"
+                        placeholder="?? 吏?λ쾾二꾩닔?щ?"
+                        value={newDeptForm.name}
+                        onChange={(e) =>
+                          setNewDeptForm({ ...newDeptForm, name: e.target.value })
+                        }
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label>?ш굔 ?묒닔 沅뚰븳 ?ㅼ젙</Label>
+                      <select
+                        className="select-field"
+                        value={newDeptForm.canIntake ? "true" : "false"}
+                        onChange={(e) =>
+                          setNewDeptForm({
+                            ...newDeptForm,
+                            canIntake: e.target.value === "true",
+                          })
+                        }
+                      >
+                        <option value="true">
+                          ???ш굔 ?묒닔 ?덉슜 (?묒닔 沅뚰븳 遺??
+                        </option>
+                        <option value="false">
+                          ?슟 ?ш굔 ?묒닔 李⑤떒 (?섏궗 ?꾨떞 遺??
+                        </option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label>?대떦 遺?쒖옣 吏??(?좏깮)</Label>
+                      <select
+                        className="select-field"
+                        value={newDeptForm.headId}
+                        onChange={(e) =>
+                          setNewDeptForm({
+                            ...newDeptForm,
+                            headId: e.target.value,
+                          })
+                        }
+                      >
+                        <option value="">遺?쒖옣 誘몄???/option>
+                        {prosecutorsList.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.dept} 쨌 {p.position || p.title})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+

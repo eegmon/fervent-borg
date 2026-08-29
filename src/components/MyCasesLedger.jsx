@@ -953,7 +953,61 @@ export default function MyCasesLedger({
   const [editingCase, setEditingCase] = useState(null);
   const [statusChangeCase, setStatusChangeCase] = useState(null);
   const [newStatus, setNewStatus] = useState("");
+  const [suspectsDispositions, setSupectsDispositions] = useState({}); // 피의자별 처분 { suspectId: disposition }
   const [approvalCase, setApprovalCase] = useState(null); // 결재 상신 모달 대상 사건
+
+  const getSuspectKey = (suspect) =>
+    suspect?.id || suspect?.uuid || suspect?.name || "unknown";
+
+  const normalizeDispositionMap = (source) => {
+    if (!source) return {};
+    if (typeof source === "string") {
+      try {
+        const parsed = JSON.parse(source);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? parsed
+          : {};
+      } catch {
+        return {};
+      }
+    }
+    return typeof source === "object" ? source : {};
+  };
+
+  const buildDispositionSummary = (caseItem, dispositionMap, fallback) => {
+    const suspectList =
+      Array.isArray(caseItem?.suspects) && caseItem.suspects.length > 0
+        ? caseItem.suspects
+        : caseItem?.suspectName
+          ? [
+              {
+                id: caseItem.suspectUuid || caseItem.suspectName,
+                name: caseItem.suspectName,
+                uuid: caseItem.suspectUuid || "",
+                role: "주범",
+              },
+            ]
+          : [];
+    if (suspectList.length <= 1) {
+      return (
+        fallback ||
+        caseItem?.disposition ||
+        caseItem?.bookingStatus ||
+        "입건 : 수사 진행 중"
+      );
+    }
+    const entries = suspectList.map((suspect, idx) => {
+      const key = getSuspectKey(suspect) || `suspect-${idx}`;
+      const value =
+        dispositionMap?.[key] ||
+        fallback ||
+        caseItem?.disposition ||
+        caseItem?.bookingStatus ||
+        "입건 : 수사 진행 중";
+      return `${suspect?.name || "피의자"}: ${value}`;
+    });
+    return entries.join(" / ");
+  };
 
   if (!currentUser) {
     return (
@@ -1043,7 +1097,23 @@ export default function MyCasesLedger({
     ].includes(currentUser.roleLevel);
 
   // 부서장(부장검사) 권한: 동일 부서 인원 휴직처리 + 부서 내 사건 재배당
-  const isSeniorProsecutor = currentUser.roleLevel === "SENIOR_PROSECUTOR";
+  // 지정된 부서장(직책/플래그 무관)도 접근 가능하도록 허용.
+  const isDeptHeadAssigned =
+    !!currentUser?.isDeptHead ||
+    !!currentUser?.isDepartmentHead ||
+    !!currentUser?.departmentHead ||
+    !!currentUser?.isHeadOfDepartment ||
+    (typeof currentUser?.position === "string" &&
+      currentUser.position.includes("부서장")) ||
+    (typeof currentUser?.title === "string" &&
+      currentUser.title.includes("부서장")) ||
+    (typeof currentUser?.position === "string" &&
+      currentUser.position.includes("부장검사")) ||
+    (typeof currentUser?.title === "string" &&
+      currentUser.title.includes("부장검사")) ||
+    currentUser?.roleLevel === "SENIOR_PROSECUTOR";
+
+  const isSeniorProsecutor = isDeptHeadAssigned;
   const [seniorTab, setSeniorTab] = useState("leave"); // "leave" | "reassign"
   const [leaveTarget, setLeaveTarget] = useState("");
   const [leaveStatus, setLeaveStatus] = useState("LEAVE");
@@ -1221,13 +1291,23 @@ export default function MyCasesLedger({
       return;
     }
 
+    const finalDisposition = buildDispositionSummary(
+      statusChangeCase,
+      suspectsDispositions,
+      newStatus ||
+        statusChangeCase.disposition ||
+        statusChangeCase.bookingStatus,
+    );
+
     if (onUpdateCase)
       onUpdateCase({
         ...statusChangeCase,
-        disposition: newStatus,
-        bookingStatus: newStatus,
+        disposition: finalDisposition,
+        bookingStatus: finalDisposition,
+        suspectsDispositions: suspectsDispositions,
       });
     setStatusChangeCase(null);
+    setSupectsDispositions({});
   };
 
   const handleApprovalSubmit = ({
@@ -2123,6 +2203,37 @@ export default function MyCasesLedger({
                             item.bookingStatus ||
                             "입건 : 수사 진행 중",
                         );
+                        // 피의자별 처분 초기화
+                        const suspectsArray =
+                          item.suspects && Array.isArray(item.suspects)
+                            ? item.suspects
+                            : item.suspectName
+                              ? [
+                                  {
+                                    id: 1,
+                                    name: item.suspectName,
+                                    uuid: item.suspectUuid,
+                                  },
+                                ]
+                              : [];
+                        const dispositions = item.suspectsDispositions || {};
+                        // 피의자가 없으면 기본 처분을 모두 같게 설정
+                        if (
+                          !item.suspectsDispositions &&
+                          item.suspects &&
+                          item.suspects.length > 0
+                        ) {
+                          const newDisps = {};
+                          item.suspects.forEach((s) => {
+                            newDisps[s.id || s.uuid || s.name] =
+                              item.disposition ||
+                              item.bookingStatus ||
+                              "입건 : 수사 진행 중";
+                          });
+                          setSupectsDispositions(newDisps);
+                        } else {
+                          setSupectsDispositions(dispositions || {});
+                        }
                       }}
                       className="btn btn-gold"
                       style={{
@@ -2390,7 +2501,34 @@ export default function MyCasesLedger({
                 <select
                   className="select-field"
                   value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    setNewStatus(nextValue);
+                    const suspects =
+                      Array.isArray(statusChangeCase?.suspects) &&
+                      statusChangeCase.suspects.length > 0
+                        ? statusChangeCase.suspects
+                        : statusChangeCase?.suspectName
+                          ? [
+                              {
+                                id:
+                                  statusChangeCase.suspectUuid ||
+                                  statusChangeCase.suspectName,
+                                name: statusChangeCase.suspectName,
+                                uuid: statusChangeCase.suspectUuid || "",
+                                role: "주범",
+                              },
+                            ]
+                          : [];
+                    setSupectsDispositions((prev) => {
+                      const nextMap = { ...prev };
+                      suspects.forEach((suspect, idx) => {
+                        const key = getSuspectKey(suspect) || `suspect-${idx}`;
+                        nextMap[key] = nextValue;
+                      });
+                      return nextMap;
+                    });
+                  }}
                   required
                 >
                   {DISPOSITION_OPTIONS.map((opt) => (
@@ -2400,6 +2538,81 @@ export default function MyCasesLedger({
                   ))}
                 </select>
               </div>
+
+              {(() => {
+                const suspects =
+                  Array.isArray(statusChangeCase?.suspects) &&
+                  statusChangeCase.suspects.length > 0
+                    ? statusChangeCase.suspects
+                    : statusChangeCase?.suspectName
+                      ? [
+                          {
+                            id:
+                              statusChangeCase.suspectUuid ||
+                              statusChangeCase.suspectName,
+                            name: statusChangeCase.suspectName,
+                            uuid: statusChangeCase.suspectUuid || "",
+                            role: "주범",
+                          },
+                        ]
+                      : [];
+                if (suspects.length <= 1) return null;
+                return (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                    }}
+                  >
+                    {suspects.map((suspect, idx) => {
+                      const key = getSuspectKey(suspect) || `suspect-${idx}`;
+                      return (
+                        <div
+                          key={key}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                          }}
+                        >
+                          <label
+                            style={{
+                              display: "block",
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                              color: "var(--text-muted)",
+                            }}
+                          >
+                            피의자별 처분 · {suspect?.name || "피의자"}
+                          </label>
+                          <select
+                            className="select-field"
+                            value={
+                              suspectsDispositions[key] ||
+                              newStatus ||
+                              "입건 : 수사 진행 중"
+                            }
+                            onChange={(e) =>
+                              setSupectsDispositions((prev) => ({
+                                ...prev,
+                                [key]: e.target.value,
+                              }))
+                            }
+                          >
+                            {DISPOSITION_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
               <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
                 <button
                   type="button"

@@ -129,6 +129,8 @@ export async function initDb() {
     "archived_at TEXT DEFAULT ''",
     "archived_by TEXT DEFAULT ''",
     "incident_date TEXT DEFAULT ''",
+    "suspects_json TEXT DEFAULT '[]'",
+    "suspects_dispositions TEXT DEFAULT '{}'",
   ]) {
     try {
       await db.execute(`ALTER TABLE cases ADD COLUMN ${column}`);

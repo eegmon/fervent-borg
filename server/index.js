@@ -423,12 +423,10 @@ async function requireCaseScope(req, res, next) {
       parseJsonArray(privateViewerIds).includes(uid) ||
       hasSecretariatWorkAccess(req.user); // 사무국은 PRIVATE 상세도 접근 허용 (마스킹 적용)
     if (!isAllowed) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "비공개 사건에 접근할 권한이 없습니다.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "비공개 사건에 접근할 권한이 없습니다.",
+      });
     }
     return next();
   }
@@ -499,6 +497,27 @@ const ALLOWED_ORDER_BY = new Set([
   "booking_date DESC",
   "booking_date ASC",
 ]);
+
+function calculateDaysElapsedFromDate(dateValue) {
+  if (!dateValue || typeof dateValue !== "string") return 0;
+  const d = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffMs = today.getTime() - d.getTime();
+  return Math.max(0, Math.floor(diffMs / 86400000));
+}
+
+function filteredActiveCaseJoinSql(baseTable, alias = baseTable) {
+  return `LEFT JOIN cases c ON (
+      c.deleted_at = '' AND (
+        c.hyeongje_no = ${alias}.hyeongje_no OR
+        c.suje_no = ${alias}.hyeongje_no OR
+        c.hyeongje_no = ${alias}.suje_no OR
+        c.suje_no = ${alias}.suje_no
+      )
+    )`;
+}
 
 function scopedQuery(table, user, orderBy = "rowid DESC") {
   if (!ALLOWED_QUERY_TABLES.has(table))
@@ -626,6 +645,34 @@ function parseJsonArray(value) {
   } catch {
     return [];
   }
+}
+
+function parseJsonObject(value) {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function buildCaseDispositionSummary(suspects, dispositions, fallback = "") {
+  const suspectList =
+    Array.isArray(suspects) && suspects.length > 0
+      ? suspects
+      : [{ name: fallback || "피의자" }];
+
+  const entries = suspectList.map((suspect, index) => {
+    const key =
+      suspect?.id || suspect?.uuid || suspect?.name || `suspect-${index}`;
+    const selected = dispositions?.[key] || fallback || "입건 : 수사 진행 중";
+    return `${suspect?.name || "피의자"}: ${selected}`;
+  });
+
+  return entries.join(" / ");
 }
 
 // Express 4 async 에러 전파 래퍼 — try/catch 없는 async 라우트에서
@@ -760,12 +807,10 @@ app.post(
     const { status, id: userId, name: userName, actingUserId } = req.user;
 
     if (!["ON_LEAVE", "DELEGATED"].includes(status)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "복귀 처리가 필요한 상태가 아닙니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "복귀 처리가 필요한 상태가 아닙니다.",
+      });
     }
 
     // 본인 계정 복귀 (status, 위임 정보 전체 초기화)
@@ -843,6 +888,22 @@ app.get(
     ];
     const rows = result.rows.map((row) => {
       const c = toCamel(row);
+      c.suspects = Array.isArray(c.suspectsJson)
+        ? c.suspectsJson
+        : parseJsonArray(c.suspectsJson || c.suspects);
+      c.suspectsDispositions = parseJsonObject(
+        c.suspectsDispositions || c.suspects_dispositions,
+      );
+      if (c.suspects.length === 0 && c.suspectName) {
+        c.suspects = [
+          {
+            id: c.suspectUuid || c.suspectName,
+            name: c.suspectName,
+            uuid: c.suspectUuid || "",
+            role: "주범",
+          },
+        ];
+      }
       if (
         c.visibility === "PRIVATE" &&
         !c.isArchived &&
@@ -953,12 +1014,10 @@ app.post(
       "압제",
     ]);
     if (!ALLOWED_PREFIXES.has(prefix)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "허용되지 않는 사건번호 유형입니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "허용되지 않는 사건번호 유형입니다.",
+      });
     }
 
     const currentYear = new Date().getFullYear();
@@ -1308,12 +1367,10 @@ app.post(
         args: [req.params.id],
       });
       if (existing.rows.length === 0) {
-        return res
-          .status(404)
-          .json({
-            success: false,
-            message: "복구 대상 죄명을 찾을 수 없습니다.",
-          });
+        return res.status(404).json({
+          success: false,
+          message: "복구 대상 죄명을 찾을 수 없습니다.",
+        });
       }
 
       await db.execute({
@@ -1352,12 +1409,10 @@ app.post(
         args: [req.params.id],
       });
       if (existing.rows.length === 0) {
-        return res
-          .status(404)
-          .json({
-            success: false,
-            message: "삭제 대상 죄명을 찾을 수 없습니다.",
-          });
+        return res.status(404).json({
+          success: false,
+          message: "삭제 대상 죄명을 찾을 수 없습니다.",
+        });
       }
       const row = existing.rows[0];
       if (!row.deleted_at || row.deleted_at === "") {
@@ -1424,6 +1479,31 @@ app.post(
     const assignedName = hasGlobalDataAccess(req.user)
       ? c.prosecutorName || ""
       : req.user.name;
+    const suspects =
+      Array.isArray(c.suspects) && c.suspects.length > 0
+        ? c.suspects
+        : c.suspectName
+          ? [
+              {
+                id: c.suspectUuid || c.suspectName,
+                name: c.suspectName,
+                uuid: c.suspectUuid || "",
+                role: "주범",
+              },
+            ]
+          : [];
+    const suspectsDispositions =
+      c.suspectsDispositions && typeof c.suspectsDispositions === "object"
+        ? c.suspectsDispositions
+        : {};
+    const finalDisposition =
+      suspects.length > 1
+        ? buildCaseDispositionSummary(
+            suspects,
+            suspectsDispositions,
+            c.disposition || c.bookingStatus || "입건 : 수사 진행 중",
+          )
+        : c.disposition || c.bookingStatus || "입건 : 수사 진행 중";
     // 클라이언트 제공 ID 무시 — 서버에서 항상 UUID 생성
     const id = `CASE-${Date.now()}-${randomUUID().slice(0, 8)}`;
     await db.execute({
@@ -1435,9 +1515,10 @@ app.post(
             court1_appealed, court1_appellant, court2_no, court2_dismissed,
             court2_result, court2_doc, court3_appealed, court3_appellant,
             court3_no, court3_remanded, court3_result, court3_doc,
-            notes, content, confiscation, charge_name, visibility, created_by, private_viewer_ids
+            notes, content, confiscation, charge_name, visibility, created_by, private_viewer_ids,
+            suspects_json, suspects_dispositions
           ) VALUES (
-            ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+            ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
           )`,
       args: [
         id,
@@ -1453,7 +1534,7 @@ app.post(
         c.bookingDate || "",
         c.incidentDate || c.bookingDate || "",
         c.bookingBasis || "",
-        c.disposition || "",
+        finalDisposition,
         c.reAppeal || "-",
         c.court1No || "",
         c.court1Result || "",
@@ -1477,6 +1558,8 @@ app.post(
         visibility,
         req.user.id,
         JSON.stringify(privateViewerIds),
+        JSON.stringify(suspects),
+        JSON.stringify(suspectsDispositions),
       ],
     });
     await writeAuditLog({
@@ -1569,6 +1652,31 @@ app.post(
           "사무국 소속 또는 비활성 계정은 담당검사로 배정할 수 없습니다.",
       });
     }
+    const suspects =
+      Array.isArray(c.suspects) && c.suspects.length > 0
+        ? c.suspects
+        : c.suspectName
+          ? [
+              {
+                id: c.suspectUuid || c.suspectName,
+                name: c.suspectName,
+                uuid: c.suspectUuid || "",
+                role: "주범",
+              },
+            ]
+          : [];
+    const suspectsDispositions =
+      c.suspectsDispositions && typeof c.suspectsDispositions === "object"
+        ? c.suspectsDispositions
+        : {};
+    const finalDisposition =
+      suspects.length > 1
+        ? buildCaseDispositionSummary(
+            suspects,
+            suspectsDispositions,
+            c.disposition || c.bookingStatus || "입건 : 수사 진행 중",
+          )
+        : c.disposition || c.bookingStatus || "입건 : 수사 진행 중";
     const caseArgs = [
       id,
       intakeCaseNo, // suje_no (e.g. 2026수제280)
@@ -1582,7 +1690,7 @@ app.post(
       c.bookingDate || "",
       c.incidentDate || c.bookingDate || "",
       c.bookingBasis || "",
-      c.disposition || "",
+      finalDisposition,
       c.reAppeal || "-",
       c.court1No || "",
       c.court1Result || "",
@@ -1606,12 +1714,14 @@ app.post(
       visibility,
       req.user.id,
       JSON.stringify(privateViewerIds),
+      JSON.stringify(suspects),
+      JSON.stringify(suspectsDispositions),
     ];
     try {
       await db.batch(
         [
           {
-            sql: `INSERT INTO cases (id,suje_no,hyeongje_no,latest_hyeongje_no,prosecutor_name,prosecutor_id,suspect_name,suspect_uuid,booking_status,booking_date,incident_date,booking_basis,disposition,re_appeal,court1_no,court1_result,court1_doc,court1_appealed,court1_appellant,court2_no,court2_dismissed,court2_result,court2_doc,court3_appealed,court3_appellant,court3_no,court3_remanded,court3_result,court3_doc,notes,content,confiscation,charge_name,visibility,created_by,private_viewer_ids) VALUES (${Array(36).fill("?").join(",")})`,
+            sql: `INSERT INTO cases (id,suje_no,hyeongje_no,latest_hyeongje_no,prosecutor_name,prosecutor_id,suspect_name,suspect_uuid,booking_status,booking_date,incident_date,booking_basis,disposition,re_appeal,court1_no,court1_result,court1_doc,court1_appealed,court1_appellant,court2_no,court2_dismissed,court2_result,court2_doc,court3_appealed,court3_appellant,court3_no,court3_remanded,court3_result,court3_doc,notes,content,confiscation,charge_name,visibility,created_by,private_viewer_ids,suspects_json,suspects_dispositions) VALUES (${Array(38).fill("?").join(",")})`,
             args: caseArgs,
           },
           {
@@ -1702,20 +1812,16 @@ app.post(
   async (req, res) => {
     const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
     if (rows.length === 0) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "일괄 등록할 사건 데이터가 없습니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "일괄 등록할 사건 데이터가 없습니다.",
+      });
     }
     if (rows.length > 500) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "한 번에 최대 500건까지 등록할 수 있습니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "한 번에 최대 500건까지 등록할 수 있습니다.",
+      });
     }
 
     try {
@@ -1952,12 +2058,10 @@ app.post(
       });
     } catch (err) {
       console.error("[POST /api/cases/bulk-import]", err);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "엑셀 일괄 등록 중 DB 저장에 실패했습니다.",
-        });
+      res.status(500).json({
+        success: false,
+        message: "엑셀 일괄 등록 중 DB 저장에 실패했습니다.",
+      });
     }
   },
 );
@@ -2174,6 +2278,32 @@ app.put(
       }
     }
 
+    const suspectsForUpdate =
+      Array.isArray(c.suspects) && c.suspects.length > 0
+        ? c.suspects
+        : c.suspectName
+          ? [
+              {
+                id: c.suspectUuid || c.suspectName,
+                name: c.suspectName,
+                uuid: c.suspectUuid || "",
+                role: "주범",
+              },
+            ]
+          : [];
+    const dispositionMapForUpdate =
+      c.suspectsDispositions && typeof c.suspectsDispositions === "object"
+        ? c.suspectsDispositions
+        : {};
+    const effectiveDisposition =
+      suspectsForUpdate.length > 1
+        ? buildCaseDispositionSummary(
+            suspectsForUpdate,
+            dispositionMapForUpdate,
+            c.disposition || c.bookingStatus || "입건 : 수사 진행 중",
+          )
+        : c.disposition || c.bookingStatus || "입건 : 수사 진행 중";
+
     await db.execute({
       sql: `UPDATE cases SET
             suje_no=?, hyeongje_no=?, latest_hyeongje_no=?,
@@ -2186,7 +2316,8 @@ app.put(
             court3_appealed=?, court3_appellant=?, court3_no=?, court3_remanded=?, court3_result=?, court3_doc=?,
             charge_name=?, notes=?, content=?, confiscation=?,
             supervisor_designated=?, supervisor_id=?, supervisor_name=?,
-            visibility=?, private_viewer_ids=?
+            visibility=?, private_viewer_ids=?,
+            suspects_json=?, suspects_dispositions=?
           WHERE id=?`,
       args: [
         sujeNo,
@@ -2200,7 +2331,7 @@ app.put(
         c.bookingDate || "",
         c.incidentDate || "",
         c.bookingBasis || "",
-        c.disposition || "",
+        effectiveDisposition,
         c.reAppeal || "-",
         c.court1No || "",
         c.court1Result || "",
@@ -2226,6 +2357,8 @@ app.put(
         c.supervisorName || "",
         newVisibility,
         JSON.stringify(newPrivateViewerIds),
+        JSON.stringify(suspectsForUpdate),
+        JSON.stringify(dispositionMapForUpdate),
         req.params.id,
       ],
     });
@@ -2304,7 +2437,22 @@ app.get(
   "/api/reports",
   requireAuth,
   asyncWrap(async (req, res) => {
-    const result = await db.execute(scopedQuery("reports", req.user));
+    const result = await db.execute({
+      sql: `SELECT r.*
+            FROM reports r
+            LEFT JOIN cases c ON (
+              c.deleted_at = '' AND (
+                c.hyeongje_no = r.hyeongje_no OR
+                c.suje_no = r.hyeongje_no OR
+                c.hyeongje_no = r.suje_no OR
+                c.suje_no = r.suje_no
+              )
+            )
+            WHERE r.deleted_at = ''
+              AND (c.id IS NULL OR c.is_archived = 0)
+            ORDER BY r.created_at DESC`,
+      args: [],
+    });
     res.json(result.rows.map(toCamel));
   }),
 );
@@ -2499,8 +2647,29 @@ app.get(
   "/api/bookings",
   requireAuth,
   asyncWrap(async (req, res) => {
-    const result = await db.execute(scopedQuery("bookings", req.user));
-    res.json(result.rows.map(toCamel));
+    const result = await db.execute({
+      sql: `SELECT b.*
+            FROM bookings b
+            LEFT JOIN cases c ON (
+              c.deleted_at = '' AND (
+                c.hyeongje_no = b.hyeongje_no OR
+                c.suje_no = b.hyeongje_no OR
+                c.hyeongje_no = b.suspect_uuid OR
+                c.suje_no = b.suspect_uuid
+              )
+            )
+            WHERE b.deleted_at = ''
+              AND (c.id IS NULL OR c.is_archived = 0)
+            ORDER BY b.booking_date DESC, b.rowid DESC`,
+      args: [],
+    });
+    const rows = result.rows.map(toCamel).map((row) => ({
+      ...row,
+      daysElapsed: calculateDaysElapsedFromDate(
+        row.bookingDate || row.booking_date,
+      ),
+    }));
+    res.json(rows);
   }),
 );
 
@@ -2523,6 +2692,9 @@ app.post(
     const assignedName = hasGlobalDataAccess(req.user)
       ? b.prosecutorName || req.user.name
       : req.user.name;
+    const computedDaysElapsed = calculateDaysElapsedFromDate(
+      b.bookingDate || "",
+    );
     // 클라이언트 제공 ID 무시 — 서버에서 항상 UUID 생성
     const id = `BKG-${Date.now()}-${randomUUID().slice(0, 8)}`;
     await db.execute({
@@ -2539,7 +2711,7 @@ app.post(
         b.dispositionStatus || "",
         b.bookingDate || "",
         b.basisUrl || "",
-        b.daysElapsed || 0,
+        computedDaysElapsed,
         b.indictmentDecision || "",
       ],
     });
@@ -2564,6 +2736,9 @@ app.patch(
       daysElapsed: "days_elapsed",
       indictmentDecision: "indictment_decision",
     };
+    if (req.body.bookingDate !== undefined) {
+      req.body.daysElapsed = calculateDaysElapsedFromDate(req.body.bookingDate);
+    }
     const updates = Object.entries(fields).filter(
       ([field]) => req.body[field] !== undefined,
     );
@@ -3339,12 +3514,10 @@ app.post(
 
     // 비밀번호 최소 길이
     if (password.length < 10) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "비밀번호는 10자 이상이어야 합니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "비밀번호는 10자 이상이어야 합니다.",
+      });
     }
 
     try {
@@ -3975,12 +4148,10 @@ app.patch(
     }
 
     if (!newPassword || newPassword.length < 10) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "비밀번호는 10자 이상이어야 합니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "비밀번호는 10자 이상이어야 합니다.",
+      });
     }
 
     try {
@@ -4844,11 +5015,16 @@ app.get("/api/suspects/:uuid/profile", requireAuth, async (req, res) => {
         totalBookings: bookings.length,
         totalAppeals: appeals.length,
         totalWarrants: warrants.length,
-        indicted: cases.filter(
-          (c) =>
-            (c.disposition || "").includes("기소") ||
-            (c.disposition || "").includes("구공판"),
-        ).length,
+        indicted: cases.filter((c) => {
+          const disp = c.disposition || "";
+          // "기소" 포함하되, "불기소"와 관련 없음 처분은 제외
+          return (
+            (disp.includes("기소") || disp.includes("구공판")) &&
+            !disp.includes("불기소") &&
+            !disp.includes("기소유예") &&
+            !disp.includes("기소중지")
+          );
+        }).length,
         nonIndicted: cases.filter((c) =>
           [
             "불기소",
@@ -4900,12 +5076,10 @@ app.post(
         .json({ success: false, message: "재배당할 사건 목록이 없습니다." });
     }
     if (caseIds.length > 100) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "한 번에 최대 100건까지 재배당할 수 있습니다.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "한 번에 최대 100건까지 재배당할 수 있습니다.",
+      });
     }
     if (!toProsecutorId || !toProsecutorName) {
       return res
@@ -4991,12 +5165,10 @@ app.post(
       });
     } catch (err) {
       console.error("[POST /cases/bulk-reassign]", err);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "일괄 재배당 중 오류가 발생했습니다.",
-        });
+      res.status(500).json({
+        success: false,
+        message: "일괄 재배당 중 오류가 발생했습니다.",
+      });
     }
   },
 );
@@ -5094,12 +5266,10 @@ app.delete("/api/approval-templates/:id", requireAuth, async (req, res) => {
     }
     const row = toCamel(result.rows[0]);
     if (row.createdBy !== req.user.id && !hasGlobalDataAccess(req.user)) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "본인이 만든 템플릿만 삭제할 수 있습니다.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "본인이 만든 템플릿만 삭제할 수 있습니다.",
+      });
     }
     await db.execute({
       sql: "UPDATE approval_templates SET deleted_at = ? WHERE id = ?",
