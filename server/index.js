@@ -643,7 +643,7 @@ app.post("/api/auth/login", authRateLimit, asyncWrap(async (req, res) => {
   });
 
   res.json({ success: true, token, user: safeUser });
-});
+}));
 
 // ════════════════════════════════════════════════════════════════════
 // 2. Cases  (GET 공개, 나머지 인증 필요)
