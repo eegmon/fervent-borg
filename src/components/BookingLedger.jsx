@@ -1,5 +1,5 @@
-import React from "react";
-import { AlertOctagon, ExternalLink } from "lucide-react";
+import React, { useState } from "react";
+import { AlertOctagon, ExternalLink, Eye, EyeOff } from "lucide-react";
 
 function getBookingElapsedDays(booking) {
   const raw = Number(booking?.daysElapsed ?? 0);
@@ -31,6 +31,8 @@ export default function BookingLedger({
   onSelectEvidence,
   onSelectSuspect,
 }) {
+  const [showArchived, setShowArchived] = useState(false);
+
   const displayBookings = React.useMemo(() => {
     const map = new Map();
     for (const booking of bookings || []) {
@@ -46,8 +48,20 @@ export default function BookingLedger({
           : current;
       map.set(key, pick);
     }
-    return [...map.values()];
-  }, [bookings]);
+    
+    // 1. 입건일자 기준 정렬 (최신순)
+    const sorted = [...map.values()].sort((a, b) => {
+      const dateA = new Date(`${a.bookingDate || ""}T00:00:00`).getTime();
+      const dateB = new Date(`${b.bookingDate || ""}T00:00:00`).getTime();
+      return dateB - dateA; // 내림차순 (최신순)
+    });
+
+    // 3. 보존처리된 사건 필터링
+    if (!showArchived) {
+      return sorted.filter((b) => !b.isArchived);
+    }
+    return sorted;
+  }, [bookings, showArchived]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -77,7 +91,40 @@ export default function BookingLedger({
             </div>
           </div>
         </div>
-        <span className="badge badge-danger">{displayBookings.length}건</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            style={{
+              background: showArchived
+                ? "rgba(245, 158, 11, 0.15)"
+                : "rgba(200, 200, 200, 0.1)",
+              border: `1px solid ${
+                showArchived
+                  ? "rgba(245, 158, 11, 0.4)"
+                  : "rgba(200, 200, 200, 0.2)"
+              }`,
+              borderRadius: 6,
+              padding: "6px 12px",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              cursor: "pointer",
+              color: showArchived ? "var(--primary-amber)" : "var(--text-muted)",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              transition: "all 0.2s ease",
+            }}
+            title={showArchived ? "보존사건 숨기기" : "보존사건 보이기"}
+          >
+            {showArchived ? (
+              <Eye size={14} />
+            ) : (
+              <EyeOff size={14} />
+            )}
+            {showArchived ? "보존사건 표시" : "보존사건 숨김"}
+          </button>
+          <span className="badge badge-danger">{displayBookings.length}건</span>
+        </div>
       </div>
 
       <div className="glass-panel" style={{ overflow: "hidden" }}>
