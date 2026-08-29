@@ -20,13 +20,37 @@ function readFileAsDataUrl(file) {
   });
 }
 
+// X-Frame-Options: DENY 또는 SAMEORIGIN을 설정하는 것으로 알려진 도메인
+const BLOCKED_IFRAME_DOMAINS = [
+  'cafe.naver.com',
+  'naver.com',
+  'naver.me',
+  'blog.naver.com',
+  'youtube.com',
+  'youtu.be',
+  'instagram.com',
+  'facebook.com',
+  'twitter.com',
+  'x.com',
+];
+
+function isIframeBlocked(url) {
+  if (!url || url.startsWith('data:')) return false;
+  try {
+    const hostname = new URL(url).hostname;
+    return BLOCKED_IFRAME_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
+  } catch {
+    return false;
+  }
+}
+
 export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectName, onSaveEvidence }) {
   const [activeUrl, setActiveUrl] = useState(url || '');
   const [evidenceList, setEvidenceList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [iframeBlocked, setIframeBlocked] = useState(false);
+  const [iframeBlocked, setIframeBlocked] = useState(() => isIframeBlocked(url || ''));
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [inputMode, setInputMode] = useState('url'); // 'url' | 'file'
@@ -54,7 +78,7 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
 
   useEffect(() => {
     setActiveUrl(url || '');
-    setIframeBlocked(false);
+    setIframeBlocked(isIframeBlocked(url || ''));
   }, [url]);
 
   if (!isOpen) return null;
@@ -295,7 +319,7 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
                 return (
                   <div
                     key={item.id}
-                    onClick={() => { setActiveUrl(item.url); setIframeBlocked(false); }}
+                    onClick={() => { setActiveUrl(item.url); setIframeBlocked(isIframeBlocked(item.url)); }}
                     style={{
                       padding: 10, borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s',
                       border: isActive ? '1px solid var(--primary-amber)' : '1px solid var(--border-subtle)',
@@ -394,22 +418,6 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
                       title="증거자료 미리보기"
                       style={{ width: '100%', flex: 1, border: 'none' }}
                       onError={() => setIframeBlocked(true)}
-                      onLoad={(e) => {
-                        // X-Frame-Options 차단 시 contentDocument 접근 불가 → about:blank로 대체됨
-                        try {
-                          const loc = e.target.contentWindow?.location?.href;
-                          if (loc === 'about:blank') setIframeBlocked(true);
-                        } catch {
-                          // cross-origin 접근 불가 = 정상 로드 중이거나 차단됨
-                          // 차단된 경우 브라우저가 빈 프레임을 보여주므로 타이머로 확인
-                          setTimeout(() => {
-                            try {
-                              const loc2 = e.target.contentWindow?.location?.href;
-                              if (!loc2 || loc2 === 'about:blank') setIframeBlocked(true);
-                            } catch { /* cross-origin 정상 */ }
-                          }, 2000);
-                        }
-                      }}
                     />
                   )
                 )}
