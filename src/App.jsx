@@ -1878,6 +1878,7 @@ export default function App() {
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
+                onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
               />
             )}
 

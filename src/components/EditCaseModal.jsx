@@ -6,6 +6,12 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
   if (!isOpen || !caseItem) return null;
 
   // 공개 범위 변경 권한: 담당검사·작성자·검찰총장만
+  const GLOBAL_DATA_ROLES = new Set(['SUPER_ADMIN', 'PROSECUTOR_GENERAL', 'CHIEF_PROSECUTOR', 'DEPUTY_CHIEF', 'CHIEF_ADMINISTRATOR']);
+  const isGlobalAccess = Boolean(currentUser?.isSuperAdmin || GLOBAL_DATA_ROLES.has(currentUser?.roleLevel));
+  const isSecretariat = Boolean(currentUser?.dept?.includes('사무국'));
+  // 담당검사 재배치 권한: 전역권한(검사장 이상)·사무국만 가능
+  const canReassign = isGlobalAccess || isSecretariat;
+
   const isOwner = Boolean(
     currentUser && (
       currentUser.id === caseItem.prosecutorId ||
@@ -150,11 +156,24 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
               </div>
               <div>
                 <label className="input-label">담당 검사</label>
-                <select className="select-field" name="prosecutorName" value={formData.prosecutorName || ''} onChange={handleChange}>
+                <select
+                  className="select-field"
+                  name="prosecutorName"
+                  value={formData.prosecutorName || ''}
+                  onChange={handleChange}
+                  disabled={!canReassign}
+                  title={!canReassign ? '담당검사 변경은 검사장 이상 또는 사무국만 가능합니다.' : undefined}
+                  style={!canReassign ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+                >
                   {prosecutorsList.map(p => (
                     <option key={p.id} value={p.name}>{p.name} ({p.position || p.title})</option>
                   ))}
                 </select>
+                {!canReassign && (
+                  <div style={{ marginTop: 3, fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                    담당검사 변경은 검사장 이상 또는 사무국 권한이 필요합니다.
+                  </div>
+                )}
               </div>
               <div>
                 <label className="input-label">📅 사건 발생일시 (공소시효 기산일)</label>

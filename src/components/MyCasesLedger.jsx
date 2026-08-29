@@ -22,6 +22,8 @@ import {
   ClipboardList,
   Clock,
   MessageSquare,
+  UserMinus,
+  ArrowRightLeft,
 } from "lucide-react";
 import EditCaseModal from "./EditCaseModal";
 import {
@@ -33,6 +35,8 @@ import {
   fetchApprovalTemplates,
   createApprovalTemplateApi,
   deleteApprovalTemplateApi,
+  updateProsecutorApi,
+  updateCaseApi,
 } from "../services/api";
 
 const STATUS_COLOR = (s) => {
@@ -1037,6 +1041,83 @@ export default function MyCasesLedger({
       "SENIOR_PROSECUTOR",
     ].includes(currentUser.roleLevel);
 
+  // 부서장(부장검사) 권한: 동일 부서 인원 휴직처리 + 부서 내 사건 재배당
+  const isSeniorProsecutor = currentUser.roleLevel === "SENIOR_PROSECUTOR";
+  const [seniorTab, setSeniorTab] = useState("leave"); // "leave" | "reassign"
+  const [leaveTarget, setLeaveTarget] = useState("");
+  const [leaveStatus, setLeaveStatus] = useState("LEAVE");
+  const [leaveLoading, setLeaveLoading] = useState(false);
+  const [reassignFromId, setReassignFromId] = useState("");
+  const [reassignToId, setReassignToId] = useState("");
+  const [reassignLoading, setReassignLoading] = useState(false);
+  const [seniorMsg, setSeniorMsg] = useState(null);
+
+  // 부서 내 하위 직급 검사 목록 (부장검사용)
+  const ROLE_AUTHORITY_CLIENT = {
+    PROBATIONARY: 10, ADMIN_PROBATIONARY: 15, ADMINISTRATOR: 30,
+    PROSECUTOR: 40, SENIOR_PROSECUTOR: 50, DEPUTY_CHIEF: 60,
+    CHIEF_ADMINISTRATOR: 65, CHIEF_PROSECUTOR: 70, PROSECUTOR_GENERAL: 80, SUPER_ADMIN: 100,
+  };
+  const deptMembers = prosecutorsList.filter(
+    (p) =>
+      p.dept === currentUser.dept &&
+      p.id !== currentUser.id &&
+      (ROLE_AUTHORITY_CLIENT[p.roleLevel] || 0) < (ROLE_AUTHORITY_CLIENT[currentUser.roleLevel] || 0),
+  );
+
+  const handleLeaveChange = async () => {
+    if (!leaveTarget) return;
+    setLeaveLoading(true);
+    setSeniorMsg(null);
+    const res = await updateProsecutorApi(leaveTarget, { status: leaveStatus });
+    setLeaveLoading(false);
+    if (res?.success) {
+      const target = deptMembers.find((p) => p.id === leaveTarget);
+      const statusLabel = leaveStatus === "LEAVE" ? "휴직" : leaveStatus === "INACTIVE" ? "비활성" : "복직";
+      setSeniorMsg({ type: "success", text: `✅ ${target?.name || leaveTarget} 검사를 ${statusLabel} 처리했습니다.` });
+    } else {
+      setSeniorMsg({ type: "error", text: `❌ 실패: ${res?.message || "서버 오류"}` });
+    }
+  };
+
+  const handleDeptReassign = async () => {
+    if (!reassignFromId || !reassignToId) return;
+    if (reassignFromId === reassignToId) {
+      setSeniorMsg({ type: "error", text: "같은 검사로는 재배당할 수 없습니다." });
+      return;
+    }
+    setReassignLoading(true);
+    setSeniorMsg(null);
+    // 해당 검사의 부서 내 활성 사건 목록 조회
+    const fromCases = ledgerData.filter(
+      (c) => c.prosecutorId === reassignFromId && !c.isArchived,
+    );
+    if (fromCases.length === 0) {
+      setReassignLoading(false);
+      setSeniorMsg({ type: "error", text: "재배당할 활성 사건이 없습니다." });
+      return;
+    }
+    const toP = deptMembers.find((p) => p.id === reassignToId) ||
+      prosecutorsList.find((p) => p.id === reassignToId);
+    let successCount = 0;
+    for (const c of fromCases) {
+      const res = await updateCaseApi(c.id, {
+        ...c,
+        prosecutorId: reassignToId,
+        prosecutorName: toP?.name || reassignToId,
+        forceReassign: true,
+      });
+      if (res?.success) successCount++;
+    }
+    setReassignLoading(false);
+    setSeniorMsg({
+      type: successCount > 0 ? "success" : "error",
+      text: successCount > 0
+        ? `✅ ${successCount}건 재배당 완료 → ${toP?.name || reassignToId}`
+        : "❌ 재배당에 실패했습니다.",
+    });
+  };
+
   const targetProsecutorName =
     isHighAdmin && selectedProsecutorFilter
       ? selectedProsecutorFilter
@@ -1327,6 +1408,130 @@ export default function MyCasesLedger({
           ))}
         </div>
       </div>
+
+      {/* ── 부서장 관리 패널 (부장검사 전용) ── */}
+      {isSeniorProsecutor && deptMembers.length > 0 && (
+        <div className="glass-panel" style={{ padding: '16px 20px', border: '1px solid rgba(245,158,11,0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <Users size={16} color="var(--primary-amber)" />
+            <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)' }}>
+              부서장 관리 패널
+            </span>
+            <span className="badge badge-gold" style={{ fontSize: '0.68rem' }}>
+              {currentUser.dept} 부서장
+            </span>
+          </div>
+
+          {/* 탭 */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+            {[
+              { id: 'leave', label: '휴직 / 복직 처리', icon: <UserMinus size={13} /> },
+              { id: 'reassign', label: '부서 내 사건 재배당', icon: <ArrowRightLeft size={13} /> },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => { setSeniorTab(t.id); setSeniorMsg(null); }}
+                className="btn"
+                style={{
+                  padding: '5px 14px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 5,
+                  background: seniorTab === t.id ? 'var(--primary-amber)' : 'rgba(255,255,255,0.05)',
+                  color: seniorTab === t.id ? '#000' : 'var(--text-main)',
+                  fontWeight: seniorTab === t.id ? 800 : 500,
+                  border: seniorTab === t.id ? 'none' : '1px solid var(--border-subtle)',
+                  borderRadius: 6,
+                }}
+              >
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 휴직 처리 탭 */}
+          {seniorTab === 'leave' && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div>
+                <label className="input-label">대상 검사</label>
+                <select className="select-field" style={{ width: 180 }} value={leaveTarget} onChange={(e) => setLeaveTarget(e.target.value)}>
+                  <option value="">-- 선택 --</option>
+                  {deptMembers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.position || p.title}) · {p.status === 'LEAVE' ? '휴직중' : p.status === 'INACTIVE' ? '비활성' : '재직중'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="input-label">처리 구분</label>
+                <select className="select-field" style={{ width: 140 }} value={leaveStatus} onChange={(e) => setLeaveStatus(e.target.value)}>
+                  <option value="ACTIVE">복직 (재직)</option>
+                  <option value="LEAVE">휴직 처리</option>
+                  <option value="INACTIVE">비활성 처리</option>
+                </select>
+              </div>
+              <button
+                onClick={handleLeaveChange}
+                disabled={!leaveTarget || leaveLoading}
+                className="btn btn-gold"
+                style={{ padding: '8px 18px', fontWeight: 700, opacity: leaveLoading ? 0.6 : 1 }}
+              >
+                <UserMinus size={14} /> {leaveLoading ? '처리 중...' : '적용'}
+              </button>
+            </div>
+          )}
+
+          {/* 사건 재배당 탭 */}
+          {seniorTab === 'reassign' && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div>
+                <label className="input-label">현재 담당 검사 (이관 출발)</label>
+                <select className="select-field" style={{ width: 200 }} value={reassignFromId} onChange={(e) => setReassignFromId(e.target.value)}>
+                  <option value="">-- 선택 --</option>
+                  {deptMembers.map((p) => {
+                    const cnt = ledgerData.filter((c) => c.prosecutorId === p.id && !c.isArchived).length;
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.position || p.title}) · {cnt}건
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <div style={{ color: 'var(--text-muted)', paddingBottom: 8 }}>→</div>
+              <div>
+                <label className="input-label">새 담당 검사 (이관 도착)</label>
+                <select className="select-field" style={{ width: 200 }} value={reassignToId} onChange={(e) => setReassignToId(e.target.value)}>
+                  <option value="">-- 선택 --</option>
+                  {deptMembers.filter((p) => p.id !== reassignFromId && p.status === 'ACTIVE').map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.position || p.title})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={handleDeptReassign}
+                disabled={!reassignFromId || !reassignToId || reassignLoading}
+                className="btn btn-gold"
+                style={{ padding: '8px 18px', fontWeight: 700, opacity: reassignLoading ? 0.6 : 1 }}
+              >
+                <ArrowRightLeft size={14} /> {reassignLoading ? '재배당 중...' : '전체 재배당'}
+              </button>
+            </div>
+          )}
+
+          {/* 결과 메시지 */}
+          {seniorMsg && (
+            <div style={{
+              marginTop: 12, padding: '7px 14px', borderRadius: 8, fontSize: '0.8rem',
+              background: seniorMsg.type === 'success' ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)',
+              color: seniorMsg.type === 'success' ? '#34d399' : '#f87171',
+              border: `1px solid ${seniorMsg.type === 'success' ? '#34d39940' : '#f8717140'}`,
+            }}>
+              {seniorMsg.text}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 현재 처리중 사건만 표시 — 보존기록은 검찰사무국에서 관리 */}
       <div

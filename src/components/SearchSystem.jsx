@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react';
+import { Search, ExternalLink, AlertCircle, RefreshCw, Clock } from 'lucide-react';
 import { isCaseConcluded, isCaseIndicted, isCaseInvestigating } from '../data/prosecutionData';
 import { isArchivedCase, matchesCaseNumber } from '../services/caseUtils';
 
@@ -11,7 +11,7 @@ const STATUS_COLOR = (s) => {
   return '#93c5fd';
 };
 
-export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSelectSuspect }) {
+export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSelectSuspect, onOpenTimeline }) {
   const [query, setQuery] = useState('');
   const [searchType, setSearchType] = useState('all');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -265,7 +265,14 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
                     )}
                   </div>
 
-                  <div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                    <button
+                      onClick={() => onOpenTimeline && onOpenTimeline(item)}
+                      className="btn btn-outline"
+                      style={{ padding: '4px 10px', fontSize: '0.72rem', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', gap: 4 }}
+                    >
+                      <Clock size={12} /> 타임라인
+                    </button>
                     {item.bookingBasis?.includes('http') ? (
                       <button
                         onClick={() => onSelectEvidence && onSelectEvidence(item.bookingBasis, item.hyeongjeNo, item.suspectName)}
@@ -274,9 +281,7 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
                       >
                         <ExternalLink size={12} /> 증거 확인
                       </button>
-                    ) : (
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>-</span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );

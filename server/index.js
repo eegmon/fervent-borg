@@ -1494,15 +1494,80 @@ app.post("/api/cases/bulk-import", requireAuth, requireSecretariat, async (req, 
 
 app.put("/api/cases/:id", requireAuth, requireCaseScope, asyncWrap(async (req, res) => {
   const c = req.body;
+
+  // ── 수정 소유권 체크 ────────────────────────────────────────────────
+  // 전역권한(검사장 이상)·사무국·직근상급자가 아닌 경우 본인 담당·작성 사건만 수정 가능
+  if (!hasGlobalDataAccess(req.user) && !hasSecretariatWorkAccess(req.user)) {
+    const ownerCheck = await db.execute({
+      sql: "SELECT prosecutor_id, created_by FROM cases WHERE id = ? AND deleted_at = ''",
+      args: [req.params.id],
+    });
+    const orow = ownerCheck.rows[0];
+    if (orow) {
+      const isOwner = orow.prosecutor_id === req.user.id || orow.created_by === req.user.id;
+      // 직근상급자(동일 부서 + 더 높은 직급) 여부 확인
+      let isSuperior = false;
+      if (!isOwner && orow.prosecutor_id) {
+        const sr = await db.execute({
+          sql: "SELECT role_level, dept FROM prosecutors WHERE id = ?",
+          args: [orow.prosecutor_id],
+        });
+        if (sr.rows.length > 0) {
+          const target = toCamel(sr.rows[0]);
+          const sameDept = (req.user.dept || "") && req.user.dept === target.dept;
+          const higherAuth =
+            (ROLE_AUTHORITY[effectiveRoleLevel(req.user)] || 0) >
+            (ROLE_AUTHORITY[target.roleLevel] || 0);
+          isSuperior = sameDept && higherAuth;
+        }
+      }
+      if (!isOwner && !isSuperior) {
+        return res.status(403).json({
+          success: false,
+          message: "담당검사 또는 작성자만 사건 원부를 수정할 수 있습니다.",
+        });
+      }
+    }
+  }
+
   if (c.forceReassign) {
-    if (
-      !hasSecretariatWorkAccess(req.user) &&
-      !GLOBAL_DATA_ROLES.has(effectiveRoleLevel(req.user))
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "사무국 탭에서만 강제 재배당할 수 있습니다.",
-      });
+    // 부서장(SENIOR_PROSECUTOR): 동일 부서 내 사건 재배당만 허용
+    const isSeniorProsecutorReassign = effectiveRoleLevel(req.user) === "SENIOR_PROSECUTOR";
+    const hasReassignAuth =
+      hasSecretariatWorkAccess(req.user) ||
+      GLOBAL_DATA_ROLES.has(effectiveRoleLevel(req.user));
+
+    if (!hasReassignAuth) {
+      if (isSeniorProsecutorReassign) {
+        // 현재 사건 담당검사와 새 담당검사 모두 동일 부서인지 확인
+        const caseOwnerRes = await db.execute({
+          sql: `SELECT p.dept FROM cases c JOIN prosecutors p ON c.prosecutor_id = p.id
+                WHERE c.id = ? AND c.deleted_at = ''`,
+          args: [req.params.id],
+        });
+        const newAssigneeRes = await db.execute({
+          sql: "SELECT dept FROM prosecutors WHERE id = ?",
+          args: [c.prosecutorId || ""],
+        });
+        const currentDept = caseOwnerRes.rows[0]?.dept || "";
+        const newDept = newAssigneeRes.rows[0]?.dept || "";
+        const requesterDept = req.user.dept || "";
+        if (
+          !requesterDept ||
+          requesterDept !== currentDept ||
+          requesterDept !== newDept
+        ) {
+          return res.status(403).json({
+            success: false,
+            message: "부서장은 동일 부서 내 사건만 재배당할 수 있습니다.",
+          });
+        }
+      } else {
+        return res.status(403).json({
+          success: false,
+          message: "사무국 탭에서만 강제 재배당할 수 있습니다.",
+        });
+      }
     }
     if (!(await validateForcedCaseAssignee(c.prosecutorId))) {
       return res.status(400).json({
@@ -1511,8 +1576,13 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, asyncWrap(async (req, r
       });
     }
   }
-  // 사무국 또는 직근 상급자(동일 부서 + 더 높은 직급)도 타인 명의 유지하며 수정 가능
-  const canEditOthers = hasGlobalDataAccess(req.user) || hasSecretariatWorkAccess(req.user);
+  // 사무국·전역권한·부서장은 타인 명의 유지하며 수정 가능
+  const isSeniorInDept = (() => {
+    if (effectiveRoleLevel(req.user) !== "SENIOR_PROSECUTOR") return false;
+    // PUT 본체에서 canEditOthers 판단용 — 부서 일치는 위 소유권 체크에서 이미 검증됨
+    return true;
+  })();
+  const canEditOthers = hasGlobalDataAccess(req.user) || hasSecretariatWorkAccess(req.user) || (c.forceReassign && isSeniorInDept);
   const assignedId = canEditOthers
     ? String(c.prosecutorId || "")
     : req.user.id;
@@ -2449,6 +2519,34 @@ app.patch(
       hasSecretariatWorkAccess(req.user);
 
     // 본인이 자기 프로필(제한 필드 제외)을 수정하는 경우는 허용
+    // 부서장(SENIOR_PROSECUTOR): 동일 부서 하위 직급의 status(휴직처리)만 변경 가능
+    const isSeniorProsecutor = effectiveRoleLevel(req.user) === "SENIOR_PROSECUTOR";
+    if (!isSelf && !isSuperAdmin && !isSecretariat && isSeniorProsecutor) {
+      // status 필드만 요청했는지 확인
+      const requestedFields = Object.keys(req.body).filter((f) => f !== undefined && req.body[f] !== undefined);
+      const onlyStatus = requestedFields.length === 1 && requestedFields[0] === "status";
+      const allowedStatuses = new Set(["ACTIVE", "LEAVE", "INACTIVE"]);
+      if (onlyStatus && allowedStatuses.has(req.body.status)) {
+        // 대상자가 동일 부서 + 하위 직급인지 확인
+        const targetRes = await db.execute({
+          sql: "SELECT role_level, dept FROM prosecutors WHERE id = ?",
+          args: [req.params.id],
+        });
+        if (targetRes.rows.length > 0) {
+          const target = toCamel(targetRes.rows[0]);
+          const sameDept = (req.user.dept || "") && req.user.dept === target.dept;
+          const isLower = (ROLE_AUTHORITY[effectiveRoleLevel(req.user)] || 0) > (ROLE_AUTHORITY[target.roleLevel] || 0);
+          if (sameDept && isLower) {
+            return next(); // 부서장 경로 통과 → 아래 PATCH 핸들러로 직접
+          }
+        }
+      }
+      return res.status(403).json({
+        success: false,
+        message: "부서장은 동일 부서 하위 직급의 재직상태(휴직처리)만 변경할 수 있습니다.",
+      });
+    }
+
     // 타인 계정 수정은 사무국/SUPER_ADMIN만 허용
     if (!isSelf && !isSuperAdmin && !isSecretariat) {
       return res.status(403).json({

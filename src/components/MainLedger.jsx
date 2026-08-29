@@ -97,6 +97,19 @@ export default function MainLedger({
         "CHIEF_PROSECUTOR",
       ].includes(currentUser.roleLevel));
 
+  // 사건 보존 권한: requireSecretariat 기준 (검사장 이상 + 사무국 + 검찰관리관 + 차장검사)
+  const canArchive =
+    currentUser &&
+    (currentUser.isSuperAdmin ||
+      [
+        "SUPER_ADMIN",
+        "PROSECUTOR_GENERAL",
+        "CHIEF_PROSECUTOR",
+        "DEPUTY_CHIEF",
+        "CHIEF_ADMINISTRATOR",
+      ].includes(currentUser.roleLevel) ||
+      String(currentUser.dept || "").includes("사무국"));
+
   // 결재 완료 여부: 해당 사건의 최종승인된 결재 문서 존재 여부
   const isCaseApprovalComplete = (caseItem) =>
     approvalsData.some(
@@ -765,7 +778,7 @@ export default function MainLedger({
                       )}
 
                     {/* 사건 보존 / 보존 해제 버튼 */}
-                    {onArchiveCase && (
+                    {onArchiveCase && canArchive && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
