@@ -26,6 +26,7 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [iframeBlocked, setIframeBlocked] = useState(false);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [inputMode, setInputMode] = useState('url'); // 'url' | 'file'
@@ -53,6 +54,7 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
 
   useEffect(() => {
     setActiveUrl(url || '');
+    setIframeBlocked(false);
   }, [url]);
 
   if (!isOpen) return null;
@@ -293,7 +295,7 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
                 return (
                   <div
                     key={item.id}
-                    onClick={() => setActiveUrl(item.url)}
+                    onClick={() => { setActiveUrl(item.url); setIframeBlocked(false); }}
                     style={{
                       padding: 10, borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s',
                       border: isActive ? '1px solid var(--primary-amber)' : '1px solid var(--border-subtle)',
@@ -371,7 +373,45 @@ export default function EvidenceModal({ isOpen, onClose, url, caseNo, suspectNam
                     </a>
                   </div>
                 ) : (
-                  <iframe src={activeUrl} title="증거자료 미리보기" style={{ width: '100%', flex: 1, border: 'none' }} />
+                  iframeBlocked ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, color: 'var(--text-muted)', padding: 24 }}>
+                      <ExternalLink size={48} color="var(--primary-amber)" />
+                      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)', textAlign: 'center' }}>
+                        이 사이트는 미리보기를 차단했습니다
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', maxWidth: 320 }}>
+                        네이버 카페 등 일부 사이트는 보안 정책으로 인해 내부 미리보기가 불가능합니다.<br />
+                        아래 버튼으로 새 창에서 직접 열어주세요.
+                      </div>
+                      <a href={activeUrl} target="_blank" rel="noopener noreferrer" className="btn btn-gold" style={{ fontSize: '0.82rem', padding: '8px 18px', gap: 6 }}>
+                        <ExternalLink size={14} /> 새 창에서 열기
+                      </a>
+                    </div>
+                  ) : (
+                    <iframe
+                      key={activeUrl}
+                      src={activeUrl}
+                      title="증거자료 미리보기"
+                      style={{ width: '100%', flex: 1, border: 'none' }}
+                      onError={() => setIframeBlocked(true)}
+                      onLoad={(e) => {
+                        // X-Frame-Options 차단 시 contentDocument 접근 불가 → about:blank로 대체됨
+                        try {
+                          const loc = e.target.contentWindow?.location?.href;
+                          if (loc === 'about:blank') setIframeBlocked(true);
+                        } catch {
+                          // cross-origin 접근 불가 = 정상 로드 중이거나 차단됨
+                          // 차단된 경우 브라우저가 빈 프레임을 보여주므로 타이머로 확인
+                          setTimeout(() => {
+                            try {
+                              const loc2 = e.target.contentWindow?.location?.href;
+                              if (!loc2 || loc2 === 'about:blank') setIframeBlocked(true);
+                            } catch { /* cross-origin 정상 */ }
+                          }, 2000);
+                        }
+                      }}
+                    />
+                  )
                 )}
               </>
             ) : (

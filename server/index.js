@@ -162,6 +162,7 @@ app.use((_req, res, next) => {
       "img-src 'self' data: https:",
       "font-src 'self' data:",
       "connect-src 'self'",
+      "frame-src 'self' https://cafe.naver.com https://naver.me https:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -339,6 +340,10 @@ async function requireCaseScope(req, res, next) {
   if (isProsecutorGeneral(req.user)) {
     return next();
   }
+  // 차장검사·검사장(GLOBAL_DATA_ROLES)은 부서 무관하게 모든 사건 접근 가능
+  if (hasGlobalDataAccess(req.user)) {
+    return next();
+  }
   // 사무국 계정: PUBLIC 사건만 무조건 통과. PRIVATE 사건은 아래 허용 목록으로 판단.
   const result = await db.execute({
     sql: `SELECT c.visibility, c.created_by, c.prosecutor_id,
@@ -358,6 +363,23 @@ async function requireCaseScope(req, res, next) {
   const privateViewerIds = String(row.private_viewer_ids || "[]");
   const uid = req.user.id;
 
+  // 직근 상급자 체크 헬퍼: 동일 부서이고 요청자 직급 > 담당검사 직급이면 true
+  async function isDirectSuperior(requesterId, targetProsecutorId) {
+    if (!targetProsecutorId) return false;
+    const r = await db.execute({
+      sql: "SELECT role_level, dept FROM prosecutors WHERE id = ?",
+      args: [targetProsecutorId],
+    });
+    if (r.rows.length === 0) return false;
+    const target = toCamel(r.rows[0]);
+    const requesterDept = req.user.dept || "";
+    const targetDept = target.dept || "";
+    if (!requesterDept || requesterDept !== targetDept) return false;
+    const requesterAuth = ROLE_AUTHORITY[effectiveRoleLevel(req.user)] || 0;
+    const targetAuth = ROLE_AUTHORITY[target.roleLevel] || 0;
+    return requesterAuth > targetAuth;
+  }
+
   // PRIVATE 사건: 담당검사, 작성자, privateViewerIds에 명시된 자, 검찰총장만 수사 내용 열람 가능.
   // 사무국은 행정 접근(사건번호·처분 확인)은 허용하되 수사 내용은 GET /api/cases 마스킹으로 처리.
   if (visibility === "PRIVATE") {
@@ -376,6 +398,10 @@ async function requireCaseScope(req, res, next) {
 
   // PUBLIC 사건: 사무국이면 통과, 아니면 부서 일치 또는 본인 사건 확인
   if (hasSecretariatWorkAccess(req.user)) {
+    return next();
+  }
+  // 직근 상급자(동일 부서 + 더 높은 직급)이면 통과
+  if (await isDirectSuperior(uid, prosecutorId)) {
     return next();
   }
   const scopeResult = await db.execute({
@@ -1484,10 +1510,12 @@ app.put("/api/cases/:id", requireAuth, requireCaseScope, asyncWrap(async (req, r
       });
     }
   }
-  const assignedId = hasGlobalDataAccess(req.user)
+  // 사무국 또는 직근 상급자(동일 부서 + 더 높은 직급)도 타인 명의 유지하며 수정 가능
+  const canEditOthers = hasGlobalDataAccess(req.user) || hasSecretariatWorkAccess(req.user);
+  const assignedId = canEditOthers
     ? String(c.prosecutorId || "")
     : req.user.id;
-  const assignedName = hasGlobalDataAccess(req.user)
+  const assignedName = canEditOthers
     ? String(c.prosecutorName || "")
     : req.user.name;
 
