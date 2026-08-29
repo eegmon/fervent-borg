@@ -69,6 +69,7 @@ export default function MainLedger({
   chargesData = [],
   onSelectEvidence,
   onSelectSuspect,
+  onOpenSuspectProfile,
   onCreateApproval,
   onUpdateCase,
   onArchiveCase,
@@ -637,7 +638,29 @@ export default function MainLedger({
                         marginTop: 2,
                       }}
                     >
-                      {item.suspectUuid && item.suspectUuid !== "-" && item.suspectUuid !== "00" ? item.suspectUuid : ""}
+                      {item.suspectUuid && item.suspectUuid !== "-" && item.suspectUuid !== "00"
+                        ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenSuspectProfile && onOpenSuspectProfile(item.suspectUuid);
+                            }}
+                            title="통합 프로필 열기"
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              cursor: "pointer",
+                              fontFamily: "monospace",
+                              fontSize: "0.72rem",
+                              color: "rgba(245,158,11,0.6)",
+                              textDecoration: "underline dotted",
+                            }}
+                          >
+                            {item.suspectUuid}
+                          </button>
+                        )
+                        : ""}
                     </div>
                     <div
                       style={{

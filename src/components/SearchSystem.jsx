@@ -11,7 +11,7 @@ const STATUS_COLOR = (s) => {
   return '#93c5fd';
 };
 
-export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSelectSuspect, onOpenTimeline }) {
+export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSelectSuspect, onOpenSuspectProfile, onOpenTimeline }) {
   const [query, setQuery] = useState('');
   const [searchType, setSearchType] = useState('all');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -234,12 +234,18 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
                       <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.85rem', textDecoration: 'underline dotted' }}>
                         {item.suspectName || '-'}
                       </div>
-                      {item.suspectUuid && (
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'monospace', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    </button>
+                    {item.suspectUuid && (
+                      <button
+                        onClick={() => onOpenSuspectProfile && onOpenSuspectProfile(item.suspectUuid)}
+                        title="통합 프로필 열기"
+                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                      >
+                        <div style={{ fontSize: '0.68rem', color: 'rgba(245,158,11,0.6)', fontFamily: 'monospace', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'underline dotted' }}>
                           {item.suspectUuid}
                         </div>
-                      )}
-                    </button>
+                      </button>
+                    )}
                   </div>
 
                   <div>

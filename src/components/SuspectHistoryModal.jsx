@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, User, Clock, RefreshCw } from 'lucide-react';
 import { fetchSuspectProfile } from '../services/api';
 
-export default function SuspectHistoryModal({ isOpen, onClose, suspectName, suspectUuid, ledgerData }) {
+export default function SuspectHistoryModal({ isOpen, onClose, suspectName, suspectUuid, ledgerData, onOpenSuspectProfile }) {
   if (!isOpen) return null;
 
   const [profileData, setProfileData] = useState(null);
@@ -66,9 +66,33 @@ export default function SuspectHistoryModal({ isOpen, onClose, suspectName, susp
               </div>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-            <X size={18} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {displayUuid && onOpenSuspectProfile && (
+              <button
+                onClick={() => { onOpenSuspectProfile(displayUuid); onClose(); }}
+                style={{
+                  background: 'rgba(245,158,11,0.12)',
+                  border: '1px solid rgba(245,158,11,0.35)',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  color: 'var(--primary-amber)',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  padding: '5px 11px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  whiteSpace: 'nowrap',
+                }}
+                title="통합 프로필 (사건·영장·항고·통계)"
+              >
+                👤 통합 프로필
+              </button>
+            )}
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {loading ? (

@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Save, Edit, Scale, AlertCircle, Search, RefreshCw, Plus, Trash2, Users, Lock, Unlock } from 'lucide-react';
 import { fetchMojangUuid } from '../services/mojangApi';
+import { useDraft } from '../services/useDraft';
 
 export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prosecutorsList = [], chargesData = [], currentUser, onToast }) {
-  if (!isOpen || !caseItem) return null;
+  // ── 임시저장 훅 (사건 ID별 독립 키) ─────────────────────────────
+  const draftKey = caseItem ? `dose_draft_edit_${caseItem.id}` : null;
+  const { hasDraft, readDraft, saveDraft, clearDraft } = useDraft(draftKey || 'dose_draft_edit_none');
 
   // 공개 범위 변경 권한: 담당검사·작성자·검찰총장만
   const GLOBAL_DATA_ROLES = new Set(['SUPER_ADMIN', 'PROSECUTOR_GENERAL', 'CHIEF_PROSECUTOR', 'DEPUTY_CHIEF', 'CHIEF_ADMINISTRATOR']);
@@ -14,17 +17,17 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
 
   const isOwner = Boolean(
     currentUser && (
-      currentUser.id === caseItem.prosecutorId ||
-      currentUser.id === caseItem.createdBy
+      currentUser.id === caseItem?.prosecutorId ||
+      currentUser.id === caseItem?.createdBy
     )
   );
   const isProsecutorGeneral = Boolean(currentUser?.isSuperAdmin || currentUser?.roleLevel === 'PROSECUTOR_GENERAL');
   const canEditVisibility = isOwner || isProsecutorGeneral;
 
-  const [formData, setFormData] = useState({ ...caseItem });
+  const [formData, setFormData] = useState(() => caseItem ? { ...caseItem } : {});
   // privateViewerIds: caseItem에서 파싱 (서버에서 JSON 문자열로 올 수 있음)
   const [privateViewerIds, setPrivateViewerIds] = useState(() => {
-    const raw = caseItem.privateViewerIds;
+    const raw = caseItem?.privateViewerIds;
     if (Array.isArray(raw)) return raw;
     if (typeof raw === 'string') {
       try { return JSON.parse(raw); } catch { return []; }
@@ -33,18 +36,60 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
   });
 
   const [suspectsList, setSuspectsList] = useState(() => {
-    if (caseItem.suspects && caseItem.suspects.length > 0) {
-      return caseItem.suspects;
-    }
-    return [
-      { id: 1, name: caseItem.suspectName || '', uuid: caseItem.suspectUuid || '', role: '주범', bookingStatus: caseItem.bookingStatus || '입건:불구속' }
-    ];
+    if (caseItem?.suspects && caseItem.suspects.length > 0) return caseItem.suspects;
+    return [{ id: 1, name: caseItem?.suspectName || '', uuid: caseItem?.suspectUuid || '', role: '주범', bookingStatus: caseItem?.bookingStatus || '입건:불구속' }];
   });
 
   const [mojangLoadingMap, setMojangLoadingMap] = useState({});
   const [mojangStatusMsg, setMojangStatusMsg] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+
+  // caseItem이 바뀌면(다른 사건 열기) 상태 초기화
+  useEffect(() => {
+    if (!caseItem) return;
+    setFormData({ ...caseItem });
+    const raw = caseItem.privateViewerIds;
+    setPrivateViewerIds(
+      Array.isArray(raw) ? raw :
+      typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []
+    );
+    setSuspectsList(
+      caseItem.suspects?.length > 0
+        ? caseItem.suspects
+        : [{ id: 1, name: caseItem.suspectName || '', uuid: caseItem.suspectUuid || '', role: '주범', bookingStatus: caseItem.bookingStatus || '입건:불구속' }]
+    );
+    setSaveError(null);
+    setMojangStatusMsg(null);
+  }, [caseItem?.id]);
+
+  // 모달 열릴 때 draft 감지
+  useEffect(() => {
+    if (isOpen && caseItem && hasDraft) setShowDraftBanner(true);
+    if (!isOpen) setShowDraftBanner(false);
+  }, [isOpen, caseItem?.id]);
+
+  // 폼 변경 시 자동 임시저장
+  useEffect(() => {
+    if (!isOpen || !caseItem) return;
+    saveDraft({ formData, suspectsList });
+  }, [formData, suspectsList, isOpen]);
+
+  const handleRestoreDraft = () => {
+    const draft = readDraft();
+    if (!draft) return;
+    if (draft.formData) setFormData(prev => ({ ...prev, ...draft.formData }));
+    if (draft.suspectsList?.length) setSuspectsList(draft.suspectsList);
+    setShowDraftBanner(false);
+  };
+
+  const handleDiscardDraft = () => {
+    clearDraft();
+    setShowDraftBanner(false);
+  };
+
+  if (!isOpen || !caseItem) return null;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -115,6 +160,7 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
       return;
     }
     // 성공(true) 또는 구버전 onSave(undefined) 모두 닫기
+    clearDraft();
     onClose();
   };
 
@@ -146,6 +192,27 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* 임시저장 복원 배너 */}
+          {showDraftBanner && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 14px', borderRadius: 8,
+              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', gap: 10,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', color: 'var(--primary-amber)', fontWeight: 700 }}>
+                <Save size={14} />
+                이전에 수정 중이던 내용이 있습니다. 이어서 수정하시겠습니까?
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button type="button" onClick={handleRestoreDraft} className="btn btn-gold" style={{ padding: '4px 12px', fontSize: '0.75rem' }}>
+                  불러오기
+                </button>
+                <button type="button" onClick={handleDiscardDraft} className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: '0.75rem' }}>
+                  무시
+                </button>
+              </div>
+            </div>
+          )}
           {/* Section 1: Basic Info */}
           <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 16, border: '1px solid var(--border-subtle)' }}>
             <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary-amber)', marginBottom: 12 }}>1. 사건 기본 정보</div>

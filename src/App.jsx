@@ -25,6 +25,7 @@ import SecretariatAdmin from "./components/SecretariatAdmin";
 import IntakeModal from "./components/IntakeModal";
 import EvidenceModal from "./components/EvidenceModal";
 import SuspectHistoryModal from "./components/SuspectHistoryModal";
+import SuspectProfileModal from "./components/SuspectProfileModal";
 import LoginModal from "./components/LoginModal";
 import PasswordChangeModal from "./components/PasswordChangeModal";
 import DeadlineAlertModal from "./components/DeadlineAlertModal";
@@ -196,6 +197,7 @@ export default function App() {
   // suspectHistoryName: { name: string, uuid: string | null } 또는 문자열(하위호환)
   const [timelineCaseItem, setTimelineCaseItem] = useState(null);
   const [memoCaseItem, setMemoCaseItem] = useState(null);
+  const [suspectProfileUuid, setSuspectProfileUuid] = useState(null);
   const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [intakeNoticeData, setIntakeNoticeData] = useState(null);
@@ -1713,6 +1715,7 @@ export default function App() {
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
+                onOpenSuspectProfile={(uuid) => setSuspectProfileUuid(uuid)}
                 onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
                 onOpenMemo={(caseItem) => setMemoCaseItem(caseItem)}
                 onOpenApprovalForCase={handleCreateApprovalForCase}
@@ -1736,6 +1739,7 @@ export default function App() {
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
+                onOpenSuspectProfile={(uuid) => setSuspectProfileUuid(uuid)}
               />
             )}
 
@@ -1749,6 +1753,7 @@ export default function App() {
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
+                onOpenSuspectProfile={(uuid) => setSuspectProfileUuid(uuid)}
                 onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
                 onOpenMemo={(caseItem) => setMemoCaseItem(caseItem)}
                 onCreateApproval={handleCreateApprovalForCase}
@@ -1831,6 +1836,7 @@ export default function App() {
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
+                onOpenSuspectProfile={(uuid) => setSuspectProfileUuid(uuid)}
               />
             )}
 
@@ -1846,6 +1852,7 @@ export default function App() {
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
+                onOpenSuspectProfile={(uuid) => setSuspectProfileUuid(uuid)}
               />
             )}
 
@@ -1856,6 +1863,7 @@ export default function App() {
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
+                onOpenSuspectProfile={(uuid) => setSuspectProfileUuid(uuid)}
               />
             )}
 
@@ -1867,6 +1875,7 @@ export default function App() {
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
+                onOpenSuspectProfile={(uuid) => setSuspectProfileUuid(uuid)}
                 onArchiveCase={handleArchiveCase}
               />
             )}
@@ -1878,12 +1887,17 @@ export default function App() {
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
                 onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
+                onOpenSuspectProfile={(uuid) => setSuspectProfileUuid(uuid)}
                 onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
               />
             )}
 
             {activeTab === "analytics" && (
-              <AnalyticsDashboard ledgerData={scopedLedgerData} />
+              <AnalyticsDashboard
+                ledgerData={scopedLedgerData}
+                prosecutorsList={prosecutorsList}
+                approvalsData={approvalsData}
+              />
             )}
 
             {activeTab === "auditlog" && canViewLoginRecords && (
@@ -1934,6 +1948,13 @@ export default function App() {
         suspectUuid={suspectHistoryName?.uuid || null}
         ledgerData={ledgerData}
         onClose={() => setSuspectHistoryName(null)}
+        onOpenSuspectProfile={(uuid) => setSuspectProfileUuid(uuid)}
+      />
+
+      <SuspectProfileModal
+        uuid={suspectProfileUuid}
+        onClose={() => setSuspectProfileUuid(null)}
+        currentUser={currentUser}
       />
 
       <CaseTimelineModal

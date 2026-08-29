@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { BarChart3, Scale, Users, Archive, CheckCircle2, X } from 'lucide-react';
+import { BarChart3, Scale, Users, Archive, CheckCircle2, X, TrendingUp, Clock, ShieldAlert, FileCheck } from 'lucide-react';
 import {
   isCaseConcluded,
   isCaseIndicted,
@@ -158,7 +158,8 @@ function getVisibleCategories(archiveFilter) {
   );
 }
 
-export default function AnalyticsDashboard({ ledgerData = [] }) {
+export default function AnalyticsDashboard({ ledgerData = [], prosecutorsList = [], approvalsData = [] }) {
+  const [activeTab, setActiveTab] = useState('stats');
   const [archiveFilter, setArchiveFilter] = useState('ALL');
   const [selectedProsecutor, setSelectedProsecutor] = useState(null);
 
@@ -204,20 +205,241 @@ export default function AnalyticsDashboard({ ledgerData = [] }) {
     setSelectedProsecutor(null);
   };
 
+  // ── workload 집계 ────────────────────────────────────────────────
+  const thisMonth = new Date().toISOString().slice(0, 7); // "2026-08"
+
+  const workloadByProsecutor = useMemo(() => {
+    const map = {};
+
+    // prosecutorsList 기준으로 초기화
+    prosecutorsList.forEach((p) => {
+      map[p.name] = {
+        id: p.id,
+        name: p.name,
+        dept: p.dept || '-',
+        position: p.position || p.title || p.roleLevel || '',
+        total: 0,
+        pending: 0,       // 미종국 (수사 진행중)
+        detained: 0,      // 구속 사건
+        disposedThisMonth: 0,  // 이번 달 처분 건수
+        avgDays: null,    // 평균 처분 소요일
+        approvalPending: 0, // 결재 대기
+        _disposalDaysSum: 0,
+        _disposalCount: 0,
+      };
+    });
+
+    ledgerData.forEach((c) => {
+      const name = c.prosecutorName || '미배정';
+      if (!map[name]) {
+        map[name] = { id: '', name, dept: '-', position: '', total: 0, pending: 0, detained: 0, disposedThisMonth: 0, avgDays: null, approvalPending: 0, _disposalDaysSum: 0, _disposalCount: 0 };
+      }
+      const entry = map[name];
+      entry.total += 1;
+
+      const disp = c.disposition || c.bookingStatus || '';
+      const isClosed = isCaseConcluded(c) || isCaseIndicted(c);
+
+      if (!isClosed && !isArchivedCase(c)) entry.pending += 1;
+      if ((c.bookingStatus || '').includes('구속') || disp.includes('구속')) entry.detained += 1;
+
+      // 이번 달 처분 건수 — disposition 또는 bookingDate가 이번 달인 경우
+      const dateRef = c.updatedAt || c.bookingDate || '';
+      if (isClosed && dateRef.startsWith(thisMonth)) entry.disposedThisMonth += 1;
+
+      // 평균 처분 소요일 계산
+      if (isClosed && c.bookingDate) {
+        const start = new Date(c.bookingDate);
+        const end = c.updatedAt ? new Date(c.updatedAt) : new Date();
+        const days = Math.max(0, Math.round((end - start) / 86400000));
+        if (!isNaN(days)) {
+          entry._disposalDaysSum += days;
+          entry._disposalCount += 1;
+        }
+      }
+    });
+
+    // 결재 대기 수
+    approvalsData.forEach((doc) => {
+      const name = doc.prosecutorName || '';
+      if (map[name] && (doc.status || '').includes('대기')) {
+        map[name].approvalPending += 1;
+      }
+    });
+
+    // 평균 처분 소요일 마무리
+    Object.values(map).forEach((entry) => {
+      if (entry._disposalCount > 0) {
+        entry.avgDays = Math.round(entry._disposalDaysSum / entry._disposalCount);
+      }
+    });
+
+    return Object.values(map)
+      .filter((e) => e.total > 0 || prosecutorsList.some((p) => p.name === e.name))
+      .sort((a, b) => b.pending - a.pending || b.total - a.total);
+  }, [ledgerData, approvalsData, prosecutorsList, thisMonth]);
+
+  const workloadSummary = useMemo(() => ({
+    totalProsecutors: workloadByProsecutor.filter((e) => e.total > 0).length,
+    maxPending: Math.max(...workloadByProsecutor.map((e) => e.pending), 1),
+    avgPending: workloadByProsecutor.length
+      ? Math.round(workloadByProsecutor.reduce((s, e) => s + e.pending, 0) / workloadByProsecutor.filter(e => e.total > 0).length || 0)
+      : 0,
+    totalDetained: workloadByProsecutor.reduce((s, e) => s + e.detained, 0),
+    totalApprovalPending: workloadByProsecutor.reduce((s, e) => s + e.approvalPending, 0),
+  }), [workloadByProsecutor]);
+
+  const LOAD_COLOR = (pending, max) => {
+    const ratio = max ? pending / max : 0;
+    if (ratio >= 0.75) return '#f87171';
+    if (ratio >= 0.4) return '#fbbf24';
+    return '#34d399';
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div className="glass-panel gold-border" style={{ padding: '16px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+      {/* 탭 헤더 */}
+      <div className="glass-panel gold-border" style={{ padding: '14px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
           <BarChart3 size={18} color="var(--primary-amber)" />
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-main)' }}>통계 및 실시간 현황</div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-              {filterMeta?.sub} 기준 · {stats.total}건 조회 중
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>사건 처분 통계 · 검사별 업무 부담 현황</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 0 }}>
+          {[
+            { id: 'stats', label: '📊 통계 현황' },
+            { id: 'workload', label: '⚖️ 업무 부담' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '8px 18px',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                borderBottom: activeTab === tab.id ? '2px solid var(--primary-amber)' : '2px solid transparent',
+                color: activeTab === tab.id ? 'var(--primary-amber)' : 'var(--text-muted)',
+                marginBottom: -1,
+                transition: 'all 0.15s',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ══ 업무 부담 탭 ══ */}
+      {activeTab === 'workload' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* 요약 카드 */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+            {[
+              { label: '활동 검사', value: workloadSummary.totalProsecutors, color: '#60a5fa', icon: <Users size={14} /> },
+              { label: '담당 중 평균', value: `${workloadSummary.avgPending}건`, color: '#fbbf24', icon: <TrendingUp size={14} /> },
+              { label: '구속 사건', value: workloadSummary.totalDetained, color: '#f87171', icon: <ShieldAlert size={14} /> },
+              { label: '결재 대기', value: workloadSummary.totalApprovalPending, color: '#a78bfa', icon: <FileCheck size={14} /> },
+            ].map((s) => (
+              <div key={s.label} className="glass-panel" style={{ padding: '16px 18px', borderLeft: `3px solid ${s.color}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: s.color, marginBottom: 6 }}>
+                  {s.icon}
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700 }}>{s.label}</span>
+                </div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: s.color }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* 검사별 상세 테이블 */}
+          <div className="glass-panel" style={{ padding: 20, overflow: 'hidden' }}>
+            <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Users size={16} color="var(--primary-amber)" />
+              검사별 업무 부담 현황
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+              미종국 사건이 많을수록 적색 · 미종국 기준 내림차순 정렬
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: 600 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                    {['검사', '부서', '전체', '미종국', '구속', '이번달 처분', '평균소요일', '결재대기', '부하'].map((h) => (
+                      <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {workloadByProsecutor.map((e, idx) => {
+                    const loadColor = LOAD_COLOR(e.pending, workloadSummary.maxPending);
+                    const loadPct = workloadSummary.maxPending ? Math.round((e.pending / workloadSummary.maxPending) * 100) : 0;
+                    return (
+                      <tr
+                        key={e.id || e.name}
+                        style={{
+                          borderBottom: '1px solid var(--border-subtle)',
+                          background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
+                        }}
+                      >
+                        <td style={{ padding: '10px 10px', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
+                          {e.name}
+                          {e.position && (
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>{e.position}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 10px', color: 'var(--text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{e.dept}</td>
+                        <td style={{ padding: '10px 10px', fontWeight: 700, color: '#93c5fd', textAlign: 'center' }}>{e.total}</td>
+                        <td style={{ padding: '10px 10px', fontWeight: 800, color: loadColor, textAlign: 'center' }}>
+                          {e.pending}
+                        </td>
+                        <td style={{ padding: '10px 10px', fontWeight: 700, color: e.detained > 0 ? '#f87171' : 'var(--text-muted)', textAlign: 'center' }}>
+                          {e.detained > 0 ? e.detained : '-'}
+                        </td>
+                        <td style={{ padding: '10px 10px', fontWeight: 700, color: '#34d399', textAlign: 'center' }}>
+                          {e.disposedThisMonth > 0 ? e.disposedThisMonth : '-'}
+                        </td>
+                        <td style={{ padding: '10px 10px', color: 'var(--text-muted)', textAlign: 'center', fontFamily: 'monospace' }}>
+                          {e.avgDays !== null ? `${e.avgDays}일` : '-'}
+                        </td>
+                        <td style={{ padding: '10px 10px', fontWeight: 700, color: e.approvalPending > 0 ? '#a78bfa' : 'var(--text-muted)', textAlign: 'center' }}>
+                          {e.approvalPending > 0 ? e.approvalPending : '-'}
+                        </td>
+                        <td style={{ padding: '10px 14px', minWidth: 100 }}>
+                          <div style={{ height: 8, background: 'var(--bg-elevated)', borderRadius: 4, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${loadPct}%`, background: loadColor, borderRadius: 4, transition: 'width 0.4s' }} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {workloadByProsecutor.length === 0 && (
+                    <tr>
+                      <td colSpan={9} style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                        담당 사건 데이터가 없습니다.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
+      )}
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {/* 통계 현황 탭: 아카이브 필터 */}
+      {activeTab === 'stats' && <>
+      <div className="glass-panel" style={{ padding: '12px 20px' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginRight: 4 }}>
+            {filterMeta?.sub} 기준 · {stats.total}건
+          </span>
           {ARCHIVE_FILTERS.map((f) => {
             const isActive = archiveFilter === f.id;
             return (
@@ -503,6 +725,7 @@ export default function AnalyticsDashboard({ ledgerData = [] }) {
           상단 필터에서 <strong style={{ color: 'var(--text-main)' }}>보존 미적용</strong> / <strong style={{ color: 'var(--text-main)' }}>보존 적용</strong>으로 나눠 통계를 확인할 수 있습니다.
         </div>
       </div>
+      </>}
     </div>
   );
 }

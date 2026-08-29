@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Scale,
   Link,
@@ -9,8 +9,10 @@ import {
   Plus,
   Trash2,
   Users,
+  Save,
 } from "lucide-react";
 import { fetchMojangUuid } from "../services/mojangApi";
+import { useDraft } from "../services/useDraft";
 
 export default function IntakeModal({
   isOpen,
@@ -73,6 +75,36 @@ export default function IntakeModal({
 
   const [mojangLoadingMap, setMojangLoadingMap] = useState({});
   const [mojangStatusMsg, setMojangStatusMsg] = useState(null);
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+
+  // ── 임시저장 훅 ─────────────────────────────────────────────────
+  const DRAFT_KEY = "dose_draft_intake";
+  const { hasDraft, readDraft, saveDraft, clearDraft } = useDraft(DRAFT_KEY);
+
+  // 모달 열릴 때 draft 존재 여부 배너 표시
+  useEffect(() => {
+    if (isOpen && hasDraft) setShowDraftBanner(true);
+  }, [isOpen]);
+
+  // 폼 변경 시 자동 임시저장
+  useEffect(() => {
+    if (!isOpen) return;
+    saveDraft({ formData, chargeRows, suspectsList });
+  }, [formData, chargeRows, suspectsList, isOpen]);
+
+  const handleRestoreDraft = () => {
+    const draft = readDraft();
+    if (!draft) return;
+    if (draft.formData) setFormData((prev) => ({ ...prev, ...draft.formData }));
+    if (draft.chargeRows?.length) setChargeRows(draft.chargeRows);
+    if (draft.suspectsList?.length) setSuspectsList(draft.suspectsList);
+    setShowDraftBanner(false);
+  };
+
+  const handleDiscardDraft = () => {
+    clearDraft();
+    setShowDraftBanner(false);
+  };
 
   if (!isOpen) return null;
 
@@ -278,6 +310,7 @@ export default function IntakeModal({
           ? `공동피의자 사건 (총 ${validSuspects.length}명: ${validSuspects.map((s) => `${s.name}[${s.role}]`).join(", ")})`
           : "신규 접수 및 담당검사 배당 완료",
     });
+    clearDraft();
     onClose();
   };
 
@@ -359,6 +392,44 @@ export default function IntakeModal({
           onSubmit={handleSubmit}
           style={{ display: "flex", flexDirection: "column", gap: 16 }}
         >
+          {/* 임시저장 복원 배너 */}
+          {showDraftBanner && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: "rgba(245,158,11,0.1)",
+                border: "1px solid rgba(245,158,11,0.35)",
+                gap: 10,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.82rem", color: "var(--primary-amber)", fontWeight: 700 }}>
+                <Save size={14} />
+                이전에 작성 중이던 내용이 있습니다. 이어서 작성하시겠습니까?
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={handleRestoreDraft}
+                  className="btn btn-gold"
+                  style={{ padding: "4px 12px", fontSize: "0.75rem" }}
+                >
+                  불러오기
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDiscardDraft}
+                  className="btn btn-secondary"
+                  style={{ padding: "4px 12px", fontSize: "0.75rem" }}
+                >
+                  무시
+                </button>
+              </div>
+            </div>
+          )}
           {/* Case Numbers */}
           <div
             style={{
