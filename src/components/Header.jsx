@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import MinecraftAvatar from "./MinecraftAvatar";
 import {
   Scale,
   FileSpreadsheet,
@@ -52,6 +53,8 @@ export default function Header({
   canViewLoginRecords = false,
   theme = "dark",
   onToggleTheme,
+  isReadOnly = false,
+  onReturnToActive,
 }) {
   return (
     <header
@@ -173,7 +176,18 @@ export default function Header({
           <button
             onClick={onOpenIntakeModal}
             className="btn btn-gold"
-            style={{ fontSize: "0.8rem", padding: "7px 14px" }}
+            disabled={isReadOnly}
+            style={{
+              fontSize: "0.8rem",
+              padding: "7px 14px",
+              opacity: isReadOnly ? 0.4 : 1,
+              cursor: isReadOnly ? "not-allowed" : "pointer",
+            }}
+            title={
+              isReadOnly
+                ? "휴가 또는 직무대리 위임 중에는 신규 사건을 접수할 수 없습니다."
+                : "신규 사건 접수"
+            }
           >
             <PlusCircle size={15} />
             신규 사건 접수
@@ -250,22 +264,15 @@ export default function Header({
                 border: "1px solid var(--border-subtle)",
               }}
             >
-              <div
+              <MinecraftAvatar
+                name={currentUser.name}
+                size={28}
                 style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
                   background: "var(--primary-amber)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 800,
-                  fontSize: "0.8rem",
                   color: "#000",
+                  border: "none",
                 }}
-              >
-                {currentUser.name[0]}
-              </div>
+              />
               <div style={{ lineHeight: 1.3 }}>
                 <div
                   style={{
@@ -328,6 +335,54 @@ export default function Header({
           )}
         </div>
       </div>
+
+      {/* Read Only Status Banner */}
+      {isReadOnly && currentUser && (
+        <div
+          style={{
+            background:
+              currentUser.status === "ON_LEAVE"
+                ? "rgba(245,158,11,0.12)"
+                : "rgba(249,115,22,0.12)",
+            borderTop: `1px solid ${
+              currentUser.status === "ON_LEAVE"
+                ? "rgba(245,158,11,0.3)"
+                : "rgba(249,115,22,0.3)"
+            }`,
+            borderBottom: `1px solid ${
+              currentUser.status === "ON_LEAVE"
+                ? "rgba(245,158,11,0.4)"
+                : "rgba(249,115,22,0.4)"
+            }`,
+            padding: "8px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            fontSize: "0.82rem",
+          }}
+        >
+          <span
+            style={{
+              color:
+                currentUser.status === "ON_LEAVE" ? "#f59e0b" : "#f97316",
+              fontWeight: 700,
+            }}
+          >
+            {currentUser.status === "ON_LEAVE"
+              ? "🟡 휴가 중 — 읽기 전용 모드로 접속 중입니다. 데이터 변경이 제한됩니다."
+              : "🔶 직무대리 위임 중 — 직무대리자가 업무를 수행 중입니다. 읽기 전용으로 접속 중입니다."}
+          </span>
+          <button
+            onClick={onReturnToActive}
+            className="btn btn-gold"
+            style={{ padding: "4px 14px", fontSize: "0.78rem" }}
+          >
+            {currentUser.status === "ON_LEAVE"
+              ? "휴가 복귀"
+              : "복귀 및 직무대리 종료"}
+          </button>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div

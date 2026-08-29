@@ -84,7 +84,8 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   box-shadow: 0 4px 20px var(--shadow-card);
-  transition: all 0.2s ease;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  contain: paint layout style;
 }
 .glass-panel:hover {
   box-shadow: 0 8px 30px var(--shadow-card-hover);

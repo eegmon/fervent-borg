@@ -21,6 +21,7 @@ import {
   Scale,
 } from "lucide-react";
 import { fetchSuspectProfile } from "../services/api";
+import { getDisplayCaseNumber } from "../services/caseUtils";
 
 const TABS = [
   { key: "cases",    label: "사건 이력",   icon: <Scale size={13} /> },
@@ -305,7 +306,7 @@ function CasesTab({ cases = [] }) {
               }}
             >
               <td style={{ padding: "8px 10px", fontFamily: "monospace", color: "var(--primary-amber)", whiteSpace: "nowrap" }}>
-                {c.hyeongjeNo || "-"}
+                {getDisplayCaseNumber(c) || "-"}
               </td>
               <td style={{ padding: "8px 10px", color: "var(--text-main)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {c.chargeName || "-"}
@@ -402,7 +403,7 @@ function AppealsTab({ appeals = [] }) {
                 {a.appealNo || "-"}
               </td>
               <td style={{ padding: "8px 10px", fontFamily: "monospace", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                {a.hyeongjeNo || "-"}
+                {getDisplayCaseNumber(a) || "-"}
               </td>
               <td style={{ padding: "8px 10px", color: "var(--text-main)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {a.chargeName || "-"}

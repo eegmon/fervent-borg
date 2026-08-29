@@ -1347,6 +1347,7 @@ function ActingOrderPanel({
         status: "DELEGATED",
         delegateTo: `${act.name} (${form.actingTitle})`,
         delegateReason: `[직무대리명령] ${form.reason}`,
+        actingUserId: act.id, // 대리자 ID 저장 (복귀 시 연쇄 초기화에 사용)
       });
     }
 
@@ -2385,6 +2386,7 @@ export default function SecretariatAdmin({
   chargesData = [],
   onUpdateCharges,
   auditLogs: initialAuditLogs = [],
+  isReadOnly = false,
 }) {
   const [activeSubTab, setActiveSubTab] = useState("registrations");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
@@ -2410,6 +2412,7 @@ export default function SecretariatAdmin({
   const [regFilter, setRegFilter] = useState("PENDING"); // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
   const [newCharge, setNewCharge] = useState("");
   const [chargeMessage, setChargeMessage] = useState("");
+  const [prosecutorStatusFilter, setProsecutorStatusFilter] = useState("ACTIVE"); // 'ACTIVE' (재직자) | 'RETIRED' (퇴직자) | 'ALL'
 
   useEffect(() => {
     if (Array.isArray(initialAuditLogs)) setAuditLogs(initialAuditLogs);
@@ -2902,6 +2905,29 @@ export default function SecretariatAdmin({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* 읽기 전용 상태 안내 배너 */}
+      {isReadOnly && (
+        <div
+          style={{
+            background: "rgba(245,158,11,0.12)",
+            border: "1px solid rgba(245,158,11,0.4)",
+            borderRadius: 10,
+            padding: "12px 18px",
+            color: "var(--primary-amber)",
+            fontSize: "0.84rem",
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <ShieldAlert size={18} />
+          <span>
+            현재 <strong>읽기 전용 모드</strong>(휴가 또는 직무대리 위임 중)로 접속 중입니다. 검찰사무국 행정 데이터 변경 및 저장이 제한됩니다.
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div
         className="glass-panel gold-border"
@@ -3641,37 +3667,86 @@ export default function SecretariatAdmin({
 
           {/* Prosecutor List */}
           <div className="glass-panel" style={{ overflow: "hidden" }}>
-            <div
-              style={{
-                padding: "14px 16px",
-                borderBottom: "1px solid var(--border-subtle)",
-                fontWeight: 700,
-                fontSize: "0.85rem",
-                color: "var(--text-main)",
-              }}
-            >
-              등록 계정 목록 ({prosecutorsList.length}명)
-            </div>
-            <div
-              className="ledger-table-container"
-              style={{ border: "none", borderRadius: 0 }}
-            >
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>계정 ID</th>
-                    <th>성명</th>
-                    <th>직위 (Position)</th>
-                    <th>직급 (Rank)</th>
-                    <th>소속 부서</th>
-                    <th>디스코드 ID</th>
-                    <th>신분 / 결재권한</th>
-                    <th>계정 관리</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {prosecutorsList.map((p) => {
-                    const st = p.status || "ACTIVE";
+            {(() => {
+              const activeCount = prosecutorsList.filter((p) => p.status !== "RETIRED").length;
+              const retiredCount = prosecutorsList.filter((p) => p.status === "RETIRED").length;
+              const displayedProsecutors = prosecutorsList.filter((p) => {
+                if (prosecutorStatusFilter === "RETIRED") return p.status === "RETIRED";
+                if (prosecutorStatusFilter === "ALL") return true;
+                return p.status !== "RETIRED";
+              });
+
+              return (
+                <>
+                  <div
+                    style={{
+                      padding: "12px 16px",
+                      borderBottom: "1px solid var(--border-subtle)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 800,
+                        fontSize: "0.88rem",
+                        color: "var(--text-main)",
+                      }}
+                    >
+                      {prosecutorStatusFilter === "RETIRED"
+                        ? `퇴직 계정 목록 (${retiredCount}명)`
+                        : `관리 대상 재직 계정 목록 (${activeCount}명)`}
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => setProsecutorStatusFilter("ACTIVE")}
+                        className={
+                          prosecutorStatusFilter === "ACTIVE"
+                            ? "btn btn-gold"
+                            : "btn btn-secondary"
+                        }
+                        style={{ padding: "4px 10px", fontSize: "0.74rem" }}
+                      >
+                        🟢 재직 계정 ({activeCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProsecutorStatusFilter("RETIRED")}
+                        className={
+                          prosecutorStatusFilter === "RETIRED"
+                            ? "btn btn-gold"
+                            : "btn btn-secondary"
+                        }
+                        style={{ padding: "4px 10px", fontSize: "0.74rem" }}
+                      >
+                        ⚫ 퇴직 계정 ({retiredCount})
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    className="ledger-table-container"
+                    style={{ border: "none", borderRadius: 0 }}
+                  >
+                    <table className="ledger-table">
+                      <thead>
+                        <tr>
+                          <th>계정 ID</th>
+                          <th>성명</th>
+                          <th>직위 (Position)</th>
+                          <th>직급 (Rank)</th>
+                          <th>소속 부서</th>
+                          <th>디스코드 ID</th>
+                          <th>신분 / 결재권한</th>
+                          <th>계정 관리</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayedProsecutors.map((p) => {
+                          const st = p.status || "ACTIVE";
                     return (
                       <tr key={p.id}>
                         <td
@@ -3777,6 +3852,20 @@ export default function SecretariatAdmin({
                                 }}
                               >
                                 🟢 정상 (재직)
+                              </span>
+                            )}
+                            {st === "RETIRED" && (
+                              <span
+                                style={{
+                                  fontSize: "0.68rem",
+                                  padding: "2px 7px",
+                                  borderRadius: 10,
+                                  background: "rgba(100,116,139,0.2)",
+                                  color: "#94a3b8",
+                                  fontWeight: 800,
+                                }}
+                              >
+                                ⚫ 퇴직 (업무종료)
                               </span>
                             )}
                             {Boolean(p.isAutoAssignExcluded) && (
@@ -4154,6 +4243,9 @@ export default function SecretariatAdmin({
                         </option>
                         <option value="ON_LEAVE">
                           🟡 휴직중 (사무대리 및 대결자 지정)
+                        </option>
+                        <option value="RETIRED">
+                          ⚫ 퇴직 (업무 및 사건배정 종료)
                         </option>
                       </select>
                     </div>
@@ -6839,6 +6931,9 @@ export default function SecretariatAdmin({
                   </tbody>
                 </table>
               </div>
+            </>
+          );
+        })()}
             )}
           </div>
         </div>

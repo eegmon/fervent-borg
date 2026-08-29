@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Clock, RefreshCw } from 'lucide-react';
 import { fetchSuspectProfile } from '../services/api';
+import { getDisplayCaseNumber } from '../services/caseUtils';
 
 export default function SuspectHistoryModal({ isOpen, onClose, suspectName, suspectUuid, ledgerData, onOpenSuspectProfile }) {
   if (!isOpen) return null;
@@ -114,9 +115,7 @@ export default function SuspectHistoryModal({ isOpen, onClose, suspectName, susp
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '0.85rem', color: 'var(--primary-amber)' }}>
-                      {c.hyeongjeNo && c.hyeongjeNo !== '-' && c.sujeNo
-                        ? `${c.hyeongjeNo}(${c.sujeNo})`
-                        : c.hyeongjeNo || c.sujeNo || '-'}
+                      {getDisplayCaseNumber(c) || '-'}
                     </span>
                     <span style={{ fontWeight: 700, fontSize: '0.78rem', color: 'var(--text-muted)' }}>담당: {c.prosecutorName}</span>
                   </div>

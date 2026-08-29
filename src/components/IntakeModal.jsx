@@ -113,6 +113,7 @@ export default function IntakeModal({
     (a, b) => (a.activeCases || 0) - (b.activeCases || 0),
   );
   const isAssignableProsecutor = (prosecutor) =>
+    prosecutor.status !== "RETIRED" &&
     !prosecutor.dept?.includes("사무국") &&
     prosecutor.roleLevel !== "CHIEF_ADMINISTRATOR";
   const set = (k, v) => setFormData((p) => ({ ...p, [k]: v }));

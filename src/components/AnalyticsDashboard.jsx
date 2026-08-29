@@ -162,6 +162,7 @@ export default function AnalyticsDashboard({ ledgerData = [], prosecutorsList = 
   const [activeTab, setActiveTab] = useState('stats');
   const [archiveFilter, setArchiveFilter] = useState('ALL');
   const [selectedProsecutor, setSelectedProsecutor] = useState(null);
+  const [includeArchivedInWorkload, setIncludeArchivedInWorkload] = useState(true);
 
   const filteredData = useMemo(() => {
     if (archiveFilter === 'ACTIVE') return ledgerData.filter((c) => !isArchivedCase(c));
@@ -211,8 +212,16 @@ export default function AnalyticsDashboard({ ledgerData = [], prosecutorsList = 
   const workloadByProsecutor = useMemo(() => {
     const map = {};
 
-    // prosecutorsList 기준으로 초기화
-    prosecutorsList.forEach((p) => {
+    // 퇴직한 검사(RETIRED) 이름 Set
+    const retiredNames = new Set(
+      prosecutorsList
+        .filter((p) => p.status === 'RETIRED')
+        .map((p) => p.name)
+    );
+
+    // 재직 중인 검사들로만 초기화
+    const activeProsecutors = prosecutorsList.filter((p) => p.status !== 'RETIRED');
+    activeProsecutors.forEach((p) => {
       map[p.name] = {
         id: p.id,
         name: p.name,
@@ -231,6 +240,13 @@ export default function AnalyticsDashboard({ ledgerData = [], prosecutorsList = 
 
     ledgerData.forEach((c) => {
       const name = c.prosecutorName || '미배정';
+      // 퇴직한 검사는 업무부담 현황에서 제외
+      if (retiredNames.has(name)) return;
+
+      const isArchived = isArchivedCase(c);
+      // 보존사건 제외 선택 시 보존사건은 전체 계산에서 건너뜀
+      if (!includeArchivedInWorkload && isArchived) return;
+
       if (!map[name]) {
         map[name] = { id: '', name, dept: '-', position: '', total: 0, pending: 0, detained: 0, disposedThisMonth: 0, avgDays: null, approvalPending: 0, _disposalDaysSum: 0, _disposalCount: 0 };
       }
@@ -240,7 +256,7 @@ export default function AnalyticsDashboard({ ledgerData = [], prosecutorsList = 
       const disp = c.disposition || c.bookingStatus || '';
       const isClosed = isCaseConcluded(c) || isCaseIndicted(c);
 
-      if (!isClosed && !isArchivedCase(c)) entry.pending += 1;
+      if (!isClosed && !isArchived) entry.pending += 1;
       if ((c.bookingStatus || '').includes('구속') || disp.includes('구속')) entry.detained += 1;
 
       // 이번 달 처분 건수 — disposition 또는 bookingDate가 이번 달인 경우
@@ -262,6 +278,7 @@ export default function AnalyticsDashboard({ ledgerData = [], prosecutorsList = 
     // 결재 대기 수
     approvalsData.forEach((doc) => {
       const name = doc.prosecutorName || '';
+      if (retiredNames.has(name)) return;
       if (map[name] && (doc.status || '').includes('대기')) {
         map[name].approvalPending += 1;
       }
@@ -275,9 +292,9 @@ export default function AnalyticsDashboard({ ledgerData = [], prosecutorsList = 
     });
 
     return Object.values(map)
-      .filter((e) => e.total > 0 || prosecutorsList.some((p) => p.name === e.name))
+      .filter((e) => e.total > 0 || activeProsecutors.some((p) => p.name === e.name))
       .sort((a, b) => b.pending - a.pending || b.total - a.total);
-  }, [ledgerData, approvalsData, prosecutorsList, thisMonth]);
+  }, [ledgerData, approvalsData, prosecutorsList, thisMonth, includeArchivedInWorkload]);
 
   const workloadSummary = useMemo(() => ({
     totalProsecutors: workloadByProsecutor.filter((e) => e.total > 0).length,
@@ -338,10 +355,41 @@ export default function AnalyticsDashboard({ ledgerData = [], prosecutorsList = 
       {/* ══ 업무 부담 탭 ══ */}
       {activeTab === 'workload' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* 보존사건 포함 여부 컨트롤 */}
+          <div className="glass-panel" style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Archive size={16} color="var(--primary-amber)" />
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                보존사건 계산 기준
+              </span>
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                ({includeArchivedInWorkload ? '보존사건 포함 전체 건수 집계 중' : '보존사건 제외 활성 사건만 집계 중'})
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => setIncludeArchivedInWorkload(true)}
+                className={includeArchivedInWorkload ? 'btn btn-gold' : 'btn btn-secondary'}
+                style={{ padding: '5px 12px', fontSize: '0.76rem' }}
+              >
+                📦 보존사건 포함
+              </button>
+              <button
+                type="button"
+                onClick={() => setIncludeArchivedInWorkload(false)}
+                className={!includeArchivedInWorkload ? 'btn btn-gold' : 'btn btn-secondary'}
+                style={{ padding: '5px 12px', fontSize: '0.76rem' }}
+              >
+                ⚡ 보존사건 제외
+              </button>
+            </div>
+          </div>
+
           {/* 요약 카드 */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
             {[
-              { label: '활동 검사', value: workloadSummary.totalProsecutors, color: '#60a5fa', icon: <Users size={14} /> },
+              { label: '활동 검사 (퇴직자 제외)', value: workloadSummary.totalProsecutors, color: '#60a5fa', icon: <Users size={14} /> },
               { label: '담당 중 평균', value: `${workloadSummary.avgPending}건`, color: '#fbbf24', icon: <TrendingUp size={14} /> },
               { label: '구속 사건', value: workloadSummary.totalDetained, color: '#f87171', icon: <ShieldAlert size={14} /> },
               { label: '결재 대기', value: workloadSummary.totalApprovalPending, color: '#a78bfa', icon: <FileCheck size={14} /> },
@@ -360,10 +408,10 @@ export default function AnalyticsDashboard({ ledgerData = [], prosecutorsList = 
           <div className="glass-panel" style={{ padding: 20, overflow: 'hidden' }}>
             <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Users size={16} color="var(--primary-amber)" />
-              검사별 업무 부담 현황
+              검사별 업무 부담 현황 (퇴직자 제외)
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 16 }}>
-              미종국 사건이 많을수록 적색 · 미종국 기준 내림차순 정렬
+              미종국 사건이 많을수록 적색 · 미종국 기준 내림차순 정렬 · {includeArchivedInWorkload ? '보존사건 포함' : '보존사건 제외'}
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: 600 }}>

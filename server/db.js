@@ -65,6 +65,7 @@ export async function initDb() {
     "discord_id TEXT DEFAULT ''",
     "acting_start TEXT DEFAULT ''",
     "acting_end TEXT DEFAULT ''",
+    "acting_user_id TEXT DEFAULT ''",
   ]) {
     try {
       await db.execute(`ALTER TABLE prosecutors ADD COLUMN ${column}`);

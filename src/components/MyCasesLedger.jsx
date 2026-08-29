@@ -942,6 +942,7 @@ export default function MyCasesLedger({
   onUndesignateCase,
   onOpenTimeline,
   onOpenMemo,
+  isReadOnly = false,
 }) {
   const [selectedProsecutorFilter, setSelectedProsecutorFilter] = useState(
     currentUser?.name || "",

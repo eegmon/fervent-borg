@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import MinecraftAvatar from "./MinecraftAvatar";
 import {
   Search,
   ExternalLink,
@@ -79,6 +80,7 @@ export default function MainLedger({
   onUndesignateCase,
   onOpenTimeline,
   onOpenMemo,
+  isReadOnly = false,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -199,50 +201,61 @@ export default function MainLedger({
     };
   }, [ledgerData]);
 
+  // 검사 부서 O(1) 조회를 위한 캐시 맵
+  const prosecutorDeptMap = useMemo(() => {
+    const map = new Map();
+    (prosecutorsList || []).forEach((p) => {
+      if (p.name) map.set(p.name, p.dept || "");
+    });
+    return map;
+  }, [prosecutorsList]);
+
   // 필터 결과 — 검색/필터 조건이 바뀔 때만 재계산
   const filtered = useMemo(() => {
-    return (ledgerData || []).filter((item) => {
-      const q = (searchTerm || "").toLowerCase().trim();
-      const sName = (item.suspectName || "").toLowerCase();
-      const pName = (item.prosecutorName || "").toLowerCase();
-      const cName = (item.chargeName || "").toLowerCase();
-      const sUuid = (item.suspectUuid || "").toLowerCase();
+    const q = (searchTerm || "").toLowerCase().trim();
+    const effectiveArchiveFilter = isChiefOrAbove ? archiveFilter : "ACTIVE";
 
-      const matchQ =
-        !q ||
-        matchesCaseNumber(item, q) ||
-        sName.includes(q) ||
-        pName.includes(q) ||
-        cName.includes(q) ||
-        sUuid.includes(q);
+    return (ledgerData || []).filter((item) => {
       const matchStatus =
         statusFilter === "ALL" ||
         (item.bookingStatus || item.disposition || "").includes(statusFilter);
+      if (!matchStatus) return false;
+
+      const pName = item.prosecutorName || "";
       const matchP =
         prosecutorFilter === "ALL" ||
-        (item.prosecutorName || "").includes(prosecutorFilter);
+        pName.includes(prosecutorFilter);
+      if (!matchP) return false;
 
-      let matchDept = true;
       if (deptFilter !== "ALL") {
-        const pUser = prosecutorsList.find(
-          (p) =>
-            p.name.includes(item.prosecutorName || "") ||
-            (item.prosecutorName || "").includes(p.name),
-        );
-        matchDept = pUser ? pUser.dept === deptFilter : false;
+        const d = prosecutorDeptMap.get(pName);
+        if (d !== undefined && d !== deptFilter) return false;
       }
 
-      const effectiveArchiveFilter = isChiefOrAbove ? archiveFilter : "ACTIVE";
       const matchArchive =
         effectiveArchiveFilter === "ALL"
           ? true
           : effectiveArchiveFilter === "ARCHIVED"
             ? Boolean(item.isArchived)
             : !item.isArchived;
+      if (!matchArchive) return false;
 
-      return matchQ && matchStatus && matchP && matchDept && matchArchive;
+      if (!q) return true;
+
+      const sName = (item.suspectName || "").toLowerCase();
+      const pNameLower = pName.toLowerCase();
+      const cName = (item.chargeName || "").toLowerCase();
+      const sUuid = (item.suspectUuid || "").toLowerCase();
+
+      return (
+        matchesCaseNumber(item, q) ||
+        sName.includes(q) ||
+        pNameLower.includes(q) ||
+        cName.includes(q) ||
+        sUuid.includes(q)
+      );
     });
-  }, [ledgerData, searchTerm, statusFilter, prosecutorFilter, deptFilter, archiveFilter, isChiefOrAbove, prosecutorsList]);
+  }, [ledgerData, searchTerm, statusFilter, prosecutorFilter, deptFilter, archiveFilter, isChiefOrAbove, prosecutorDeptMap]);
 
   // 정렬
   const sorted = useMemo(() => {
@@ -574,23 +587,15 @@ export default function MainLedger({
                       minWidth: 120,
                     }}
                   >
-                    <div
+                    <MinecraftAvatar
+                      name={item.prosecutorName}
+                      size={28}
                       style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "50%",
                         background: "rgba(245,158,11,0.15)",
                         border: "1px solid rgba(245,158,11,0.3)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "0.75rem",
-                        fontWeight: 800,
                         color: "var(--primary-amber)",
                       }}
-                    >
-                      {(item.prosecutorName || "?")[0]}
-                    </div>
+                    />
                     <div>
                       <div
                         style={{
@@ -881,17 +886,23 @@ export default function MainLedger({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (isReadOnly) return;
                           onArchiveCase(item.id, !item.isArchived);
                         }}
+                        disabled={isReadOnly}
                         className="btn btn-outline"
                         style={{
                           padding: "5px 10px",
                           fontSize: "0.75rem",
                           color: item.isArchived ? "#34d399" : "#f59e0b",
                           border: `1px solid ${item.isArchived ? "rgba(52,211,153,0.4)" : "rgba(245,158,11,0.3)"}`,
+                          opacity: isReadOnly ? 0.4 : 1,
+                          cursor: isReadOnly ? "not-allowed" : "pointer",
                         }}
                         title={
-                          item.isArchived
+                          isReadOnly
+                            ? "읽기 전용 상태에서는 변경할 수 없습니다."
+                            : item.isArchived
                             ? "보존 해제하여 사건 원부 기본 목록으로 복원"
                             : "사건을 보존 처리하여 보존기록 서고로 이동"
                         }
@@ -925,8 +936,10 @@ export default function MainLedger({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (isReadOnly) return;
                         setEditingCase(item);
                       }}
+                      disabled={isReadOnly}
                       className="btn btn-outline"
                       style={{
                         padding: "5px 10px",
@@ -937,7 +950,10 @@ export default function MainLedger({
                             ? "rgba(147,197,253,0.5)"
                             : "#93c5fd",
                         border: `1px solid ${item.supervisorDesignated && !isCaseApprovalComplete(item) ? "rgba(147,197,253,0.15)" : "rgba(147,197,253,0.3)"}`,
+                        opacity: isReadOnly ? 0.4 : 1,
+                        cursor: isReadOnly ? "not-allowed" : "pointer",
                       }}
+                      title={isReadOnly ? "읽기 전용 상태에서는 수정할 수 없습니다." : undefined}
                     >
                       {item.supervisorDesignated &&
                       !isCaseApprovalComplete(item) ? (
@@ -992,10 +1008,18 @@ export default function MainLedger({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (isReadOnly) return;
                         onCreateApproval(item);
                       }}
+                      disabled={isReadOnly}
                       className="btn btn-gold"
-                      style={{ padding: "5px 10px", fontSize: "0.75rem" }}
+                      style={{
+                        padding: "5px 10px",
+                        fontSize: "0.75rem",
+                        opacity: isReadOnly ? 0.4 : 1,
+                        cursor: isReadOnly ? "not-allowed" : "pointer",
+                      }}
+                      title={isReadOnly ? "읽기 전용 상태에서는 결재를 올릴 수 없습니다." : undefined}
                     >
                       <FileCheck size={12} />
                       결재
@@ -1008,8 +1032,10 @@ export default function MainLedger({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (isReadOnly) return;
                             onUndesignateCase && onUndesignateCase(item.id);
                           }}
+                          disabled={isReadOnly}
                           className="btn btn-outline"
                           style={{
                             padding: "5px 10px",

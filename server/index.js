@@ -183,10 +183,24 @@ async function requireAuth(req, res, next) {
   try {
     const claims = jwt.verify(header.slice(7), JWT_SECRET);
     const result = await db.execute({
-      sql: "SELECT id, name, role_level, dept, status, is_super_admin, dual_dept, dual_role_level, dual_secretariat_work, can_arbitrary_approve, acting_start, acting_end FROM prosecutors WHERE id = ?",
+      sql: "SELECT id, name, role_level, dept, status, is_super_admin, dual_dept, dual_role_level, dual_secretariat_work, can_arbitrary_approve, acting_start, acting_end, acting_user_id FROM prosecutors WHERE id = ?",
       args: [claims.id],
     });
-    if (result.rows.length === 0 || result.rows[0].status !== "ACTIVE") {
+
+    const READONLY_STATUSES = new Set(["ON_LEAVE", "DELEGATED"]);
+
+    if (result.rows.length === 0) {
+      return res
+        .status(401)
+        .json({ success: false, message: "계정을 찾을 수 없습니다." });
+    }
+    const statusVal = result.rows[0].status;
+    if (statusVal === "RETIRED") {
+      return res
+        .status(403)
+        .json({ success: false, message: "퇴직 처리된 계정입니다." });
+    }
+    if (statusVal !== "ACTIVE" && !READONLY_STATUSES.has(statusVal)) {
       return res
         .status(401)
         .json({ success: false, message: "비활성화된 계정입니다." });
@@ -197,6 +211,7 @@ async function requireAuth(req, res, next) {
       ...account,
       isSuperAdmin: Boolean(account.isSuperAdmin),
       canArbitraryApprove: Boolean(account.canArbitraryApprove),
+      isReadOnly: READONLY_STATUSES.has(statusVal),
     };
 
     // 직무대리 기간 만료 자동 회수: acting_end가 지났으면 dualRoleLevel 초기화
@@ -225,6 +240,19 @@ async function requireAuth(req, res, next) {
       .status(401)
       .json({ success: false, message: "유효하지 않거나 만료된 토큰입니다." });
   }
+}
+
+// ── 읽기전용 상태 쓰기 차단 미들웨어 ──────────────────────────────────
+// ON_LEAVE / DELEGATED 계정이 데이터 변경을 시도하면 403 반환
+function requireReadWrite(req, res, next) {
+  if (req.user?.isReadOnly) {
+    return res.status(403).json({
+      success: false,
+      message:
+        "읽기 전용 상태입니다. 휴가 또는 직무대리 위임 중에는 데이터 변경이 불가합니다.",
+    });
+  }
+  next();
 }
 
 // ── 직무대리(dualRoleLevel) 통합 유효 권한 헬퍼 ────────────────────
@@ -617,6 +645,16 @@ function validateEvidenceUrl(urlTrimmed) {
   return null; // 통과
 }
 
+// ── 쓰기 요청 읽기전용 계정 차단 (글로벌) ────────────────────────────
+// POST/PUT/PATCH/DELETE 메서드에 대해 읽기전용 계정을 차단한다.
+// 단, /api/auth/return (복귀 API) 는 읽기전용 계정이 직접 호출해야 하므로 예외.
+app.use("/api", (req, res, next) => {
+  const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+  if (!WRITE_METHODS.has(req.method)) return next();
+  if (req.path === "/auth/return") return next(); // 복귀 API 예외
+  return requireReadWrite(req, res, next);
+});
+
 // ════════════════════════════════════════════════════════════════════
 // 1. Auth
 // ════════════════════════════════════════════════════════════════════
@@ -643,6 +681,13 @@ app.post("/api/auth/login", authRateLimit, asyncWrap(async (req, res) => {
   }
 
   const user = toCamel(result.rows[0]);
+  if (user.status === "RETIRED") {
+    return res.status(403).json({
+      success: false,
+      message: "퇴직 처리된 계정입니다. 로그인이 불가능합니다.",
+    });
+  }
+
   const match = await bcrypt.compare(password, user.password);
   if (!match) {
     return res
@@ -669,6 +714,67 @@ app.post("/api/auth/login", authRateLimit, asyncWrap(async (req, res) => {
   });
 
   res.json({ success: true, token, user: safeUser });
+}));
+
+// POST /api/auth/return — 휴가·직무대리 위임 종료 후 본인 복귀
+app.post("/api/auth/return", requireAuth, asyncWrap(async (req, res) => {
+  const { status, id: userId, name: userName, actingUserId } = req.user;
+
+  if (!["ON_LEAVE", "DELEGATED"].includes(status)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "복귀 처리가 필요한 상태가 아닙니다." });
+  }
+
+  // 본인 계정 복귀 (status, 위임 정보 전체 초기화)
+  await db.execute({
+    sql: `UPDATE prosecutors
+            SET status='ACTIVE', delegate_to='', delegate_reason='', acting_user_id=''
+          WHERE id=?`,
+    args: [userId],
+  });
+
+  // acting_user_id가 있으면 status 무관하게 대리자 계정도 초기화
+  if (actingUserId) {
+    await db.execute({
+      sql: `UPDATE prosecutors SET
+              dual_role_level='', acting_title='',
+              acting_start='', acting_end='',
+              delegate_to='', delegate_reason=''
+            WHERE id=?`,
+      args: [actingUserId],
+    });
+
+    // 직무대리명령 명령서 상태 업데이트
+    await db.execute({
+      sql: `UPDATE office_documents
+              SET payload_json = json_patch(payload_json, '{"status":"해제완료(본인복귀)"}')
+            WHERE document_type='order'
+              AND json_extract(payload_json,'$.originalUserId')=?
+              AND json_extract(payload_json,'$.status')='발령중'
+              AND deleted_at=''`,
+      args: [userId],
+    });
+  }
+
+  const detail =
+    status === "ON_LEAVE"
+      ? actingUserId
+        ? "휴가 복귀 처리 (직무대리 연쇄 해제)"
+        : "휴가 복귀 처리"
+      : "직무대리 위임 종료 후 복귀 처리";
+
+  await writeAuditLog({
+    action: "RETURN",
+    entityType: "prosecutor",
+    entityId: userId,
+    entityLabel: userName,
+    actorId: userId,
+    actorName: userName,
+    detail,
+  });
+
+  res.json({ success: true });
 }));
 
 // ════════════════════════════════════════════════════════════════════
@@ -2598,6 +2704,7 @@ app.patch(
       position: "position",
       title: "title",
       discordId: "discord_id",
+      actingUserId: "acting_user_id",
       note: "note",
     };
     const updates = Object.entries(allowedFields)

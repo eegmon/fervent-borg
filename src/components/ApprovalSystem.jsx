@@ -457,6 +457,7 @@ export default function ApprovalSystem({
   nextDocNo,
   onToast,
   prosecutorsList = [],
+  isReadOnly = false,
 }) {
   const approvalList = (Array.isArray(approvals) ? approvals : []).map(
     (doc) => ({
@@ -727,6 +728,7 @@ export default function ApprovalSystem({
   const [rejectReason, setRejectReason] = useState("보완수사요구");
 
   const handleRejectConfirm = () => {
+    if (isReadOnly) return;
     if (!selectedDoc || !rejectReason.trim()) return;
     onRejectDoc(selectedDoc.id, currentUser?.id, rejectReason.trim());
     setRejectModalOpen(false);
@@ -743,6 +745,7 @@ export default function ApprovalSystem({
   );
 
   const handleApproveStandard = (docId) => {
+    if (isReadOnly) return;
     if (!selectedDoc) return;
     const now = new Date().toISOString().replace("T", " ").substring(0, 16);
     const isHighRank = [
@@ -805,6 +808,7 @@ export default function ApprovalSystem({
   const handleApprove = handleApproveStandard;
 
   const handleApproveArbitrary = (docId) => {
+    if (isReadOnly) return;
     if (!selectedDoc || isApprovalRequired) {
       onToast?.("결재 필수 지정 사건은 전결 승인할 수 없습니다.", "error");
       return;

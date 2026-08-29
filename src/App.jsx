@@ -127,6 +127,7 @@ import {
   saveDepartmentsApi,
   fetchCharges,
   bulkReassignApi,
+  returnToActiveApi,
 } from "./services/api";
 
 export default function App() {
@@ -278,14 +279,14 @@ export default function App() {
         currentUser.isSuperAdmin ||
         currentUser.dept?.includes("사무국") ||
         ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY", "CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(
-          currentUser.roleLevel,
+          clientEffectiveRoleLevel(currentUser),
         )
           ? fetchAuditLogs()
           : Promise.resolve([]),
         currentUser.isSuperAdmin ||
         currentUser.dept?.includes("사무국") ||
         ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY", "CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(
-          currentUser.roleLevel,
+          clientEffectiveRoleLevel(currentUser),
         )
           ? fetchAllCaseHistory()
           : Promise.resolve([]),
@@ -318,87 +319,171 @@ export default function App() {
     loadDbData();
   }, [currentUser]);
 
-  const operationalProsecutorsList = prosecutorsList.filter(
-    (prosecutor) => !isManagementAccount(prosecutor),
+  const operationalProsecutorsList = useMemo(
+    () => prosecutorsList.filter((prosecutor) => !isManagementAccount(prosecutor)),
+    [prosecutorsList],
   );
 
-  const pendingApprovalsCount = approvalsData.filter((a) =>
-    a.status.includes("대기"),
-  ).length;
-
-  // ── 직급(roleLevel) 기반 정보 보안 스코핑 (이름/ID 하드코딩 제거) ─────
-  const isGlobalAdmin =
-    currentUser &&
-    (currentUser.isSuperAdmin ||
-      currentUser.roleLevel === "SUPER_ADMIN" ||
-      currentUser.roleLevel === "PROSECUTOR_GENERAL" ||
-      currentUser.roleLevel === "CHIEF_PROSECUTOR" ||
-      currentUser.roleLevel === "DEPUTY_CHIEF" ||
-      currentUser.roleLevel === "CHIEF_ADMINISTRATOR" ||
-      (currentUser.dept && currentUser.dept.includes("사무국")));
-
-  const canViewLoginRecords = Boolean(
-    currentUser &&
-    (currentUser.isSuperAdmin ||
-      currentUser.dept?.includes("사무국") ||
-      ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY", "CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(
-        currentUser.roleLevel,
-      )),
+  const pendingApprovalsCount = useMemo(
+    () => approvalsData.filter((a) => (a.status || "").includes("대기")).length,
+    [approvalsData],
   );
+
+  // ── 직무대리(dualRoleLevel) 반영 유효 직급 헬퍼 ─────────────────────
+  const ROLE_AUTHORITY_CLIENT = {
+    SUPER_ADMIN: 99,
+    PROSECUTOR_GENERAL: 90,
+    CHIEF_PROSECUTOR: 80,
+    DEPUTY_CHIEF: 70,
+    SENIOR_PROSECUTOR: 60,
+    PROSECUTOR: 50,
+    PROBATIONARY: 10,
+    CHIEF_ADMINISTRATOR: 75,
+    ADMINISTRATOR: 45,
+    ADMIN_PROBATIONARY: 5,
+  };
+
+  const clientEffectiveRoleLevel = (user) => {
+    if (!user) return "PROBATIONARY";
+    const base = user.roleLevel || "PROBATIONARY";
+    const dual = user.dualRoleLevel || "";
+    if (!dual) return base;
+
+    // 기간 체크: acting_start ~ acting_end 범위 내에만 대리 권한 유효
+    const now = new Date();
+    const start = user.actingStart ? new Date(user.actingStart) : null;
+    const end   = user.actingEnd   ? new Date(user.actingEnd)   : null;
+    if (start && now < start) return base;
+    if (end   && now > end)   return base;
+
+    const baseAuth = ROLE_AUTHORITY_CLIENT[base] || 0;
+    const dualAuth = ROLE_AUTHORITY_CLIENT[dual] || 0;
+    return dualAuth > baseAuth ? dual : base;
+  };
+
+  const effectiveRole = useMemo(
+    () => clientEffectiveRoleLevel(currentUser),
+    [currentUser],
+  );
+
+  // ── 직급(roleLevel) 기반 정보 보안 스코핑 ─────
+  const isGlobalAdmin = useMemo(() => {
+    return Boolean(
+      currentUser &&
+      (currentUser.isSuperAdmin ||
+        effectiveRole === "SUPER_ADMIN" ||
+        effectiveRole === "PROSECUTOR_GENERAL" ||
+        effectiveRole === "CHIEF_PROSECUTOR" ||
+        effectiveRole === "DEPUTY_CHIEF" ||
+        effectiveRole === "CHIEF_ADMINISTRATOR" ||
+        (currentUser.dept && currentUser.dept.includes("사무국")))
+    );
+  }, [currentUser, effectiveRole]);
+
+  const canViewLoginRecords = useMemo(() => {
+    return Boolean(
+      currentUser &&
+      (currentUser.isSuperAdmin ||
+        currentUser.dept?.includes("사무국") ||
+        ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY", "CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(
+          effectiveRole,
+        ))
+    );
+  }, [currentUser, effectiveRole]);
+
+  // 읽기 전용 여부: 휴가 또는 직무대리 위임 중
+  const isReadOnly = Boolean(
+    currentUser && ["ON_LEAVE", "DELEGATED"].includes(currentUser.status)
+  );
+
+  // 본인 복귀 핸들러
+  const handleReturnToActive = async () => {
+    if (!currentUser) return;
+    const label =
+      currentUser.status === "ON_LEAVE" ? "휴가 복귀" : "직무대리 종료 및 복귀";
+    if (!window.confirm(`${label} 처리하시겠습니까?`)) return;
+
+    const res = await returnToActiveApi();
+    if (!res?.success) {
+      showToast(res?.message || "복귀 처리에 실패했습니다.", "error");
+      return;
+    }
+
+    const updated = {
+      ...currentUser,
+      status: "ACTIVE",
+      delegateTo: "",
+      delegateReason: "",
+      actingUserId: "",
+    };
+    setCurrentUser(updated);
+    try {
+      sessionStorage.setItem("dose_pros_session", JSON.stringify(updated));
+    } catch {}
+
+    // 검사 목록도 갱신
+    fetchProsecutors().then((pList) => {
+      if (pList) setProsecutorsList(pList);
+    });
+
+    showToast(`${label} 처리가 완료되었습니다.`, "success");
+  };
+
+  // 검사 부서 O(1) 조회를 위한 캐시 맵
+  const prosecutorDeptMap = useMemo(() => {
+    const map = new Map();
+    prosecutorsList.forEach((p) => {
+      if (p.id) map.set(p.id, p.dept || "");
+      if (p.name) map.set(p.name, p.dept || "");
+    });
+    return map;
+  }, [prosecutorsList]);
 
   const isProsecutorInUserDept = (prosecutorNameOrId) => {
     if (isGlobalAdmin || !currentUser) return true;
-    const pUser = prosecutorsList.find(
-      (p) =>
-        p.id === prosecutorNameOrId ||
-        p.name === prosecutorNameOrId ||
-        p.name.includes(prosecutorNameOrId) ||
-        (prosecutorNameOrId && prosecutorNameOrId.includes(p.name)),
-    );
-    return pUser ? pUser.dept === currentUser.dept : true;
+    if (!prosecutorNameOrId) return true;
+    const dept = prosecutorDeptMap.get(prosecutorNameOrId);
+    return dept !== undefined ? dept === currentUser.dept : true;
   };
+
+  const CLOSED_KEYWORDS = [
+    "불기소", "종국", "기소유예", "혐의없음", "무혐의",
+    "죄가안됨", "공소권없음", "각하", "기소중지", "타관송치",
+    "처분완료", "구속기소", "불구속기소", "약식기소", "구공판",
+  ];
 
   const scopeRecords = (records, includeOwnRecord = false) => {
     if (isGlobalAdmin) return records;
     return records.filter((item) => {
-      // 본인 담당 사건 또는 본인 작성 사건
-      if (includeOwnRecord && item.prosecutorId === currentUser?.id)
-        return true;
-      // 동일 부서 사건
+      if (includeOwnRecord && item.prosecutorId === currentUser?.id) return true;
       if (isProsecutorInUserDept(item.prosecutorName)) return true;
-      // 보존사건은 전 부서 열람 가능
       if (item.isArchived) return true;
-      // 종국·기소 완료 사건은 전 부서 열람 가능 (서버 정책과 동기화)
       const disp = (item.disposition || "").toLowerCase();
       const status = (item.bookingStatus || "").toLowerCase();
-      const CLOSED = [
-        "불기소",
-        "종국",
-        "기소유예",
-        "혐의없음",
-        "무혐의",
-        "죄가안됨",
-        "공소권없음",
-        "각하",
-        "기소중지",
-        "타관송치",
-        "처분완료",
-        "구속기소",
-        "불구속기소",
-        "약식기소",
-        "구공판",
-      ];
-      if (CLOSED.some((k) => disp.includes(k) || status.includes(k)))
-        return true;
-      return false;
+      return CLOSED_KEYWORDS.some((k) => disp.includes(k) || status.includes(k));
     });
   };
 
-  const scopedLedgerData = scopeRecords(ledgerData, true);
-  const scopedApprovalsData = scopeRecords(approvalsData, true);
-  const scopedReportsData = scopeRecords(reportsData);
-  const scopedAppealsData = scopeRecords(appealsData);
-  const scopedBookingsData = scopeRecords(bookingsData);
+  const scopedLedgerData = useMemo(
+    () => scopeRecords(ledgerData, true),
+    [ledgerData, isGlobalAdmin, currentUser, prosecutorDeptMap],
+  );
+  const scopedApprovalsData = useMemo(
+    () => scopeRecords(approvalsData, true),
+    [approvalsData, isGlobalAdmin, currentUser, prosecutorDeptMap],
+  );
+  const scopedReportsData = useMemo(
+    () => scopeRecords(reportsData),
+    [reportsData, isGlobalAdmin, currentUser, prosecutorDeptMap],
+  );
+  const scopedAppealsData = useMemo(
+    () => scopeRecords(appealsData),
+    [appealsData, isGlobalAdmin, currentUser, prosecutorDeptMap],
+  );
+  const scopedBookingsData = useMemo(
+    () => scopeRecords(bookingsData),
+    [bookingsData, isGlobalAdmin, currentUser, prosecutorDeptMap],
+  );
 
   // Handler: Login Success (Persists Session — password 필드 제외)
   const handleLoginSuccess = async (user, authResult = null) => {
@@ -991,6 +1076,13 @@ export default function App() {
     (currentUserDeptObj ? currentUserDeptObj.canIntake !== false : true);
 
   const handleTryOpenIntakeModal = () => {
+    if (isReadOnly) {
+      showToast(
+        "❌ [읽기 전용] 휴가 또는 직무대리 위임 중에는 신규 사건을 접수할 수 없습니다.",
+        "error",
+      );
+      return;
+    }
     if (!userCanIntake) {
       showToast(
         `❌ [사건 접수 제한] 소속 부서('${currentUser?.dept}')는 사건 접수 권한이 없습니다. 검찰사무국에 권한을 요청하세요.`,
@@ -1370,6 +1462,8 @@ export default function App() {
         canViewLoginRecords={canViewLoginRecords}
         theme={theme}
         onToggleTheme={toggleTheme}
+        isReadOnly={isReadOnly}
+        onReturnToActive={handleReturnToActive}
       />
 
       {/* Main Container */}
@@ -1711,6 +1805,7 @@ export default function App() {
                 currentUser={currentUser}
                 prosecutorsList={operationalProsecutorsList}
                 chargesData={chargesData}
+                isReadOnly={isReadOnly}
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
@@ -1735,6 +1830,7 @@ export default function App() {
               <WarrantLedger
                 currentUser={currentUser}
                 prosecutorsList={operationalProsecutorsList}
+                isReadOnly={isReadOnly}
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
@@ -1749,6 +1845,7 @@ export default function App() {
                 departmentsData={departmentsData}
                 prosecutorsList={operationalProsecutorsList}
                 chargesData={chargesData}
+                isReadOnly={isReadOnly}
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })
                 }
@@ -1775,6 +1872,7 @@ export default function App() {
                 onApproveDoc={handleApproveDoc}
                 onRejectDoc={handleRejectDoc}
                 currentUser={currentUser}
+                isReadOnly={isReadOnly}
                 onSaveNewApproval={handleSaveNewApproval}
                 onUpdateApprovalDoc={handleUpdateApprovalDoc}
                 ledgerData={scopedLedgerData}
@@ -1794,6 +1892,7 @@ export default function App() {
                 bookingsData={bookingsData}
                 departmentsData={departmentsData}
                 prosecutorsList={prosecutorsList}
+                isReadOnly={isReadOnly}
                 onReassignCase={handleReassignCase}
                 onBulkReassign={handleBulkReassignCases}
                 onUpdateCase={handleUpdateCase}

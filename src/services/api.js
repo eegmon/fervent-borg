@@ -96,6 +96,11 @@ export function logoutApi() {
   clearToken();
 }
 
+/** 휴가·직무대리 위임 종료 후 본인 복귀 */
+export function returnToActiveApi() {
+  return apiFetch("/auth/return", { method: "POST" });
+}
+
 // ════════════════════════════════════════════════════════════════════
 // Cases
 // ════════════════════════════════════════════════════════════════════
