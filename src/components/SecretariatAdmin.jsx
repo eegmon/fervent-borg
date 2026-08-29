@@ -362,9 +362,10 @@ function DesignateApprovalPanel({
         ) : (
           filtered.map((c) => {
             const isDesignated = !!c.supervisorDesignated;
-            const displayNo = c.hyeongjeNo && c.hyeongjeNo !== "-" && c.sujeNo
-              ? `${c.hyeongjeNo}(${c.sujeNo})`
-              : c.hyeongjeNo || c.sujeNo || "-";
+            const displayNo =
+              c.hyeongjeNo && c.hyeongjeNo !== "-" && c.sujeNo
+                ? `${c.hyeongjeNo}(${c.sujeNo})`
+                : c.hyeongjeNo || c.sujeNo || "-";
             const label = `${displayNo} (피의자: ${c.suspectName})`;
             return (
               <div
@@ -2156,35 +2157,109 @@ function ArchiveStoragePanel({ ledgerData = [], onArchiveCase, addLog }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* 확인 다이얼로그 */}
       {confirmTarget && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-          <div className="glass-panel" style={{ maxWidth: 400, width: "90%", padding: 28, textAlign: "center" }}>
-            <div style={{ fontWeight: 800, fontSize: "1rem", color: "var(--text-main)", marginBottom: 10 }}>보존 해제 확인</div>
-            <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: 20, lineHeight: 1.6 }}>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              maxWidth: 400,
+              width: "90%",
+              padding: 28,
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 800,
+                fontSize: "1rem",
+                color: "var(--text-main)",
+                marginBottom: 10,
+              }}
+            >
+              보존 해제 확인
+            </div>
+            <div
+              style={{
+                fontSize: "0.82rem",
+                color: "var(--text-muted)",
+                marginBottom: 20,
+                lineHeight: 1.6,
+              }}
+            >
               <strong style={{ color: "var(--primary-amber)" }}>
                 {confirmTarget.hyeongjeNo || confirmTarget.sujeNo}
-              </strong> 사건을 보존 해제하고 원부 목록으로 복원합니다.
+              </strong>{" "}
+              사건을 보존 해제하고 원부 목록으로 복원합니다.
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-              <button onClick={() => setConfirmTarget(null)} className="btn btn-secondary" style={{ padding: "8px 20px" }}>취소</button>
-              <button onClick={doUnarchive} className="btn btn-gold" style={{ padding: "8px 20px" }}>🔄 보존 해제</button>
+              <button
+                onClick={() => setConfirmTarget(null)}
+                className="btn btn-secondary"
+                style={{ padding: "8px 20px" }}
+              >
+                취소
+              </button>
+              <button
+                onClick={doUnarchive}
+                className="btn btn-gold"
+                style={{ padding: "8px 20px" }}
+              >
+                🔄 보존 해제
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* 헤더 */}
-      <div className="glass-panel gold-border" style={{ padding: "14px 20px", background: "rgba(245,158,11,0.06)" }}>
-        <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--primary-amber)", display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+      <div
+        className="glass-panel gold-border"
+        style={{ padding: "14px 20px", background: "rgba(245,158,11,0.06)" }}
+      >
+        <div
+          style={{
+            fontWeight: 800,
+            fontSize: "0.95rem",
+            color: "var(--primary-amber)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 4,
+          }}
+        >
           <Archive size={18} /> 보존기록 서고
         </div>
         <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-          보존 처리된 사건 기록 관리 · 총 <strong style={{ color: "var(--primary-amber)" }}>{archivedCases.length}건</strong> 보존 중
+          보존 처리된 사건 기록 관리 · 총{" "}
+          <strong style={{ color: "var(--primary-amber)" }}>
+            {archivedCases.length}건
+          </strong>{" "}
+          보존 중
         </div>
       </div>
 
       {/* 검색 */}
       <div style={{ position: "relative" }}>
-        <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
+        <Search
+          size={14}
+          style={{
+            position: "absolute",
+            left: 10,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "var(--text-muted)",
+            pointerEvents: "none",
+          }}
+        />
         <input
           className="input-field"
           style={{ paddingLeft: 32 }}
@@ -2196,32 +2271,109 @@ function ArchiveStoragePanel({ ledgerData = [], onArchiveCase, addLog }) {
 
       {/* 목록 */}
       {filtered.length === 0 ? (
-        <div className="glass-panel" style={{ padding: 40, textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem" }}>
-          {archivedCases.length === 0 ? "보존된 사건이 없습니다." : "검색 조건에 해당하는 보존 사건이 없습니다."}
+        <div
+          className="glass-panel"
+          style={{
+            padding: 40,
+            textAlign: "center",
+            color: "var(--text-muted)",
+            fontSize: "0.85rem",
+          }}
+        >
+          {archivedCases.length === 0
+            ? "보존된 사건이 없습니다."
+            : "검색 조건에 해당하는 보존 사건이 없습니다."}
         </div>
       ) : (
         <div className="glass-panel" style={{ overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "0.82rem",
+            }}
+          >
             <thead>
-              <tr style={{ background: "var(--bg-elevated)", borderBottom: "1px solid var(--border-subtle)" }}>
-                {["사건번호", "피의자", "죄명", "처분", "담당검사", "보존일", ""].map((h) => (
-                  <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700, color: "var(--text-muted)", fontSize: "0.75rem" }}>{h}</th>
+              <tr
+                style={{
+                  background: "var(--bg-elevated)",
+                  borderBottom: "1px solid var(--border-subtle)",
+                }}
+              >
+                {[
+                  "사건번호",
+                  "피의자",
+                  "죄명",
+                  "처분",
+                  "담당검사",
+                  "보존일",
+                  "",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: "10px 14px",
+                      textAlign: "left",
+                      fontWeight: 700,
+                      color: "var(--text-muted)",
+                      fontSize: "0.75rem",
+                    }}
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr key={c.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                  <td style={{ padding: "10px 14px", fontFamily: "monospace", color: "var(--primary-amber)", fontWeight: 700 }}>
+                <tr
+                  key={c.id}
+                  style={{ borderBottom: "1px solid var(--border-subtle)" }}
+                >
+                  <td
+                    style={{
+                      padding: "10px 14px",
+                      fontFamily: "monospace",
+                      color: "var(--primary-amber)",
+                      fontWeight: 700,
+                    }}
+                  >
                     {c.hyeongjeNo && c.hyeongjeNo !== "-" && c.sujeNo
                       ? `${c.hyeongjeNo}(${c.sujeNo})`
                       : c.hyeongjeNo || c.sujeNo || "-"}
                   </td>
-                  <td style={{ padding: "10px 14px", color: "var(--text-main)" }}>{c.suspectName || "-"}</td>
-                  <td style={{ padding: "10px 14px", color: "var(--text-muted)" }}>{c.chargeName || "-"}</td>
-                  <td style={{ padding: "10px 14px", color: "#34d399", fontWeight: 600 }}>{c.disposition || "-"}</td>
-                  <td style={{ padding: "10px 14px", color: "var(--text-muted)" }}>{c.prosecutorName || "-"}</td>
-                  <td style={{ padding: "10px 14px", color: "var(--text-muted)", fontSize: "0.75rem", fontFamily: "monospace" }}>
+                  <td
+                    style={{ padding: "10px 14px", color: "var(--text-main)" }}
+                  >
+                    {c.suspectName || "-"}
+                  </td>
+                  <td
+                    style={{ padding: "10px 14px", color: "var(--text-muted)" }}
+                  >
+                    {c.chargeName || "-"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "10px 14px",
+                      color: "#34d399",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {c.disposition || "-"}
+                  </td>
+                  <td
+                    style={{ padding: "10px 14px", color: "var(--text-muted)" }}
+                  >
+                    {c.prosecutorName || "-"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "10px 14px",
+                      color: "var(--text-muted)",
+                      fontSize: "0.75rem",
+                      fontFamily: "monospace",
+                    }}
+                  >
                     {c.archivedAt ? c.archivedAt.slice(0, 10) : "-"}
                   </td>
                   <td style={{ padding: "10px 14px" }}>
@@ -2229,7 +2381,13 @@ function ArchiveStoragePanel({ ledgerData = [], onArchiveCase, addLog }) {
                       <button
                         onClick={() => handleUnarchive(c)}
                         className="btn btn-outline"
-                        style={{ fontSize: "0.72rem", padding: "4px 10px", color: "#34d399", border: "1px solid rgba(52,211,153,0.4)", whiteSpace: "nowrap" }}
+                        style={{
+                          fontSize: "0.72rem",
+                          padding: "4px 10px",
+                          color: "#34d399",
+                          border: "1px solid rgba(52,211,153,0.4)",
+                          whiteSpace: "nowrap",
+                        }}
                       >
                         🔄 보존 해제
                       </button>
@@ -2412,7 +2570,8 @@ export default function SecretariatAdmin({
   const [regFilter, setRegFilter] = useState("PENDING"); // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
   const [newCharge, setNewCharge] = useState("");
   const [chargeMessage, setChargeMessage] = useState("");
-  const [prosecutorStatusFilter, setProsecutorStatusFilter] = useState("ACTIVE"); // 'ACTIVE' (재직자) | 'RETIRED' (퇴직자) | 'ALL'
+  const [prosecutorStatusFilter, setProsecutorStatusFilter] =
+    useState("ACTIVE"); // 'ACTIVE' (재직자) | 'RETIRED' (퇴직자) | 'ALL'
 
   useEffect(() => {
     if (Array.isArray(initialAuditLogs)) setAuditLogs(initialAuditLogs);
@@ -2923,7 +3082,8 @@ export default function SecretariatAdmin({
         >
           <ShieldAlert size={18} />
           <span>
-            현재 <strong>읽기 전용 모드</strong>(휴가 또는 직무대리 위임 중)로 접속 중입니다. 검찰사무국 행정 데이터 변경 및 저장이 제한됩니다.
+            현재 <strong>읽기 전용 모드</strong>(휴가 또는 직무대리 위임 중)로
+            접속 중입니다. 검찰사무국 행정 데이터 변경 및 저장이 제한됩니다.
           </span>
         </div>
       )}
@@ -3503,7 +3663,6 @@ export default function SecretariatAdmin({
         <div
           style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 16 }}
         >
-          {/* Add Form */}
           <div className="glass-panel" style={{ padding: 20 }}>
             <div
               style={{
@@ -3665,13 +3824,17 @@ export default function SecretariatAdmin({
             </form>
           </div>
 
-          {/* Prosecutor List */}
           <div className="glass-panel" style={{ overflow: "hidden" }}>
             {(() => {
-              const activeCount = prosecutorsList.filter((p) => p.status !== "RETIRED").length;
-              const retiredCount = prosecutorsList.filter((p) => p.status === "RETIRED").length;
+              const activeCount = prosecutorsList.filter(
+                (p) => p.status !== "RETIRED",
+              ).length;
+              const retiredCount = prosecutorsList.filter(
+                (p) => p.status === "RETIRED",
+              ).length;
               const displayedProsecutors = prosecutorsList.filter((p) => {
-                if (prosecutorStatusFilter === "RETIRED") return p.status === "RETIRED";
+                if (prosecutorStatusFilter === "RETIRED")
+                  return p.status === "RETIRED";
                 if (prosecutorStatusFilter === "ALL") return true;
                 return p.status !== "RETIRED";
               });
@@ -3727,6 +3890,7 @@ export default function SecretariatAdmin({
                       </button>
                     </div>
                   </div>
+
                   <div
                     className="ledger-table-container"
                     style={{ border: "none", borderRadius: 0 }}
@@ -3747,2809 +3911,682 @@ export default function SecretariatAdmin({
                       <tbody>
                         {displayedProsecutors.map((p) => {
                           const st = p.status || "ACTIVE";
-                    return (
-                      <tr key={p.id}>
-                        <td
-                          style={{
-                            fontFamily: "monospace",
-                            color: "var(--primary-amber)",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {p.id}
-                        </td>
-                        <td style={{ fontWeight: 700 }}>{p.name}</td>
-                        <td
-                          style={{
-                            color: "var(--text-main)",
-                            fontSize: "0.8rem",
-                          }}
-                        >
-                          {p.position || p.title || "-"}
-                          {p.dualPosition && (
-                            <div
-                              style={{
-                                color: "#a7f3d0",
-                                fontSize: "0.7rem",
-                                marginTop: 3,
-                              }}
-                            >
-                              겸직: {p.dualPosition}
-                              {p.dualDept ? ` · ${p.dualDept}` : ""}
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          <span
-                            style={{
-                              fontSize: "0.68rem",
-                              fontWeight: 700,
-                              padding: "3px 9px",
-                              borderRadius: 20,
-                              background: `${ROLE_COLORS[p.roleLevel] || "#3b82f6"}20`,
-                              color: ROLE_COLORS[p.roleLevel] || "#3b82f6",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {ROLE_LABELS[p.roleLevel] || p.rank || p.roleLevel}
-                          </span>
-                        </td>
-                        <td style={{ color: "var(--text-muted)" }}>{p.dept}</td>
-                        <td>
-                          <DiscordIdCell
-                            prosecutor={p}
-                            onUpdateProsecutorStatus={onUpdateProsecutorStatus}
-                            addLog={addLog}
-                          />
-                        </td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 4,
-                              alignItems: "flex-start",
-                            }}
-                          >
-                            {st === "ON_LEAVE" && (
-                              <span
+                          return (
+                            <tr key={p.id}>
+                              <td
                                 style={{
-                                  fontSize: "0.68rem",
-                                  padding: "2px 7px",
-                                  borderRadius: 10,
-                                  background: "rgba(239,68,68,0.15)",
-                                  color: "#f87171",
-                                  fontWeight: 800,
+                                  fontFamily: "monospace",
+                                  color: "var(--primary-amber)",
+                                  fontWeight: 700,
                                 }}
                               >
-                                🟡 휴직중{" "}
-                                {p.delegateTo ? `(대결: ${p.delegateTo})` : ""}
-                              </span>
-                            )}
-                            {st === "DELEGATED" && (
-                              <span
+                                {p.id}
+                              </td>
+                              <td style={{ fontWeight: 700 }}>{p.name}</td>
+                              <td
                                 style={{
-                                  fontSize: "0.68rem",
-                                  padding: "2px 7px",
-                                  borderRadius: 10,
-                                  background: "rgba(59,130,246,0.15)",
-                                  color: "#60a5fa",
-                                  fontWeight: 800,
+                                  color: "var(--text-main)",
+                                  fontSize: "0.8rem",
                                 }}
                               >
-                                🔵 권한위임 (대결자: {p.delegateTo || "미지정"})
-                              </span>
-                            )}
-                            {st === "ACTIVE" && (
-                              <span
-                                style={{
-                                  fontSize: "0.68rem",
-                                  padding: "2px 7px",
-                                  borderRadius: 10,
-                                  background: "rgba(52,211,153,0.15)",
-                                  color: "#34d399",
-                                  fontWeight: 800,
-                                }}
-                              >
-                                🟢 정상 (재직)
-                              </span>
-                            )}
-                            {st === "RETIRED" && (
-                              <span
-                                style={{
-                                  fontSize: "0.68rem",
-                                  padding: "2px 7px",
-                                  borderRadius: 10,
-                                  background: "rgba(100,116,139,0.2)",
-                                  color: "#94a3b8",
-                                  fontWeight: 800,
-                                }}
-                              >
-                                ⚫ 퇴직 (업무종료)
-                              </span>
-                            )}
-                            {Boolean(p.isAutoAssignExcluded) && (
-                              <span
-                                style={{
-                                  fontSize: "0.65rem",
-                                  padding: "2px 6px",
-                                  borderRadius: 8,
-                                  background: "rgba(239,68,68,0.12)",
-                                  color: "#f87171",
-                                  fontWeight: 800,
-                                }}
-                              >
-                                🚫 자동배정 제외 대상
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          {hasSecretariatAccess &&
-                            (!p.dept?.includes("사무국") ||
-                              canManageSecretariatPersonnel) && (
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: 4,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <button
-                                  onClick={() => {
-                                    const updatedState =
-                                      !p.isAutoAssignExcluded;
-                                    if (onUpdateProsecutorStatus) {
-                                      onUpdateProsecutorStatus(p.id, {
-                                        isAutoAssignExcluded: updatedState,
-                                      });
-                                    }
-                                    addLog(
-                                      "자동배정 설정 변경",
-                                      `'${p.name}' 검사의 자동배정 상태 변경 (${updatedState ? "제외" : "포함"})`,
-                                    );
-                                  }}
-                                  className="btn btn-secondary"
+                                {p.position || p.title || "-"}
+                                {p.dualPosition && (
+                                  <div
+                                    style={{
+                                      color: "#a7f3d0",
+                                      fontSize: "0.7rem",
+                                      marginTop: 3,
+                                    }}
+                                  >
+                                    겸직: {p.dualPosition}
+                                    {p.dualDept ? ` · ${p.dualDept}` : ""}
+                                  </div>
+                                )}
+                              </td>
+                              <td>
+                                <span
                                   style={{
-                                    padding: "3px 7px",
                                     fontSize: "0.68rem",
-                                    color: p.isAutoAssignExcluded
-                                      ? "#f87171"
-                                      : "#34d399",
-                                    borderColor: p.isAutoAssignExcluded
-                                      ? "rgba(239,68,68,0.3)"
-                                      : "rgba(52,211,153,0.3)",
+                                    fontWeight: 700,
+                                    padding: "3px 9px",
+                                    borderRadius: 20,
+                                    background: `${ROLE_COLORS[p.roleLevel] || "#3b82f6"}20`,
+                                    color:
+                                      ROLE_COLORS[p.roleLevel] || "#3b82f6",
+                                    whiteSpace: "nowrap",
                                   }}
-                                  title={
-                                    p.isAutoAssignExcluded
-                                      ? "자동배정 포함으로 전환"
-                                      : "자동배정 제외로 전환"
+                                >
+                                  {ROLE_LABELS[p.roleLevel] ||
+                                    p.rank ||
+                                    p.roleLevel}
+                                </span>
+                              </td>
+                              <td style={{ color: "var(--text-muted)" }}>
+                                {p.dept}
+                              </td>
+                              <td>
+                                <DiscordIdCell
+                                  prosecutor={p}
+                                  onUpdateProsecutorStatus={
+                                    onUpdateProsecutorStatus
                                   }
-                                >
-                                  {p.isAutoAssignExcluded
-                                    ? "⭕ 배정 포함"
-                                    : "🚫 배정 제외"}
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setStatusModalUser(p);
-                                    setStatusForm({
-                                      status: p.status || "ACTIVE",
-                                      canArbitraryApprove:
-                                        !!p.canArbitraryApprove,
-                                      roleLevel: p.roleLevel || "PROSECUTOR",
-                                      rank: p.rank || "",
-                                      position: p.position || p.title || "",
-                                      delegateTo: p.delegateTo || "",
-                                      delegateReason: p.delegateReason || "",
-                                      dualPosition: p.dualPosition || "",
-                                      dualDept: p.dualDept || "",
-                                      dualRoleLevel: p.dualRoleLevel || "",
-                                      dualSecretariatWork:
-                                        !!p.dualSecretariatWork,
-                                      isAutoAssignExcluded:
-                                        !!p.isAutoAssignExcluded,
-                                    });
-                                  }}
-                                  className="btn btn-secondary"
+                                  addLog={addLog}
+                                />
+                              </td>
+                              <td>
+                                <div
                                   style={{
-                                    padding: "3px 7px",
-                                    fontSize: "0.68rem",
-                                    color: "var(--primary-amber)",
-                                    borderColor: "rgba(245,158,11,0.3)",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 4,
+                                    alignItems: "flex-start",
                                   }}
-                                  title="휴직/결재위임 설정"
                                 >
-                                  ⚙️ 상세 설정
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteProsecutor(p)}
-                                  className="btn btn-secondary"
-                                  style={{
-                                    padding: "3px 7px",
-                                    fontSize: "0.68rem",
-                                    color: "#f87171",
-                                    borderColor: "rgba(239,68,68,0.3)",
-                                  }}
-                                  title="계정 삭제"
-                                >
-                                  <Trash2 size={11} /> 삭제
-                                </button>
-                              </div>
-                            )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* 휴직 / 결재권한 위임 설정 팝업 모달 */}
-            {statusModalUser && (
-              <div
-                style={{
-                  position: "fixed",
-                  inset: 0,
-                  background: "rgba(0,0,0,0.75)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  zIndex: 9999,
-                }}
-              >
-                <div
-                  className="glass-panel"
-                  style={{
-                    maxWidth: 460,
-                    width: "92%",
-                    padding: 24,
-                    borderRadius: 14,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: 800,
-                      fontSize: "0.95rem",
-                      color: "var(--text-main)",
-                      marginBottom: 16,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <span>⚙️ 결재권한 위임 & 신분 상태 설정</span>
-                    <button
-                      onClick={() => setStatusModalUser(null)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--text-muted)",
-                        cursor: "pointer",
-                        fontSize: "1.1rem",
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  <div
-                    style={{
-                      padding: "12px",
-                      borderRadius: 8,
-                      background: "rgba(245,158,11,0.08)",
-                      border: "1px solid rgba(245,158,11,0.25)",
-                      marginBottom: 14,
-                    }}
-                  >
-                    <Label>승진·직급 변경</Label>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 8,
-                      }}
-                    >
-                      <select
-                        className="select-field"
-                        value={
-                          statusForm.roleLevel ||
-                          statusModalUser.roleLevel ||
-                          "PROSECUTOR"
-                        }
-                        onChange={(e) => {
-                          const roleLevel = e.target.value;
-                          const labels = {
-                            PROSECUTOR_GENERAL: "검찰총장",
-                            CHIEF_PROSECUTOR: "검사장",
-                            DEPUTY_CHIEF: "차장검사",
-                            CHIEF_ADMINISTRATOR: "검찰관리관",
-                            SENIOR_PROSECUTOR: "부장검사",
-                            PROSECUTOR: "평검사",
-                            PROBATIONARY: "검사시보",
-                            ADMINISTRATOR: "검찰사무관",
-                            ADMIN_PROBATIONARY: "검찰사무관시보",
-                          };
-                          setStatusForm({
-                            ...statusForm,
-                            roleLevel,
-                            rank: labels[roleLevel] || roleLevel,
-                          });
-                        }}
-                      >
-                        {ROLE_HIERARCHY.filter(
-                          (role) => role !== "SUPER_ADMIN",
-                        ).map((role) => (
-                          <option key={role} value={role}>
-                            {ROLE_LABELS[role]}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        className="input-field"
-                        value={statusForm.rank || ""}
-                        onChange={(e) =>
-                          setStatusForm({ ...statusForm, rank: e.target.value })
-                        }
-                        placeholder="직급 표시명"
-                      />
-                    </div>
-                    <input
-                      className="input-field"
-                      style={{ marginTop: 8 }}
-                      value={statusForm.position || ""}
-                      onChange={(e) =>
-                        setStatusForm({
-                          ...statusForm,
-                          position: e.target.value,
-                          title: e.target.value,
-                        })
-                      }
-                      placeholder="직위 (예: 형사부장)"
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      padding: 12,
-                      borderRadius: 8,
-                      background: "var(--bg-elevated)",
-                      marginBottom: 16,
-                      fontSize: "0.8rem",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    대상 계정:{" "}
-                    <strong style={{ color: "var(--primary-amber)" }}>
-                      {statusModalUser.name} (
-                      {statusModalUser.position || statusModalUser.title})
-                    </strong>
-                    <br />
-                    소속 부서: {statusModalUser.dept}
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 14,
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        background: "rgba(52,211,153,0.08)",
-                        border: "1px solid rgba(52,211,153,0.25)",
-                      }}
-                    >
-                      <Label>겸직 정보 (선택)</Label>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 1fr",
-                          gap: 8,
-                        }}
-                      >
-                        <input
-                          className="input-field"
-                          placeholder="겸직 직위"
-                          value={statusForm.dualPosition || ""}
-                          onChange={(e) =>
-                            setStatusForm({
-                              ...statusForm,
-                              dualPosition: e.target.value,
-                            })
-                          }
-                        />
-                        <select
-                          className="select-field"
-                          value={statusForm.dualDept || ""}
-                          onChange={(e) =>
-                            setStatusForm({
-                              ...statusForm,
-                              dualDept: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="">겸직 부서 없음</option>
-                          {departmentsData.map((dept) => (
-                            <option key={dept.id} value={dept.name}>
-                              {dept.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <select
-                        className="select-field"
-                        style={{ marginTop: 8 }}
-                        value={statusForm.dualRoleLevel || ""}
-                        onChange={(e) =>
-                          setStatusForm({
-                            ...statusForm,
-                            dualRoleLevel: e.target.value,
-                          })
-                        }
-                      >
-                        <option value="">겸직 직급 없음</option>
-                        {ROLE_HIERARCHY.filter(
-                          (role) => role !== "SUPER_ADMIN",
-                        ).map((role) => (
-                          <option key={role} value={role}>
-                            {ROLE_LABELS[role]}
-                          </option>
-                        ))}
-                      </select>
-                      <label
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          alignItems: "center",
-                          marginTop: 8,
-                          fontSize: "0.75rem",
-                          color: "var(--text-main)",
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={!!statusForm.dualSecretariatWork}
-                          onChange={(e) =>
-                            setStatusForm({
-                              ...statusForm,
-                              dualSecretariatWork: e.target.checked,
-                            })
-                          }
-                        />
-                        겸직 사무국 업무 권한 승인
-                      </label>
-                    </div>
-                    <div>
-                      <Label>신분 / 결재 권한 상태 선택 *</Label>
-                      <select
-                        className="select-field"
-                        value={statusForm.status}
-                        onChange={(e) =>
-                          setStatusForm({
-                            ...statusForm,
-                            status: e.target.value,
-                          })
-                        }
-                      >
-                        <option value="ACTIVE">
-                          🟢 정상 재직 (직접 결재 수행)
-                        </option>
-                        <option value="DELEGATED">
-                          🔵 결재권한 위임 (대결자에게 결재권 부여)
-                        </option>
-                        <option value="ON_LEAVE">
-                          🟡 휴직중 (사무대리 및 대결자 지정)
-                        </option>
-                        <option value="RETIRED">
-                          ⚫ 퇴직 (업무 및 사건배정 종료)
-                        </option>
-                      </select>
-                    </div>
-
-                    <div
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        background: "var(--bg-elevated)",
-                        border: "1px solid var(--border-subtle)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        id="autoAssignExCheck"
-                        checked={!!statusForm.isAutoAssignExcluded}
-                        onChange={(e) =>
-                          setStatusForm({
-                            ...statusForm,
-                            isAutoAssignExcluded: e.target.checked,
-                          })
-                        }
-                      />
-                      <label
-                        htmlFor="autoAssignExCheck"
-                        style={{
-                          fontSize: "0.78rem",
-                          color: "var(--text-main)",
-                          cursor: "pointer",
-                        }}
-                      >
-                        🚫 신규 사건 자동 배정 대상에서 제외하기 (고위 관리자 /
-                        전담 제외)
-                      </label>
-                    </div>
-
-                    <div
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        background: "var(--bg-elevated)",
-                        border: "1px solid var(--border-subtle)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        id="arbitraryApproveCheck"
-                        checked={!!statusForm.canArbitraryApprove}
-                        onChange={(e) =>
-                          setStatusForm({
-                            ...statusForm,
-                            canArbitraryApprove: e.target.checked,
-                          })
-                        }
-                      />
-                      <label
-                        htmlFor="arbitraryApproveCheck"
-                        style={{
-                          fontSize: "0.78rem",
-                          color: "var(--text-main)",
-                          cursor: "pointer",
-                        }}
-                      >
-                        ⚡ 전결 승인 권한 허용
-                      </label>
-                    </div>
-
-                    {statusForm.status !== "ACTIVE" && (
-                      <>
-                        <div>
-                          <Label>대결자 (대리 결재 승인자) 지정 *</Label>
-                          <select
-                            className="select-field"
-                            value={statusForm.delegateTo}
-                            onChange={(e) =>
-                              setStatusForm({
-                                ...statusForm,
-                                delegateTo: e.target.value,
-                              })
-                            }
-                          >
-                            <option value="">대결자 선택...</option>
-                            {prosecutorsList
-                              .filter((p) => p.id !== statusModalUser.id)
-                              .map((p) => (
-                                <option key={p.id} value={p.name}>
-                                  {p.name} ({p.title} / {p.dept})
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-                        <div>
-                          <Label>휴직 / 위임 사유</Label>
-                          <input
-                            className="input-field"
-                            placeholder="예: 연가, 해외 출장, 육아 휴직"
-                            value={statusForm.delegateReason}
-                            onChange={(e) =>
-                              setStatusForm({
-                                ...statusForm,
-                                delegateReason: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 10,
-                        justifyContent: "flex-end",
-                        marginTop: 10,
-                      }}
-                    >
-                      <button
-                        onClick={() => setStatusModalUser(null)}
-                        className="btn btn-secondary"
-                        style={{ padding: "8px 16px" }}
-                      >
-                        취소
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (onUpdateProsecutorStatus) {
-                            onUpdateProsecutorStatus(
-                              statusModalUser.id,
-                              statusForm,
-                            );
-                          }
-                          addLog(
-                            "검사 신분/위임 설정",
-                            `'${statusModalUser.name}' 검사 상태 변경 (${statusForm.status}, 대결자: ${statusForm.delegateTo || "없음"})`,
+                                  {st === "ON_LEAVE" && (
+                                    <span
+                                      style={{
+                                        fontSize: "0.68rem",
+                                        padding: "2px 7px",
+                                        borderRadius: 10,
+                                        background: "rgba(239,68,68,0.15)",
+                                        color: "#f87171",
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      🟡 휴직중{" "}
+                                      {p.delegateTo
+                                        ? `(대결: ${p.delegateTo})`
+                                        : ""}
+                                    </span>
+                                  )}
+                                  {st === "DELEGATED" && (
+                                    <span
+                                      style={{
+                                        fontSize: "0.68rem",
+                                        padding: "2px 7px",
+                                        borderRadius: 10,
+                                        background: "rgba(59,130,246,0.15)",
+                                        color: "#60a5fa",
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      🔵 권한위임 (대결자:{" "}
+                                      {p.delegateTo || "미지정"})
+                                    </span>
+                                  )}
+                                  {st === "ACTIVE" && (
+                                    <span
+                                      style={{
+                                        fontSize: "0.68rem",
+                                        padding: "2px 7px",
+                                        borderRadius: 10,
+                                        background: "rgba(52,211,153,0.15)",
+                                        color: "#34d399",
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      🟢 정상 (재직)
+                                    </span>
+                                  )}
+                                  {st === "RETIRED" && (
+                                    <span
+                                      style={{
+                                        fontSize: "0.68rem",
+                                        padding: "2px 7px",
+                                        borderRadius: 10,
+                                        background: "rgba(100,116,139,0.2)",
+                                        color: "#94a3b8",
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      ⚫ 퇴직 (업무종료)
+                                    </span>
+                                  )}
+                                  {Boolean(p.isAutoAssignExcluded) && (
+                                    <span
+                                      style={{
+                                        fontSize: "0.65rem",
+                                        padding: "2px 6px",
+                                        borderRadius: 8,
+                                        background: "rgba(239,68,68,0.12)",
+                                        color: "#f87171",
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      🚫 자동배정 제외 대상
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td>
+                                {hasSecretariatAccess &&
+                                  (!p.dept?.includes("사무국") ||
+                                    canManageSecretariatPersonnel) && (
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        gap: 4,
+                                        flexWrap: "wrap",
+                                      }}
+                                    >
+                                      <button
+                                        onClick={() => {
+                                          const updatedState =
+                                            !p.isAutoAssignExcluded;
+                                          if (onUpdateProsecutorStatus) {
+                                            onUpdateProsecutorStatus(p.id, {
+                                              isAutoAssignExcluded:
+                                                updatedState,
+                                            });
+                                          }
+                                          addLog(
+                                            "자동배정 설정 변경",
+                                            `'${p.name}' 검사의 자동배정 상태 변경 (${updatedState ? "제외" : "포함"})`,
+                                          );
+                                        }}
+                                        className="btn btn-secondary"
+                                        style={{
+                                          padding: "3px 7px",
+                                          fontSize: "0.68rem",
+                                          color: p.isAutoAssignExcluded
+                                            ? "#f87171"
+                                            : "#34d399",
+                                          borderColor: p.isAutoAssignExcluded
+                                            ? "rgba(239,68,68,0.3)"
+                                            : "rgba(52,211,153,0.3)",
+                                        }}
+                                        title={
+                                          p.isAutoAssignExcluded
+                                            ? "자동배정 포함으로 전환"
+                                            : "자동배정 제외로 전환"
+                                        }
+                                      >
+                                        {p.isAutoAssignExcluded
+                                          ? "⭕ 배정 포함"
+                                          : "🚫 배정 제외"}
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setStatusModalUser(p);
+                                          setStatusForm({
+                                            status: p.status || "ACTIVE",
+                                            canArbitraryApprove:
+                                              !!p.canArbitraryApprove,
+                                            roleLevel:
+                                              p.roleLevel || "PROSECUTOR",
+                                            rank: p.rank || "",
+                                            position:
+                                              p.position || p.title || "",
+                                            delegateTo: p.delegateTo || "",
+                                            delegateReason:
+                                              p.delegateReason || "",
+                                            dualPosition: p.dualPosition || "",
+                                            dualDept: p.dualDept || "",
+                                            dualRoleLevel:
+                                              p.dualRoleLevel || "",
+                                            dualSecretariatWork:
+                                              !!p.dualSecretariatWork,
+                                            isAutoAssignExcluded:
+                                              !!p.isAutoAssignExcluded,
+                                          });
+                                        }}
+                                        className="btn btn-secondary"
+                                        style={{
+                                          padding: "3px 7px",
+                                          fontSize: "0.68rem",
+                                          color: "var(--primary-amber)",
+                                          borderColor: "rgba(245,158,11,0.3)",
+                                        }}
+                                        title="휴직/결재위임 설정"
+                                      >
+                                        ⚙️ 상세 설정
+                                      </button>
+                                      <button
+                                        onClick={() =>
+                                          handleDeleteProsecutor(p)
+                                        }
+                                        className="btn btn-secondary"
+                                        style={{
+                                          padding: "3px 7px",
+                                          fontSize: "0.68rem",
+                                          color: "#f87171",
+                                          borderColor: "rgba(239,68,68,0.3)",
+                                        }}
+                                        title="계정 삭제"
+                                      >
+                                        <Trash2 size={11} /> 삭제
+                                      </button>
+                                    </div>
+                                  )}
+                              </td>
+                            </tr>
                           );
-                          setStatusModalUser(null);
-                        }}
-                        className="btn btn-gold"
-                        style={{ padding: "8px 16px" }}
-                      >
-                        설정 저장
-                      </button>
-                    </div>
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* 부서 & 부원 관리 탭 */}
-      {activeSubTab === "depts" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* 상단 통합 안내 */}
-          <div
-            className="glass-panel"
-            style={{
-              padding: "16px 20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 10,
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontWeight: 800,
-                  fontSize: "0.95rem",
-                  color: "var(--text-main)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <Building2 size={16} color="var(--primary-amber)" />
-                검찰 부서 신설·삭제 & 부서장 부원 직위 관리
-              </div>
-              <div
-                style={{
-                  fontSize: "0.72rem",
-                  color: "var(--text-muted)",
-                  marginTop: 2,
-                }}
-              >
-                부서를 신설/삭제하고 담당 부서장이 부원을 배치하며, 소속 부서
-                변경 시 직위가 부서명에 맞춰 자동으로 연동됩니다.
-              </div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "320px 1fr",
-              gap: 16,
-            }}
-          >
-            {/* 왼쪽: 부서 목록 및 신설 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* 1. 신규 부서 등록 폼 */}
-              <div className="glass-panel" style={{ padding: 18 }}>
-                <div
-                  style={{
-                    fontWeight: 800,
-                    fontSize: "0.85rem",
-                    color: "var(--text-main)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginBottom: 12,
-                  }}
-                >
-                  <Plus size={14} color="var(--primary-amber)" />
-                  신규 부서 신설
-                </div>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!newDeptForm.name) {
-                      alert("부서명을 입력하세요.");
-                      return;
-                    }
-                    const selectedHead = prosecutorsList.find(
-                      (p) => p.id === newDeptForm.headId,
-                    );
-                    const newDept = {
-                      id: `dept_${Date.now()}`,
-                      name: newDeptForm.name,
-                      desc: newDeptForm.desc || "검찰 수사 및 사무 담당 부서",
-                      headId: newDeptForm.headId || "",
-                      headName: selectedHead ? selectedHead.name : "미지정",
-                      canIntake: newDeptForm.canIntake !== false,
-                    };
-                    if (onAddDepartment) onAddDepartment(newDept);
-                    addLog(
-                      "부서 신설",
-                      `'${newDept.name}' 신설 (부서장: ${newDept.headName}, 사건접수: ${newDept.canIntake ? "허용" : "차단"})`,
-                    );
-                    setNewDeptForm({
-                      name: "",
-                      desc: "",
-                      headId: "",
-                      canIntake: true,
-                    });
-                    alert(
-                      `'${newDept.name}' 부서가 성공적으로 신설되었습니다.`,
-                    );
-                  }}
-                  style={{ display: "flex", flexDirection: "column", gap: 10 }}
-                >
-                  <div>
-                    <Label>부서 명칭 *</Label>
-                    <input
-                      className="input-field"
-                      placeholder="예: 지능범죄수사부"
-                      value={newDeptForm.name}
-                      onChange={(e) =>
-                        setNewDeptForm({ ...newDeptForm, name: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label>사건 접수 권한 설정</Label>
-                    <select
-                      className="select-field"
-                      value={newDeptForm.canIntake ? "true" : "false"}
-                      onChange={(e) =>
-                        setNewDeptForm({
-                          ...newDeptForm,
-                          canIntake: e.target.value === "true",
-                        })
-                      }
-                    >
-                      <option value="true">
-                        ✅ 사건 접수 허용 (접수 권한 부여)
-                      </option>
-                      <option value="false">
-                        🚫 사건 접수 차단 (수사 전담 부서)
-                      </option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label>담당 부서장 지정 (선택)</Label>
-                    <select
-                      className="select-field"
-                      value={newDeptForm.headId}
-                      onChange={(e) =>
-                        setNewDeptForm({
-                          ...newDeptForm,
-                          headId: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="">부서장 미지정</option>
-                      {prosecutorsList.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.dept} · {p.position || p.title})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>부서 관장 사무 (설명)</Label>
-                    <input
-                      className="input-field"
-                      placeholder="부서의 담당 수사/사무 분야 설명"
-                      value={newDeptForm.desc}
-                      onChange={(e) =>
-                        setNewDeptForm({ ...newDeptForm, desc: e.target.value })
-                      }
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="btn btn-gold"
-                    style={{ marginTop: 4, fontSize: "0.82rem" }}
-                  >
-                    <Plus size={14} /> 부서 신설 완료
-                  </button>
-                </form>
-              </div>
-
-              {/* 2. 부서 카드 리스트 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div
-                  style={{
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    color: "var(--text-muted)",
-                    padding: "0 4px",
-                  }}
-                >
-                  등록 부서 목록 ({departmentsData.length}개)
-                </div>
-                {departmentsData.map((d) => {
-                  const isSelected =
-                    selectedDeptId === d.id || selectedDeptId === d.name;
-                  const members = prosecutorsList.filter(
-                    (p) => p.dept === d.name,
-                  );
-                  const headUser = prosecutorsList.find(
-                    (p) => p.id === d.headId || p.dept === d.name,
-                  );
-                  return (
+                  {statusModalUser && (
                     <div
-                      key={d.id}
-                      onClick={() => setSelectedDeptId(d.name)}
-                      className="glass-panel"
                       style={{
-                        padding: "12px 14px",
-                        cursor: "pointer",
-                        borderRadius: 10,
-                        border: isSelected
-                          ? "1px solid var(--primary-amber)"
-                          : "1px solid var(--border-subtle)",
-                        background: isSelected
-                          ? "rgba(245,158,11,0.08)"
-                          : "var(--bg-card)",
-                        transition: "all 0.15s",
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(0,0,0,0.75)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 9999,
                       }}
                     >
                       <div
+                        className="glass-panel"
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: 4,
+                          maxWidth: 460,
+                          width: "92%",
+                          padding: 24,
+                          borderRadius: 14,
                         }}
                       >
                         <div
                           style={{
                             fontWeight: 800,
-                            fontSize: "0.88rem",
-                            color: isSelected
-                              ? "var(--primary-amber)"
-                              : "var(--text-main)",
-                          }}
-                        >
-                          {d.name}
-                        </div>
-                        <span
-                          className="badge badge-info"
-                          style={{ fontSize: "0.68rem" }}
-                        >
-                          {members.length}명 소속
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "0.72rem",
-                          color: "var(--text-muted)",
-                          lineHeight: 1.4,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        <span style={{ flexShrink: 0 }}>부서장:</span>
-                        <select
-                          className="select-field"
-                          style={{
-                            fontSize: "0.68rem",
-                            padding: "2px 4px",
-                            flex: 1,
-                            minWidth: 0,
-                            background: "var(--bg-card)",
+                            fontSize: "0.95rem",
                             color: "var(--text-main)",
-                            border: "1px solid var(--border-subtle)",
-                            borderRadius: 4,
-                          }}
-                          value={d.headId || ""}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            const selected = prosecutorsList.find(
-                              (p) => p.id === e.target.value,
-                            );
-                            const updated = {
-                              ...d,
-                              headId: e.target.value,
-                              headName: selected?.name || "미지정",
-                            };
-                            if (onUpdateDepartment) onUpdateDepartment(updated);
-                            addLog(
-                              "부서장 지정",
-                              `'${d.name}' 부서장 → ${selected?.name || "미지정"}`,
-                            );
+                            marginBottom: 16,
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
                           }}
                         >
-                          <option value="">미지정</option>
-                          {(() => {
-                            const members = prosecutorsList.filter(
-                              (p) => p.dept === d.name,
-                            );
-                            const others = prosecutorsList.filter(
-                              (p) => p.dept !== d.name,
-                            );
-                            return (
-                              <>
-                                {members.length > 0 && (
-                                  <optgroup label={`${d.name} 소속`}>
-                                    {members.map((p) => (
-                                      <option key={p.id} value={p.id}>
-                                        {p.name} ({p.title || p.roleLevel})
-                                      </option>
-                                    ))}
-                                  </optgroup>
-                                )}
-                                <optgroup label="타 부서">
-                                  {others.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                      {p.name} · {p.dept || "미배속"}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              </>
-                            );
-                          })()}
-                        </select>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "0.68rem",
-                          color: "var(--text-muted)",
-                          marginTop: 4,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {d.desc}
-                      </div>
-
-                      {/* 권한 및 삭제 버튼 */}
-                      <div
-                        style={{
-                          marginTop: 8,
-                          paddingTop: 6,
-                          borderTop: "1px solid var(--border-subtle)",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onToggleDeptIntake) onToggleDeptIntake(d.id);
-                            addLog(
-                              "부서 사건접수권한 변경",
-                              `'${d.name}' 사건접수권한 ${d.canIntake !== false ? "차단" : "부여"}`,
-                            );
-                          }}
-                          className="btn btn-outline"
-                          style={{
-                            padding: "3px 8px",
-                            fontSize: "0.68rem",
-                            color:
-                              d.canIntake !== false ? "#4ade80" : "#f87171",
-                            borderColor:
-                              d.canIntake !== false
-                                ? "rgba(74,222,128,0.3)"
-                                : "rgba(239,68,68,0.3)",
-                            background:
-                              d.canIntake !== false
-                                ? "rgba(74,222,128,0.08)"
-                                : "rgba(239,68,68,0.08)",
-                          }}
-                          title="클릭하여 이 부서의 신규 사건 접수 권한 부여/차단 전환"
-                        >
-                          사건접수:{" "}
-                          {d.canIntake !== false ? "✅ 허용" : "🚫 차단"}
-                        </button>
-
-                        {departmentsData.length > 1 && (
+                          <span>⚙️ 결재권한 위임 & 신분 상태 설정</span>
                           <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (
-                                !window.confirm(
-                                  `'${d.name}' 부서를 해체/삭제하시겠습니까?`,
-                                )
-                              )
-                                return;
-                              if (onDeleteDepartment) onDeleteDepartment(d.id);
-                              addLog("부서 삭제", `'${d.name}' 부서 해체`);
-                            }}
-                            className="btn btn-outline"
+                            onClick={() => setStatusModalUser(null)}
                             style={{
-                              padding: "3px 8px",
-                              fontSize: "0.68rem",
-                              color: "#f87171",
-                            }}
-                          >
-                            <Trash2 size={11} /> 삭제
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 오른쪽: 선택된 부서의 부원 배치 및 관리 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {(() => {
-                const currentDeptObj =
-                  departmentsData.find(
-                    (d) => d.id === selectedDeptId || d.name === selectedDeptId,
-                  ) || departmentsData[0];
-                const deptName = currentDeptObj?.name || selectedDeptId;
-                const members = prosecutorsList.filter(
-                  (p) => p.dept === deptName,
-                );
-                const deptCases = ledgerData.filter(
-                  (c) =>
-                    c.prosecutorName &&
-                    members.some(
-                      (m) =>
-                        m.name.includes(c.prosecutorName) ||
-                        c.prosecutorName.includes(m.name),
-                    ),
-                );
-                const nonMembers = prosecutorsList.filter(
-                  (p) => p.dept !== deptName,
-                );
-
-                return (
-                  <>
-                    {/* 부서 요약 패널 */}
-                    <div className="glass-panel" style={{ padding: 20 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: 12,
-                        }}
-                      >
-                        <div>
-                          <div
-                            style={{
-                              fontSize: "1.1rem",
-                              fontWeight: 800,
-                              color: "var(--text-main)",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                            }}
-                          >
-                            <Building2 size={20} color="var(--primary-amber)" />
-                            {deptName} 부원 & 조직 관리
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "0.75rem",
+                              background: "none",
+                              border: "none",
                               color: "var(--text-muted)",
-                              marginTop: 2,
+                              cursor: "pointer",
+                              fontSize: "1.1rem",
                             }}
                           >
-                            {currentDeptObj?.desc} · 부서장:{" "}
-                            <strong style={{ color: "var(--primary-amber)" }}>
-                              {currentDeptObj?.headName || "지정 필요"}
-                            </strong>
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", gap: 10 }}>
-                          <div
-                            style={{
-                              textAlign: "center",
-                              padding: "6px 12px",
-                              background: "var(--bg-elevated)",
-                              borderRadius: 8,
-                              border: "1px solid var(--border-subtle)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: "1.1rem",
-                                fontWeight: 900,
-                                color: "var(--primary-amber)",
-                              }}
-                            >
-                              {members.length}명
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "0.68rem",
-                                color: "var(--text-muted)",
-                              }}
-                            >
-                              소속 부원
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              textAlign: "center",
-                              padding: "6px 12px",
-                              background: "var(--bg-elevated)",
-                              borderRadius: 8,
-                              border: "1px solid var(--border-subtle)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: "1.1rem",
-                                fontWeight: 900,
-                                color: "#60a5fa",
-                              }}
-                            >
-                              {deptCases.length}건
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "0.68rem",
-                                color: "var(--text-muted)",
-                              }}
-                            >
-                              부서 사건 수
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 부서원 발령/이동 폼 */}
-                      <div
-                        style={{
-                          background: "var(--bg-elevated)",
-                          padding: 14,
-                          borderRadius: 10,
-                          border: "1px solid var(--border-subtle)",
-                          marginTop: 14,
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: "0.8rem",
-                            fontWeight: 700,
-                            color: "var(--text-main)",
-                            marginBottom: 8,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                          }}
-                        >
-                          <UserPlus size={14} color="var(--primary-amber)" />{" "}
-                          신규 부원 이관 / {deptName} 발령
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 10,
-                            alignItems: "center",
-                          }}
-                        >
-                          <select
-                            id="deptTransferSelect"
-                            className="select-field"
-                            style={{ flex: 1 }}
-                            defaultValue=""
-                          >
-                            <option value="" disabled>
-                              이동할 인원 선택 (현재 타 부서 소속)...
-                            </option>
-                            {nonMembers.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} ({p.dept} · {p.position || p.title})
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const sel =
-                                document.getElementById(
-                                  "deptTransferSelect",
-                                )?.value;
-                              if (!sel) {
-                                alert("발령할 인원을 선택해주세요.");
-                                return;
-                              }
-                              const targetUser = prosecutorsList.find(
-                                (p) => p.id === sel,
-                              );
-                              if (onUpdateUserDept)
-                                onUpdateUserDept(sel, deptName);
-                              addLog(
-                                "부서원 인사이동",
-                                `${targetUser?.name} → '${deptName}'(으)로 인사이동 발령 (직위 자동 갱신)`,
-                              );
-                              alert(
-                                `${targetUser?.name}님이 '${deptName}'(으)로 성공적으로 발령되었습니다.`,
-                              );
-                            }}
-                            className="btn btn-gold"
-                            style={{
-                              padding: "8px 16px",
-                              fontSize: "0.8rem",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <UserPlus size={14} /> 인사 발령
+                            ✕
                           </button>
                         </div>
+
                         <div
                           style={{
-                            fontSize: "0.7rem",
-                            color: "var(--text-muted)",
-                            marginTop: 6,
+                            padding: "12px",
+                            borderRadius: 8,
+                            background: "rgba(245,158,11,0.08)",
+                            border: "1px solid rgba(245,158,11,0.25)",
+                            marginBottom: 14,
                           }}
                         >
-                          💡 발령 시 사용자의 **직위(Position)**가{" "}
-                          <span style={{ color: "var(--primary-amber)" }}>
-                            [{deptName} ...]
-                          </span>{" "}
-                          형태로 자동 변경 및 반영됩니다.
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 소속 부원 명단 테이블 */}
-                    <div className="glass-panel" style={{ overflow: "hidden" }}>
-                      <div
-                        style={{
-                          padding: "14px 16px",
-                          borderBottom: "1px solid var(--border-subtle)",
-                          fontWeight: 700,
-                          fontSize: "0.85rem",
-                          color: "var(--text-main)",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span>
-                          {deptName} 소속 부원 명단 ({members.length}명)
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "0.72rem",
-                            color: "var(--text-muted)",
-                            fontWeight: 400,
-                          }}
-                        >
-                          직급과 직위가 부서에 맞춰 동적 표시됩니다
-                        </span>
-                      </div>
-                      <div
-                        className="ledger-table-container"
-                        style={{ border: "none", borderRadius: 0 }}
-                      >
-                        <table className="ledger-table">
-                          <thead>
-                            <tr>
-                              <th>계정 ID</th>
-                              <th>성명</th>
-                              <th>부서 반영 직위 (Position)</th>
-                              <th>직급 (Rank)</th>
-                              <th>담당 사건 수</th>
-                              <th>부서 변경</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {members.length === 0 ? (
-                              <tr>
-                                <td
-                                  colSpan={6}
-                                  style={{
-                                    textAlign: "center",
-                                    padding: 24,
-                                    color: "var(--text-muted)",
-                                  }}
-                                >
-                                  현재 {deptName} 소속 부원이 없습니다. 위의
-                                  인사 발령 폼을 통해 부원을 배치해보세요.
-                                </td>
-                              </tr>
-                            ) : (
-                              members.map((p) => {
-                                const pCases = ledgerData.filter(
-                                  (c) =>
-                                    c.prosecutorName &&
-                                    c.prosecutorName.includes(p.name),
-                                );
-                                return (
-                                  <tr key={p.id}>
-                                    <td
-                                      style={{
-                                        fontFamily: "monospace",
-                                        color: "var(--primary-amber)",
-                                        fontWeight: 700,
-                                      }}
-                                    >
-                                      {p.id}
-                                    </td>
-                                    <td style={{ fontWeight: 700 }}>
-                                      {p.name}
-                                    </td>
-                                    <td>
-                                      <span
-                                        style={{
-                                          fontWeight: 700,
-                                          color: "var(--text-main)",
-                                          fontSize: "0.82rem",
-                                        }}
-                                      >
-                                        {p.position || `${deptName} 검사`}
-                                      </span>
-                                    </td>
-                                    <td>
-                                      <span
-                                        style={{
-                                          fontSize: "0.68rem",
-                                          fontWeight: 700,
-                                          padding: "3px 9px",
-                                          borderRadius: 20,
-                                          background: `${ROLE_COLORS[p.roleLevel] || "#3b82f6"}20`,
-                                          color:
-                                            ROLE_COLORS[p.roleLevel] ||
-                                            "#3b82f6",
-                                          whiteSpace: "nowrap",
-                                        }}
-                                      >
-                                        {ROLE_LABELS[p.roleLevel] ||
-                                          p.rank ||
-                                          p.roleLevel}
-                                      </span>
-                                    </td>
-                                    <td
-                                      style={{
-                                        fontWeight: 700,
-                                        color: "#60a5fa",
-                                      }}
-                                    >
-                                      {pCases.length}건
-                                    </td>
-                                    <td>
-                                      <select
-                                        className="select-field"
-                                        style={{
-                                          fontSize: "0.72rem",
-                                          padding: "3px 6px",
-                                        }}
-                                        value={p.dept}
-                                        onChange={(e) => {
-                                          if (onUpdateUserDept)
-                                            onUpdateUserDept(
-                                              p.id,
-                                              e.target.value,
-                                            );
-                                          addLog(
-                                            "부원 소속 변경",
-                                            `${p.name} → '${e.target.value}' 소속 변경`,
-                                          );
-                                        }}
-                                      >
-                                        {departmentsData.map((d) => (
-                                          <option key={d.id} value={d.name}>
-                                            {d.name}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </td>
-                                  </tr>
-                                );
-                              })
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeSubTab === "reassign" && (
-        <div
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
-        >
-          {/* 좌측: 단건 직권 재배당 */}
-          <div className="glass-panel" style={{ padding: 24 }}>
-            <div
-              style={{
-                fontWeight: 800,
-                fontSize: "0.9rem",
-                color: "var(--text-main)",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: 16,
-              }}
-            >
-              <RefreshCw size={15} color="var(--primary-amber)" />
-              단건 사건 직권 재배당
-            </div>
-            <form
-              onSubmit={handleReassign}
-              style={{ display: "flex", flexDirection: "column", gap: 14 }}
-            >
-              <div>
-                <Label>재배당 대상 사건 *</Label>
-                <select
-                  className="select-field"
-                  value={selectedCaseNo}
-                  onChange={(e) => setSelectedCaseNo(e.target.value)}
-                >
-                  {ledgerData.map((c) => (
-                    <option key={c.id} value={c.hyeongjeNo}>
-                      {c.hyeongjeNo} (담당: {c.prosecutorName} | 피의자:{" "}
-                      {c.suspectName})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label>변경할 신규 담당검사 *</Label>
-                <select
-                  className="select-field"
-                  value={targetPId}
-                  onChange={(e) => setTargetPId(e.target.value)}
-                >
-                  <option value="">담당검사 선택...</option>
-                  {prosecutorsList
-                    .filter((p) => ["ACTIVE", "ON_LEAVE"].includes(p.status))
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.title} / {p.dept})
-                        {p.status === "ON_LEAVE" ? " [휴직중]" : ""}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <button
-                type="submit"
-                className="btn btn-gold"
-                style={{ marginTop: 4 }}
-              >
-                <CheckCircle2 size={14} />
-                직권 재배당 실행
-              </button>
-            </form>
-          </div>
-
-          {/* 우측: 사건 일괄 재배당 (휴직 / 부서이동 시) */}
-          <div className="glass-panel" style={{ padding: 24 }}>
-            <div
-              style={{
-                fontWeight: 800,
-                fontSize: "0.9rem",
-                color: "var(--text-main)",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: 16,
-              }}
-            >
-              <Users size={15} color="#818cf8" />
-              사건 일괄 재배당 (인사이동 · 휴직 전담)
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <Label>기존 담당 검사 선택 (출처) *</Label>
-                <select
-                  className="select-field"
-                  value={bulkSourcePName}
-                  onChange={(e) => {
-                    setBulkSourcePName(e.target.value);
-                    const matchingCases = ledgerData
-                      .filter((c) => c.prosecutorName === e.target.value)
-                      .map((c) => c.id);
-                    setSelectedBulkCaseIds(matchingCases);
-                  }}
-                >
-                  <option value="">검사 선택...</option>
-                  {Array.from(
-                    new Set(
-                      ledgerData.map((c) => c.prosecutorName).filter(Boolean),
-                    ),
-                  ).map((name) => (
-                    <option key={name} value={name}>
-                      {name} (현재 사건{" "}
-                      {
-                        ledgerData.filter((c) => c.prosecutorName === name)
-                          .length
-                      }
-                      건)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {bulkSourcePName && (
-                <div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: 6,
-                    }}
-                  >
-                    <Label>
-                      이전 대상 사건 선택 ({selectedBulkCaseIds.length}건
-                      선택됨)
-                    </Label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const allIds = ledgerData
-                          .filter((c) => c.prosecutorName === bulkSourcePName)
-                          .map((c) => c.id);
-                        setSelectedBulkCaseIds(
-                          selectedBulkCaseIds.length === allIds.length
-                            ? []
-                            : allIds,
-                        );
-                      }}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--primary-amber)",
-                        fontSize: "0.72rem",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {selectedBulkCaseIds.length ===
-                      ledgerData.filter(
-                        (c) => c.prosecutorName === bulkSourcePName,
-                      ).length
-                        ? "전체 해제"
-                        : "전체 선택"}
-                    </button>
-                  </div>
-                  <div
-                    style={{
-                      maxHeight: 180,
-                      overflowY: "auto",
-                      border: "1px solid var(--border-subtle)",
-                      borderRadius: 8,
-                      padding: 8,
-                      background: "var(--bg-elevated)",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 4,
-                    }}
-                  >
-                    {ledgerData
-                      .filter((c) => c.prosecutorName === bulkSourcePName)
-                      .map((c) => {
-                        const isChecked = selectedBulkCaseIds.includes(c.id);
-                        return (
-                          <label
-                            key={c.id}
+                          <Label>승진·직급 변경</Label>
+                          <div
                             style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: 8,
+                            }}
+                          >
+                            <select
+                              className="select-field"
+                              value={
+                                statusForm.roleLevel ||
+                                statusModalUser.roleLevel ||
+                                "PROSECUTOR"
+                              }
+                              onChange={(e) => {
+                                const roleLevel = e.target.value;
+                                const labels = {
+                                  PROSECUTOR_GENERAL: "검찰총장",
+                                  CHIEF_PROSECUTOR: "검사장",
+                                  DEPUTY_CHIEF: "차장검사",
+                                  CHIEF_ADMINISTRATOR: "검찰관리관",
+                                  SENIOR_PROSECUTOR: "부장검사",
+                                  PROSECUTOR: "평검사",
+                                  PROBATIONARY: "검사시보",
+                                  ADMINISTRATOR: "검찰사무관",
+                                  ADMIN_PROBATIONARY: "검찰사무관시보",
+                                };
+                                setStatusForm({
+                                  ...statusForm,
+                                  roleLevel,
+                                  rank: labels[roleLevel] || roleLevel,
+                                });
+                              }}
+                            >
+                              {ROLE_HIERARCHY.filter(
+                                (role) => role !== "SUPER_ADMIN",
+                              ).map((role) => (
+                                <option key={role} value={role}>
+                                  {ROLE_LABELS[role]}
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              className="input-field"
+                              value={statusForm.rank || ""}
+                              onChange={(e) =>
+                                setStatusForm({
+                                  ...statusForm,
+                                  rank: e.target.value,
+                                })
+                              }
+                              placeholder="직급 표시명"
+                            />
+                          </div>
+                          <input
+                            className="input-field"
+                            style={{ marginTop: 8 }}
+                            value={statusForm.position || ""}
+                            onChange={(e) =>
+                              setStatusForm({
+                                ...statusForm,
+                                position: e.target.value,
+                                title: e.target.value,
+                              })
+                            }
+                            placeholder="직위 (예: 형사부장)"
+                          />
+                        </div>
+
+                        <div
+                          style={{
+                            padding: 12,
+                            borderRadius: 8,
+                            background: "var(--bg-elevated)",
+                            marginBottom: 16,
+                            fontSize: "0.8rem",
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          대상 계정:{" "}
+                          <strong style={{ color: "var(--primary-amber)" }}>
+                            {statusModalUser.name} (
+                            {statusModalUser.position || statusModalUser.title})
+                          </strong>
+                          <br />
+                          소속 부서: {statusModalUser.dept}
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 14,
+                          }}
+                        >
+                          <div
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 8,
+                              background: "rgba(52,211,153,0.08)",
+                              border: "1px solid rgba(52,211,153,0.25)",
+                            }}
+                          >
+                            <Label>겸직 정보 (선택)</Label>
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                gap: 8,
+                              }}
+                            >
+                              <input
+                                className="input-field"
+                                placeholder="겸직 직위"
+                                value={statusForm.dualPosition || ""}
+                                onChange={(e) =>
+                                  setStatusForm({
+                                    ...statusForm,
+                                    dualPosition: e.target.value,
+                                  })
+                                }
+                              />
+                              <select
+                                className="select-field"
+                                value={statusForm.dualDept || ""}
+                                onChange={(e) =>
+                                  setStatusForm({
+                                    ...statusForm,
+                                    dualDept: e.target.value,
+                                  })
+                                }
+                              >
+                                <option value="">겸직 부서 없음</option>
+                                {departmentsData.map((dept) => (
+                                  <option key={dept.id} value={dept.name}>
+                                    {dept.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <select
+                              className="select-field"
+                              style={{ marginTop: 8 }}
+                              value={statusForm.dualRoleLevel || ""}
+                              onChange={(e) =>
+                                setStatusForm({
+                                  ...statusForm,
+                                  dualRoleLevel: e.target.value,
+                                })
+                              }
+                            >
+                              <option value="">겸직 직급 없음</option>
+                              {ROLE_HIERARCHY.filter(
+                                (role) => role !== "SUPER_ADMIN",
+                              ).map((role) => (
+                                <option key={role} value={role}>
+                                  {ROLE_LABELS[role]}
+                                </option>
+                              ))}
+                            </select>
+                            <label
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                alignItems: "center",
+                                marginTop: 8,
+                                fontSize: "0.75rem",
+                                color: "var(--text-main)",
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={!!statusForm.dualSecretariatWork}
+                                onChange={(e) =>
+                                  setStatusForm({
+                                    ...statusForm,
+                                    dualSecretariatWork: e.target.checked,
+                                  })
+                                }
+                              />
+                              겸직 사무국 업무 권한 승인
+                            </label>
+                          </div>
+
+                          <div>
+                            <Label>신분 / 결재 권한 상태 선택 *</Label>
+                            <select
+                              className="select-field"
+                              value={statusForm.status}
+                              onChange={(e) =>
+                                setStatusForm({
+                                  ...statusForm,
+                                  status: e.target.value,
+                                })
+                              }
+                            >
+                              <option value="ACTIVE">
+                                🟢 정상 재직 (직접 결재 수행)
+                              </option>
+                              <option value="DELEGATED">
+                                🔵 결재권한 위임 (대결자에게 결재권 부여)
+                              </option>
+                              <option value="ON_LEAVE">
+                                🟡 휴직중 (사무대리 및 대결자 지정)
+                              </option>
+                              <option value="RETIRED">
+                                ⚫ 퇴직 (업무 및 사건배정 종료)
+                              </option>
+                            </select>
+                          </div>
+
+                          <div
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 8,
+                              background: "var(--bg-elevated)",
+                              border: "1px solid var(--border-subtle)",
                               display: "flex",
                               alignItems: "center",
-                              gap: 8,
-                              fontSize: "0.78rem",
-                              cursor: "pointer",
-                              padding: "4px 6px",
-                              borderRadius: 4,
-                              background: isChecked
-                                ? "rgba(129,140,248,0.1)"
-                                : "transparent",
+                              gap: 10,
                             }}
                           >
                             <input
                               type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedBulkCaseIds([
-                                    ...selectedBulkCaseIds,
-                                    c.id,
-                                  ]);
-                                } else {
-                                  setSelectedBulkCaseIds(
-                                    selectedBulkCaseIds.filter(
-                                      (id) => id !== c.id,
-                                    ),
-                                  );
-                                }
-                              }}
+                              id="autoAssignExCheck"
+                              checked={!!statusForm.isAutoAssignExcluded}
+                              onChange={(e) =>
+                                setStatusForm({
+                                  ...statusForm,
+                                  isAutoAssignExcluded: e.target.checked,
+                                })
+                              }
                             />
-                            <span
+                            <label
+                              htmlFor="autoAssignExCheck"
                               style={{
-                                fontFamily: "monospace",
-                                color: "var(--primary-amber)",
+                                fontSize: "0.78rem",
+                                color: "var(--text-main)",
+                                cursor: "pointer",
                               }}
                             >
-                              {c.hyeongjeNo}
-                            </span>
-                            <span>
-                              | {c.suspectName} ({c.chargeName})
-                            </span>
-                          </label>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
+                              🚫 신규 사건 자동 배정 대상에서 제외하기 (고위
+                              관리자 / 전담 제외)
+                            </label>
+                          </div>
 
-              <div>
-                <Label>인계받을 신임 검사 (도착) *</Label>
-                <select
-                  className="select-field"
-                  value={bulkTargetPId}
-                  onChange={(e) => setBulkTargetPId(e.target.value)}
-                >
-                  <option value="">신임 검사 선택...</option>
-                  {prosecutorsList
-                    .filter(
-                      (p) =>
-                        p.name !== bulkSourcePName &&
-                        ["ACTIVE", "ON_LEAVE"].includes(p.status),
-                    )
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.title} / {p.dept})
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div>
-                <Label>재배당 사유</Label>
-                <input
-                  className="input-field"
-                  placeholder="예: 인사 이동, 휴직, 부서 인사이동"
-                  value={bulkReason}
-                  onChange={(e) => setBulkReason(e.target.value)}
-                />
-              </div>
-
-              <button
-                type="button"
-                className="btn btn-gold"
-                disabled={
-                  !bulkSourcePName ||
-                  selectedBulkCaseIds.length === 0 ||
-                  !bulkTargetPId
-                }
-                onClick={async () => {
-                  const targetP = prosecutorsList.find(
-                    (p) => p.id === bulkTargetPId,
-                  );
-                  if (!targetP) return;
-                  if (
-                    !window.confirm(
-                      `'${bulkSourcePName}' 검사의 사건 ${selectedBulkCaseIds.length}건을 '${targetP.name}' 검사에게 일괄 재배당하시겠습니까?`,
-                    )
-                  )
-                    return;
-
-                  if (onBulkReassign) {
-                    const ok = await onBulkReassign(
-                      selectedBulkCaseIds,
-                      targetP.id,
-                      targetP.name,
-                      bulkReason,
-                    );
-                    if (ok) {
-                      addLog(
-                        "사건 일괄 재배당",
-                        `'${bulkSourcePName}' → '${targetP.name}' 검사로 사건 ${selectedBulkCaseIds.length}건 일괄 재배당 (${bulkReason})`,
-                      );
-                      setSelectedBulkCaseIds([]);
-                      setBulkSourcePName("");
-                      setBulkTargetPId("");
-                    }
-                  }
-                }}
-                style={{ marginTop: 4 }}
-              >
-                <RefreshCw size={14} />
-                일괄 재배당 실행 ({selectedBulkCaseIds.length}건)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeSubTab === "import" && hasHighLevelAdminAccess && (
-        <ExcelImportTab onBulkImport={onBulkImport} />
-      )}
-
-      {activeSubTab === "docnos" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* 안내 + 일괄 재부여 */}
-          <div
-            className="glass-panel"
-            style={{
-              padding: "16px 20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 10,
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontWeight: 800,
-                  fontSize: "0.9rem",
-                  color: "var(--text-main)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <FilePen size={15} color="var(--primary-amber)" />
-                문서번호 관리 — 검찰사무국 전용
-              </div>
-              <div
-                style={{
-                  fontSize: "0.72rem",
-                  color: "var(--text-muted)",
-                  marginTop: 2,
-                }}
-              >
-                각 결재 문서의 문서번호를 직접 수정하거나, 전체를 순번대로 일괄
-                재부여할 수 있습니다.
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                다음 자동 순번:{" "}
-                <strong
-                  style={{
-                    color: "var(--primary-amber)",
-                    fontFamily: "monospace",
-                  }}
-                >
-                  2026-결재-{String(docNoCounter || 1).padStart(3, "0")}
-                </strong>
-              </span>
-              <button
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      "전체 결재 문서 번호를 1번부터 순서대로 재부여하시겠습니까?",
-                    )
-                  )
-                    return;
-                  const sorted = [...(approvalsData || [])].sort(
-                    (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-                  );
-                  sorted.forEach((doc, idx) => {
-                    const newNo = `2026-결재-${String(idx + 1).padStart(3, "0")}`;
-                    onUpdateDocNo(doc.id, newNo);
-                  });
-                  if (setDocNoCounter)
-                    setDocNoCounter((approvalsData || []).length + 1);
-                  addLog(
-                    "문서번호 일괄 재부여",
-                    `전체 ${(approvalsData || []).length}건 문서번호 순번 재정렬 완료`,
-                  );
-                  alert("문서번호 일괄 재부여가 완료되었습니다.");
-                }}
-                className="btn btn-gold"
-                style={{ fontSize: "0.8rem" }}
-              >
-                <RefreshCw size={13} />
-                전체 순번 재부여
-              </button>
-            </div>
-          </div>
-
-          {/* 결재 문서 목록 + 인라인 편집 */}
-          <div className="glass-panel" style={{ overflow: "hidden" }}>
-            <div
-              className="ledger-table-container"
-              style={{ border: "none", borderRadius: 0 }}
-            >
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 48 }}>#</th>
-                    <th>문서번호</th>
-                    <th>제목</th>
-                    <th>담당검사</th>
-                    <th>상태</th>
-                    <th>생성일</th>
-                    <th style={{ width: 100, textAlign: "center" }}>편집</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(approvalsData || []).map((doc, idx) => (
-                    <tr key={doc.id}>
-                      <td
-                        style={{
-                          color: "var(--text-muted)",
-                          fontFamily: "monospace",
-                          textAlign: "center",
-                        }}
-                      >
-                        {idx + 1}
-                      </td>
-                      <td>
-                        {editingDocId === doc.id ? (
-                          <input
-                            className="input-field"
+                          <div
                             style={{
-                              fontFamily: "monospace",
-                              fontWeight: 700,
-                              color: "var(--primary-amber)",
-                              padding: "5px 8px",
-                              fontSize: "0.82rem",
-                              width: 180,
-                            }}
-                            value={editingDocNoValue}
-                            onChange={(e) =>
-                              setEditingDocNoValue(e.target.value)
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                onUpdateDocNo(doc.id, editingDocNoValue);
-                                addLog(
-                                  "문서번호 수동 수정",
-                                  `${doc.docNo} → ${editingDocNoValue} (${doc.title.slice(0, 20)}...)`,
-                                );
-                                setEditingDocId(null);
-                              }
-                              if (e.key === "Escape") setEditingDocId(null);
-                            }}
-                            autoFocus
-                          />
-                        ) : (
-                          <span
-                            style={{
-                              fontFamily: "monospace",
-                              fontWeight: 700,
-                              color: "var(--primary-amber)",
+                              padding: "10px 12px",
+                              borderRadius: 8,
+                              background: "var(--bg-elevated)",
+                              border: "1px solid var(--border-subtle)",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
                             }}
                           >
-                            {doc.docNo}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ maxWidth: 260 }}>
-                        <div
-                          style={{
-                            whiteSpace: "normal",
-                            lineHeight: 1.4,
-                            fontSize: "0.8rem",
-                          }}
-                        >
-                          {doc.title}
-                        </div>
-                      </td>
-                      <td style={{ fontWeight: 700 }}>{doc.prosecutorName}</td>
-                      <td>
-                        <span
-                          className={`badge ${doc.status === "최종승인" ? "badge-success" : doc.status.includes("대기") ? "badge-warning" : "badge-info"}`}
-                          style={{ fontSize: "0.68rem" }}
-                        >
-                          {doc.status}
-                        </span>
-                      </td>
-                      <td
-                        style={{
-                          fontFamily: "monospace",
-                          fontSize: "0.72rem",
-                          color: "var(--text-muted)",
-                        }}
-                      >
-                        {doc.createdAt}
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        {editingDocId === doc.id ? (
+                            <input
+                              type="checkbox"
+                              id="arbitraryApproveCheck"
+                              checked={!!statusForm.canArbitraryApprove}
+                              onChange={(e) =>
+                                setStatusForm({
+                                  ...statusForm,
+                                  canArbitraryApprove: e.target.checked,
+                                })
+                              }
+                            />
+                            <label
+                              htmlFor="arbitraryApproveCheck"
+                              style={{
+                                fontSize: "0.78rem",
+                                color: "var(--text-main)",
+                                cursor: "pointer",
+                              }}
+                            >
+                              ⚡ 전결 승인 권한 허용
+                            </label>
+                          </div>
+
+                          {statusForm.status !== "ACTIVE" && (
+                            <>
+                              <div>
+                                <Label>대결자 (대리 결재 승인자) 지정 *</Label>
+                                <select
+                                  className="select-field"
+                                  value={statusForm.delegateTo}
+                                  onChange={(e) =>
+                                    setStatusForm({
+                                      ...statusForm,
+                                      delegateTo: e.target.value,
+                                    })
+                                  }
+                                >
+                                  <option value="">대결자 선택...</option>
+                                  {prosecutorsList
+                                    .filter((p) => p.id !== statusModalUser.id)
+                                    .map((p) => (
+                                      <option key={p.id} value={p.name}>
+                                        {p.name} ({p.title} / {p.dept})
+                                      </option>
+                                    ))}
+                                </select>
+                              </div>
+                              <div>
+                                <Label>휴직 / 위임 사유</Label>
+                                <input
+                                  className="input-field"
+                                  placeholder="예: 연가, 해외 출장, 육아 휴직"
+                                  value={statusForm.delegateReason}
+                                  onChange={(e) =>
+                                    setStatusForm({
+                                      ...statusForm,
+                                      delegateReason: e.target.value,
+                                    })
+                                  }
+                                />
+                              </div>
+                            </>
+                          )}
+
                           <div
                             style={{
                               display: "flex",
-                              gap: 4,
-                              justifyContent: "center",
+                              gap: 10,
+                              justifyContent: "flex-end",
+                              marginTop: 10,
                             }}
                           >
+                            <button
+                              onClick={() => setStatusModalUser(null)}
+                              className="btn btn-secondary"
+                              style={{ padding: "8px 16px" }}
+                            >
+                              취소
+                            </button>
                             <button
                               onClick={() => {
-                                onUpdateDocNo(doc.id, editingDocNoValue);
+                                if (onUpdateProsecutorStatus) {
+                                  onUpdateProsecutorStatus(
+                                    statusModalUser.id,
+                                    statusForm,
+                                  );
+                                }
                                 addLog(
-                                  "문서번호 수동 수정",
-                                  `${doc.docNo} → ${editingDocNoValue}`,
+                                  "검사 신분/위임 설정",
+                                  `'${statusModalUser.name}' 검사 상태 변경 (${statusForm.status}, 대결자: ${statusForm.delegateTo || "없음"})`,
                                 );
-                                setEditingDocId(null);
+                                setStatusModalUser(null);
                               }}
                               className="btn btn-gold"
-                              style={{
-                                padding: "4px 8px",
-                                fontSize: "0.72rem",
-                              }}
+                              style={{ padding: "8px 16px" }}
                             >
-                              <Save size={12} />
-                              저장
-                            </button>
-                            <button
-                              onClick={() => setEditingDocId(null)}
-                              className="btn btn-outline"
-                              style={{
-                                padding: "4px 8px",
-                                fontSize: "0.72rem",
-                              }}
-                            >
-                              <X size={12} />
+                              설정 저장
                             </button>
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setEditingDocId(doc.id);
-                              setEditingDocNoValue(doc.docNo);
-                            }}
-                            className="btn btn-outline"
-                            style={{ padding: "4px 10px", fontSize: "0.72rem" }}
-                          >
-                            <Pencil size={12} />
-                            수정
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
-        </div>
-      )}
-
-      {activeSubTab === "docmgmt" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* 상단 탭 헤더 */}
-          <div
-            className="glass-panel"
-            style={{
-              padding: "16px 20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 10,
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontWeight: 800,
-                  fontSize: "0.95rem",
-                  color: "var(--text-main)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <FileBox size={16} color="var(--primary-amber)" />
-                문서 관리 (접수 · 발송 · 보존)
-              </div>
-              <div
-                style={{
-                  fontSize: "0.72rem",
-                  color: "var(--text-muted)",
-                  marginTop: 2,
-                }}
-              >
-                검찰청법 제4조 / 검찰사무관 직무 제5호: 문서의 접수ㆍ발송ㆍ보존
-                및 문서관리에 관한 통합 처리
-              </div>
-            </div>
-            {/* 서브 카테고리 스위치 */}
-            <div
-              style={{
-                display: "flex",
-                gap: 6,
-                background: "var(--bg-elevated)",
-                padding: 4,
-                borderRadius: 8,
-              }}
-            >
-              <button
-                onClick={() => setDocMgmtTab("receive")}
-                className={
-                  docMgmtTab === "receive" ? "btn btn-gold" : "btn btn-outline"
-                }
-                style={{ fontSize: "0.78rem", padding: "5px 12px" }}
-              >
-                <FileInput size={13} /> 문서 접수 ({receivedDocs.length})
-              </button>
-              <button
-                onClick={() => setDocMgmtTab("send")}
-                className={
-                  docMgmtTab === "send" ? "btn btn-gold" : "btn btn-outline"
-                }
-                style={{ fontSize: "0.78rem", padding: "5px 12px" }}
-              >
-                <Send size={13} /> 문서 발송 ({sentDocs.length})
-              </button>
-              <button
-                onClick={() => setDocMgmtTab("archive")}
-                className={
-                  docMgmtTab === "archive" ? "btn btn-gold" : "btn btn-outline"
-                }
-                style={{ fontSize: "0.78rem", padding: "5px 12px" }}
-              >
-                <Archive size={13} /> 문서 보존 ({archivedDocs.length})
-              </button>
-            </div>
-          </div>
-
-          {/* 1. 문서 접수 탭 */}
-          {docMgmtTab === "receive" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* 신규 접수 등록 폼 */}
-              <div className="glass-panel" style={{ padding: 18 }}>
-                <div
-                  style={{
-                    fontWeight: 800,
-                    fontSize: "0.85rem",
-                    color: "var(--text-main)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginBottom: 12,
-                  }}
-                >
-                  <Plus size={14} color="var(--primary-amber)" />
-                  신규 대외/대내 문서 접수 등록
-                </div>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!newReceive.title || !newReceive.from) {
-                      alert("문서 제목과 발송처를 입력하세요.");
-                      return;
-                    }
-                    const newNo =
-                      newReceive.docNo ||
-                      `2026-접수-${String(receivedDocs.length + 1).padStart(3, "0")}`;
-                    const item = {
-                      id: `RCV-${Date.now()}`,
-                      docNo: newNo,
-                      title: newReceive.title,
-                      from: newReceive.from,
-                      to: newReceive.to || "검찰사무국",
-                      date: today,
-                      type: newReceive.type,
-                      status: "접수완료",
-                      note: newReceive.note,
-                    };
-                    const saved = await createOfficeDocumentApi(
-                      "receive",
-                      item,
-                    );
-                    if (!saved?.success) {
-                      alert(saved?.message || "문서 저장에 실패했습니다.");
-                      return;
-                    }
-                    setReceivedDocs((prev) => [
-                      saved.document || item,
-                      ...prev,
-                    ]);
-                    addLog(
-                      "문서 접수 등록",
-                      `[${newNo}] ${newReceive.title} (발신: ${newReceive.from})`,
-                    );
-                    setNewReceive({
-                      docNo: "",
-                      title: "",
-                      from: "",
-                      to: "",
-                      type: "공문",
-                      note: "",
-                    });
-                    alert(
-                      `문서가 성공적으로 접수 등록되었습니다. (접수번호: ${newNo})`,
-                    );
-                  }}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                    gap: 10,
-                    alignItems: "flex-end",
-                  }}
-                >
-                  <div>
-                    <Label>접수 번호 (자동부여)</Label>
-                    <input
-                      className="input-field"
-                      placeholder={`2026-접수-${String(receivedDocs.length + 1).padStart(3, "0")}`}
-                      value={newReceive.docNo}
-                      onChange={(e) =>
-                        setNewReceive({ ...newReceive, docNo: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>문서 제목 *</Label>
-                    <input
-                      className="input-field"
-                      placeholder="예: 사건기록 송부 및 인계서"
-                      value={newReceive.title}
-                      onChange={(e) =>
-                        setNewReceive({ ...newReceive, title: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label>발신처 (보낸 곳) *</Label>
-                    <input
-                      className="input-field"
-                      placeholder="예: 서울지방법원 / 경찰청"
-                      value={newReceive.from}
-                      onChange={(e) =>
-                        setNewReceive({ ...newReceive, from: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label>수신/담당 (받을 곳)</Label>
-                    <input
-                      className="input-field"
-                      placeholder="예: 첨단범죄수사부"
-                      value={newReceive.to}
-                      onChange={(e) =>
-                        setNewReceive({ ...newReceive, to: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>문서 유형</Label>
-                    <select
-                      className="select-field"
-                      value={newReceive.type}
-                      onChange={(e) =>
-                        setNewReceive({ ...newReceive, type: e.target.value })
-                      }
-                    >
-                      <option value="공문">공문서</option>
-                      <option value="사건기록">사건기록/이송</option>
-                      <option value="영장">영장관련통보</option>
-                      <option value="민원서류">고소/고발 민원</option>
-                    </select>
-                  </div>
-                  <button
-                    type="submit"
-                    className="btn btn-gold"
-                    style={{ padding: "9px 16px", fontSize: "0.82rem" }}
-                  >
-                    <FileInput size={14} /> 접수 처리
-                  </button>
-                </form>
-              </div>
-
-              {/* 접수 문서 목록 */}
-              <div className="glass-panel" style={{ overflow: "hidden" }}>
-                <div
-                  className="ledger-table-container"
-                  style={{ border: "none", borderRadius: 0 }}
-                >
-                  <table className="ledger-table">
-                    <thead>
-                      <tr>
-                        <th>접수번호</th>
-                        <th>문서 제목</th>
-                        <th>발신처</th>
-                        <th>수신/담당</th>
-                        <th>유형</th>
-                        <th>접수일자</th>
-                        <th>상태</th>
-                        <th style={{ textAlign: "center" }}>삭제</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {receivedDocs.map((doc) => (
-                        <tr key={doc.id}>
-                          <td
-                            style={{
-                              fontFamily: "monospace",
-                              fontWeight: 700,
-                              color: "var(--primary-amber)",
-                            }}
-                          >
-                            {doc.docNo}
-                          </td>
-                          <td style={{ fontWeight: 600 }}>{doc.title}</td>
-                          <td>{doc.from}</td>
-                          <td style={{ color: "var(--text-muted)" }}>
-                            {doc.to}
-                          </td>
-                          <td>
-                            <span className="badge badge-info">{doc.type}</span>
-                          </td>
-                          <td
-                            style={{
-                              fontFamily: "monospace",
-                              fontSize: "0.75rem",
-                              color: "var(--text-muted)",
-                            }}
-                          >
-                            {doc.date}
-                          </td>
-                          <td>
-                            <span
-                              className={`badge ${doc.status === "처리완료" ? "badge-success" : "badge-warning"}`}
-                            >
-                              {doc.status}
-                            </span>
-                          </td>
-                          <td style={{ textAlign: "center" }}>
-                            <button
-                              onClick={async () => {
-                                const result = await deleteOfficeDocumentApi(
-                                  doc.id,
-                                );
-                                if (!result?.success) {
-                                  alert(
-                                    result?.message ||
-                                      "문서 삭제에 실패했습니다.",
-                                  );
-                                  return;
-                                }
-                                setReceivedDocs((prev) =>
-                                  prev.filter((d) => d.id !== doc.id),
-                                );
-                                addLog(
-                                  "접수문서 삭제",
-                                  `${doc.docNo} (${doc.title})`,
-                                );
-                              }}
-                              className="btn btn-outline"
-                              style={{
-                                padding: "3px 8px",
-                                fontSize: "0.7rem",
-                                color: "#f87171",
-                              }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 2. 문서 발송 탭 */}
-          {docMgmtTab === "send" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* 신규 발송 등록 폼 */}
-              <div className="glass-panel" style={{ padding: 18 }}>
-                <div
-                  style={{
-                    fontWeight: 800,
-                    fontSize: "0.85rem",
-                    color: "var(--text-main)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginBottom: 12,
-                  }}
-                >
-                  <Plus size={14} color="var(--primary-amber)" />
-                  대외 공문 및 기소장/영장 발송 처리
-                </div>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!newSend.title || !newSend.to) {
-                      alert("문서 제목과 수신처를 입력하세요.");
-                      return;
-                    }
-                    const newNo =
-                      newSend.docNo ||
-                      `2026-발송-${String(sentDocs.length + 1).padStart(3, "0")}`;
-                    const item = {
-                      id: `SND-${Date.now()}`,
-                      docNo: newNo,
-                      title: newSend.title,
-                      to: newSend.to,
-                      from: "도스온라인 검찰청",
-                      date: today,
-                      type: newSend.type,
-                      status: "발송완료",
-                      note: newSend.note,
-                    };
-                    const saved = await createOfficeDocumentApi("send", item);
-                    if (!saved?.success) {
-                      alert(saved?.message || "문서 저장에 실패했습니다.");
-                      return;
-                    }
-                    setSentDocs((prev) => [saved.document || item, ...prev]);
-                    addLog(
-                      "문서 발송 등록",
-                      `[${newNo}] ${newSend.title} (수신: ${newSend.to})`,
-                    );
-                    setNewSend({
-                      docNo: "",
-                      title: "",
-                      to: "",
-                      type: "공문",
-                      note: "",
-                    });
-                    alert(
-                      `문서가 성공적으로 발송 등록되었습니다. (발송번호: ${newNo})`,
-                    );
-                  }}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                    gap: 10,
-                    alignItems: "flex-end",
-                  }}
-                >
-                  <div>
-                    <Label>발송 번호 (자동부여)</Label>
-                    <input
-                      className="input-field"
-                      placeholder={`2026-발송-${String(sentDocs.length + 1).padStart(3, "0")}`}
-                      value={newSend.docNo}
-                      onChange={(e) =>
-                        setNewSend({ ...newSend, docNo: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>문서 제목 *</Label>
-                    <input
-                      className="input-field"
-                      placeholder="예: 공소장 송부 및 집행요청"
-                      value={newSend.title}
-                      onChange={(e) =>
-                        setNewSend({ ...newSend, title: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label>수신처 (받는 기관/부서) *</Label>
-                    <input
-                      className="input-field"
-                      placeholder="예: 서울지방법원 형사합의부"
-                      value={newSend.to}
-                      onChange={(e) =>
-                        setNewSend({ ...newSend, to: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label>문서 유형</Label>
-                    <select
-                      className="select-field"
-                      value={newSend.type}
-                      onChange={(e) =>
-                        setNewSend({ ...newSend, type: e.target.value })
-                      }
-                    >
-                      <option value="공문">공문서</option>
-                      <option value="기소장">기소장/공소장</option>
-                      <option value="영장">영장청구서</option>
-                      <option value="수사지휘">수사지휘서</option>
-                    </select>
-                  </div>
-                  <button
-                    type="submit"
-                    className="btn btn-gold"
-                    style={{ padding: "9px 16px", fontSize: "0.82rem" }}
-                  >
-                    <Send size={14} /> 발송 처리
-                  </button>
-                </form>
-              </div>
-
-              {/* 발송 문서 목록 */}
-              <div className="glass-panel" style={{ overflow: "hidden" }}>
-                <div
-                  className="ledger-table-container"
-                  style={{ border: "none", borderRadius: 0 }}
-                >
-                  <table className="ledger-table">
-                    <thead>
-                      <tr>
-                        <th>발송번호</th>
-                        <th>문서 제목</th>
-                        <th>수신처</th>
-                        <th>발신처</th>
-                        <th>유형</th>
-                        <th>발송일자</th>
-                        <th>상태</th>
-                        <th style={{ textAlign: "center" }}>삭제</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sentDocs.map((doc) => (
-                        <tr key={doc.id}>
-                          <td
-                            style={{
-                              fontFamily: "monospace",
-                              fontWeight: 700,
-                              color: "var(--primary-amber)",
-                            }}
-                          >
-                            {doc.docNo}
-                          </td>
-                          <td style={{ fontWeight: 600 }}>{doc.title}</td>
-                          <td>{doc.to}</td>
-                          <td style={{ color: "var(--text-muted)" }}>
-                            {doc.from}
-                          </td>
-                          <td>
-                            <span className="badge badge-info">{doc.type}</span>
-                          </td>
-                          <td
-                            style={{
-                              fontFamily: "monospace",
-                              fontSize: "0.75rem",
-                              color: "var(--text-muted)",
-                            }}
-                          >
-                            {doc.date}
-                          </td>
-                          <td>
-                            <span className="badge badge-success">
-                              {doc.status}
-                            </span>
-                          </td>
-                          <td style={{ textAlign: "center" }}>
-                            <button
-                              onClick={async () => {
-                                const result = await deleteOfficeDocumentApi(
-                                  doc.id,
-                                );
-                                if (!result?.success) {
-                                  alert(
-                                    result?.message ||
-                                      "문서 삭제에 실패했습니다.",
-                                  );
-                                  return;
-                                }
-                                setSentDocs((prev) =>
-                                  prev.filter((d) => d.id !== doc.id),
-                                );
-                                addLog(
-                                  "발송문서 삭제",
-                                  `${doc.docNo} (${doc.title})`,
-                                );
-                              }}
-                              className="btn btn-outline"
-                              style={{
-                                padding: "3px 8px",
-                                fontSize: "0.7rem",
-                                color: "#f87171",
-                              }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 3. 문서 보존 탭 */}
-          {docMgmtTab === "archive" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* 보존 이전 폼 */}
-              <div className="glass-panel" style={{ padding: 18 }}>
-                <div
-                  style={{
-                    fontWeight: 800,
-                    fontSize: "0.85rem",
-                    color: "var(--text-main)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginBottom: 12,
-                  }}
-                >
-                  <Plus size={14} color="var(--primary-amber)" />
-                  종결 사건 및 중요 보존 문서 이관 등록
-                </div>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!newArchive.title) {
-                      alert("보존 대상 문서 제목을 입력하세요.");
-                      return;
-                    }
-                    const newNo =
-                      newArchive.docNo ||
-                      `2026-보존-${String(archivedDocs.length + 1).padStart(3, "0")}`;
-                    const item = {
-                      id: `ARC-${Date.now()}`,
-                      docNo: newNo,
-                      title: newArchive.title,
-                      caseNo: newArchive.caseNo || "-",
-                      retentionYears: Number(newArchive.retentionYears),
-                      archivedDate: today,
-                      category: newArchive.category,
-                      status: "보존중",
-                    };
-                    const saved = await createOfficeDocumentApi(
-                      "archive",
-                      item,
-                    );
-                    if (!saved?.success) {
-                      alert(saved?.message || "문서 저장에 실패했습니다.");
-                      return;
-                    }
-                    setArchivedDocs((prev) => [
-                      saved.document || item,
-                      ...prev,
-                    ]);
-                    addLog(
-                      "문서 보존 등록",
-                      `[${newNo}] ${newArchive.title} (보존기간: ${newArchive.retentionYears}년)`,
-                    );
-                    setNewArchive({
-                      docNo: "",
-                      title: "",
-                      caseNo: "",
-                      retentionYears: 10,
-                      category: "형사사건기록",
-                    });
-                    alert(
-                      `문서가 성공적으로 영구/기한 보존 서고로 이관되었습니다. (보존번호: ${newNo})`,
-                    );
-                  }}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                    gap: 10,
-                    alignItems: "flex-end",
-                  }}
-                >
-                  <div>
-                    <Label>보존 번호 (자동부여)</Label>
-                    <input
-                      className="input-field"
-                      placeholder={`2026-보존-${String(archivedDocs.length + 1).padStart(3, "0")}`}
-                      value={newArchive.docNo}
-                      onChange={(e) =>
-                        setNewArchive({ ...newArchive, docNo: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>보존 문서/사건 제목 *</Label>
-                    <input
-                      className="input-field"
-                      placeholder="예: 2026형제210호 판결 확정 사건기록"
-                      value={newArchive.title}
-                      onChange={(e) =>
-                        setNewArchive({ ...newArchive, title: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label>관련 사건번호 (선택)</Label>
-                    <select
-                      className="select-field"
-                      value={newArchive.caseNo}
-                      onChange={(e) =>
-                        setNewArchive({
-                          ...newArchive,
-                          caseNo: e.target.value,
-                          title: `${e.target.value}호 사건기록 및 서류`,
-                        })
-                      }
-                    >
-                      <option value="">사건 직접 선택...</option>
-                      {ledgerData.map((c) => (
-                        <option key={c.id} value={c.hyeongjeNo}>
-                          {c.hyeongjeNo} ({c.suspectName})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>보존 연한 (년)</Label>
-                    <select
-                      className="select-field"
-                      value={newArchive.retentionYears}
-                      onChange={(e) =>
-                        setNewArchive({
-                          ...newArchive,
-                          retentionYears: e.target.value,
-                        })
-                      }
-                    >
-                      <option value={3}>3년 (일반행정)</option>
-                      <option value={5}>5년 (불기소기록)</option>
-                      <option value={10}>10년 (단기형사사건)</option>
-                      <option value={30}>30년 (중형사사건/판결문)</option>
-                      <option value={99}>영구보존 (주요사례/대법원확정)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label>보존 분류</Label>
-                    <select
-                      className="select-field"
-                      value={newArchive.category}
-                      onChange={(e) =>
-                        setNewArchive({
-                          ...newArchive,
-                          category: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="형사사건기록">형사사건기록</option>
-                      <option value="판결문">판결문/결정서</option>
-                      <option value="처분결의서">전자결재문서</option>
-                      <option value="행정공문">행정/인사서류</option>
-                    </select>
-                  </div>
-                  <button
-                    type="submit"
-                    className="btn btn-gold"
-                    style={{ padding: "9px 16px", fontSize: "0.82rem" }}
-                  >
-                    <Archive size={14} /> 보존서고 이관
-                  </button>
-                </form>
-              </div>
-
-              {/* 보존 문서 목록 */}
-              <div className="glass-panel" style={{ overflow: "hidden" }}>
-                <div
-                  className="ledger-table-container"
-                  style={{ border: "none", borderRadius: 0 }}
-                >
-                  <table className="ledger-table">
-                    <thead>
-                      <tr>
-                        <th>보존번호</th>
-                        <th>보존 문서 제목</th>
-                        <th>사건번호</th>
-                        <th>보존 분류</th>
-                        <th>보존 기한</th>
-                        <th>이관 일자</th>
-                        <th>상태</th>
-                        <th style={{ textAlign: "center" }}>삭제</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {archivedDocs.map((doc) => (
-                        <tr key={doc.id}>
-                          <td
-                            style={{
-                              fontFamily: "monospace",
-                              fontWeight: 700,
-                              color: "var(--primary-amber)",
-                            }}
-                          >
-                            {doc.docNo}
-                          </td>
-                          <td style={{ fontWeight: 600 }}>{doc.title}</td>
-                          <td
-                            style={{
-                              fontFamily: "monospace",
-                              color: "#93c5fd",
-                            }}
-                          >
-                            {doc.caseNo}
-                          </td>
-                          <td>
-                            <span className="badge badge-info">
-                              {doc.category}
-                            </span>
-                          </td>
-                          <td
-                            style={{
-                              fontWeight: 700,
-                              color:
-                                doc.retentionYears === 99
-                                  ? "#dc2626"
-                                  : "var(--text-main)",
-                            }}
-                          >
-                            {doc.retentionYears === 99
-                              ? "영구 보존"
-                              : `${doc.retentionYears}년`}
-                          </td>
-                          <td
-                            style={{
-                              fontFamily: "monospace",
-                              fontSize: "0.75rem",
-                              color: "var(--text-muted)",
-                            }}
-                          >
-                            {doc.archivedDate}
-                          </td>
-                          <td>
-                            <span className="badge badge-success">
-                              {doc.status}
-                            </span>
-                          </td>
-                          <td style={{ textAlign: "center" }}>
-                            <button
-                              onClick={async () => {
-                                const result = await deleteOfficeDocumentApi(
-                                  doc.id,
-                                );
-                                if (!result?.success) {
-                                  alert(
-                                    result?.message ||
-                                      "문서 삭제에 실패했습니다.",
-                                  );
-                                  return;
-                                }
-                                setArchivedDocs((prev) =>
-                                  prev.filter((d) => d.id !== doc.id),
-                                );
-                                addLog(
-                                  "보존문서 삭제",
-                                  `${doc.docNo} (${doc.title})`,
-                                );
-                              }}
-                              className="btn btn-outline"
-                              style={{
-                                padding: "3px 8px",
-                                fontSize: "0.7rem",
-                                color: "#f87171",
-                              }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -6931,9 +4968,6 @@ export default function SecretariatAdmin({
                   </tbody>
                 </table>
               </div>
-            </>
-          );
-        })()}
             )}
           </div>
         </div>
