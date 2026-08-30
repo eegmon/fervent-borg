@@ -632,7 +632,7 @@ export default function ApprovalSystem({
       onToast?.(`카페용 복사에 실패했습니다: ${error.message}`, "error");
     }
   };
-  const [viewMode, setViewMode] = useState("HWP"); // 'HWP' | 'GOV_PAPER'
+  const [viewMode, setViewMode] = useState("GOV_PAPER"); // 'HWP' | 'GOV_PAPER'
 
   const [approvalLine, setApprovalLine] = useState([
     {
@@ -681,9 +681,10 @@ export default function ApprovalSystem({
       );
       return {
         role: step.role,
-        name: idx === 0
-          ? (currentUser?.name || matched?.name || step.name || "")
-          : (matched?.name || step.name || ""),
+        name:
+          idx === 0
+            ? currentUser?.name || matched?.name || step.name || ""
+            : matched?.name || step.name || "",
         status: idx === 0 ? "상신완료" : "결재대기",
         date: idx === 0 ? now : "-",
       };
@@ -697,7 +698,8 @@ export default function ApprovalSystem({
     const steps = approvalLine.map((step) => ({
       role: step.role,
       name: step.name,
-      roleLevel: prosecutorsList.find((p) => p.name === step.name)?.roleLevel || "",
+      roleLevel:
+        prosecutorsList.find((p) => p.name === step.name)?.roleLevel || "",
     }));
     const res = await createApprovalTemplateApi({
       name: newTemplateName.trim(),
@@ -889,7 +891,12 @@ export default function ApprovalSystem({
     // ── 전역 권한이 없으면 본인 담당 사건에만 결재 상신 가능 ──────────
     const isGlobalApproval =
       currentUser?.isSuperAdmin ||
-      ["SUPER_ADMIN", "PROSECUTOR_GENERAL", "CHIEF_ADMINISTRATOR", "ADMINISTRATOR"].includes(currentUser?.roleLevel) ||
+      [
+        "SUPER_ADMIN",
+        "PROSECUTOR_GENERAL",
+        "CHIEF_ADMINISTRATOR",
+        "ADMINISTRATOR",
+      ].includes(currentUser?.roleLevel) ||
       String(currentUser?.dept || "").includes("사무국");
     if (!isGlobalApproval && newDocData.hyeongjeNo) {
       const ownerCase = ledgerData.find(
@@ -1321,15 +1328,22 @@ export default function ApprovalSystem({
                         });
                       }}
                     >
-                      {((() => {
+                      {(() => {
                         const isGlobalApproval =
                           currentUser?.isSuperAdmin ||
-                          ["SUPER_ADMIN", "PROSECUTOR_GENERAL", "CHIEF_ADMINISTRATOR", "ADMINISTRATOR"].includes(currentUser?.roleLevel) ||
+                          [
+                            "SUPER_ADMIN",
+                            "PROSECUTOR_GENERAL",
+                            "CHIEF_ADMINISTRATOR",
+                            "ADMINISTRATOR",
+                          ].includes(currentUser?.roleLevel) ||
                           String(currentUser?.dept || "").includes("사무국");
                         return isGlobalApproval
                           ? ledgerData
-                          : ledgerData.filter((l) => l.prosecutorId === currentUser?.id);
-                      })()).map((l) => (
+                          : ledgerData.filter(
+                              (l) => l.prosecutorId === currentUser?.id,
+                            );
+                      })().map((l) => (
                         <option key={l.id} value={l.hyeongjeNo}>
                           {l.hyeongjeNo} ({l.suspectName})
                         </option>
@@ -1623,7 +1637,9 @@ export default function ApprovalSystem({
                       <Users size={14} />
                       결재라인 편집
                     </span>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <div
+                      style={{ display: "flex", gap: 6, alignItems: "center" }}
+                    >
                       {/* 템플릿 불러오기 드롭다운 */}
                       <div style={{ position: "relative" }}>
                         <button
@@ -1718,7 +1734,9 @@ export default function ApprovalSystem({
                                         marginTop: 1,
                                       }}
                                     >
-                                      {(tpl.steps || []).map((s) => s.role).join(" → ")}
+                                      {(tpl.steps || [])
+                                        .map((s) => s.role)
+                                        .join(" → ")}
                                     </div>
                                   </button>
                                   <button
@@ -1822,7 +1840,9 @@ export default function ApprovalSystem({
                         <input
                           type="checkbox"
                           checked={newTemplateShared}
-                          onChange={(e) => setNewTemplateShared(e.target.checked)}
+                          onChange={(e) =>
+                            setNewTemplateShared(e.target.checked)
+                          }
                         />
                         공유 템플릿
                       </label>
