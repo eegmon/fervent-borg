@@ -444,7 +444,7 @@ async function requireCaseScope(req, res, next) {
     sql: `SELECT 1 FROM cases c JOIN prosecutors p ON c.prosecutor_id = p.id
           WHERE c.id = ? AND
             (p.dept = (SELECT dept FROM prosecutors WHERE id = ?)
-              OR c.created_by = ? OR c.prosecutor_id = ?
+              OR c.created_by = ? OR c.prosecutor_name = ?
               OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0
               OR (c.visibility = 'PUBLIC' AND (
                 c.disposition LIKE '%불기소%' OR c.disposition LIKE '%종국%' OR
@@ -583,11 +583,11 @@ function scopedQuery(table, user, orderBy = "rowid DESC") {
             WHERE c.deleted_at = '' AND
               (c.is_archived = 1
                 OR (c.visibility = 'PUBLIC' AND p.dept = (SELECT dept FROM prosecutors WHERE id = ?))
-                OR c.created_by = ? OR c.prosecutor_id = ?
+                OR c.created_by = ? OR c.prosecutor_name = ?
                 OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0
                 OR (c.visibility = 'PUBLIC' AND (${closedCondition})))
             ORDER BY c.${orderBy}`,
-      args: [user.id, user.id, user.id, user.id, ...closedArgs],
+      args: [user.id, user.id, user.name, user.id, ...closedArgs],
     };
   }
   // cases 외 테이블: 사무국이면 전체, 아니면 부서 한정
@@ -2084,13 +2084,13 @@ app.put(
     // 전역권한(검사장 이상)·사무국·직근상급자가 아닌 경우 본인 담당·작성 사건만 수정 가능
     if (!hasGlobalDataAccess(req.user) && !hasSecretariatWorkAccess(req.user)) {
       const ownerCheck = await db.execute({
-        sql: "SELECT prosecutor_id, created_by FROM cases WHERE id = ? AND deleted_at = ''",
+        sql: "SELECT prosecutor_id, prosecutor_name, created_by FROM cases WHERE id = ? AND deleted_at = ''",
         args: [req.params.id],
       });
       const orow = ownerCheck.rows[0];
       if (orow) {
         const isOwner =
-          orow.prosecutor_id === req.user.id || orow.created_by === req.user.id;
+          orow.prosecutor_name === req.user.name || orow.created_by === req.user.id;
         // 직근상급자(동일 부서 + 더 높은 직급) 여부 확인
         let isSuperior = false;
         if (!isOwner && orow.prosecutor_id) {
@@ -2909,7 +2909,7 @@ app.post(
         args: [doc.hyeongjeNo, doc.hyeongjeNo],
       });
       const caseRow = caseCheck.rows[0];
-      if (caseRow && caseRow.prosecutor_id !== req.user.id) {
+      if (caseRow && caseRow.prosecutor_name !== req.user.name) {
         return res.status(403).json({
           success: false,
           message: "담당 사건의 결재만 상신할 수 있습니다.",
