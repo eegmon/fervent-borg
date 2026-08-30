@@ -5462,35 +5462,36 @@ app.get("/api/mojang/uuid/:username", async (req, res) => {
     });
   }
 
-  // 1) ashcon.app — 통합 API (권장)
+// 1) playerdb.co — 레이트리밋 없는 안정적인 대체 API (권장)
   try {
-    const ashconRes = await fetch(
-      `https://api.ashcon.app/mojang/v2/user/${encodeURIComponent(cleanName)}`,
+    const playerdbRes = await fetch(
+      `https://playerdb.co/api/player/minecraft/${encodeURIComponent(cleanName)}`,
       { signal: AbortSignal.timeout(5000) },
     );
-    if (ashconRes.ok) {
-      const data = await ashconRes.json();
-      if (data?.uuid) {
+    if (playerdbRes.status === 404) {
+      return res.status(404).json({
+        success: false,
+        message: `'${cleanName}' 닉네임을 찾을 수 없습니다.`,
+      });
+    }
+    if (playerdbRes.ok) {
+      const data = await playerdbRes.json();
+      const player = data?.data?.player;
+      if (data?.success && player?.id) {
+        const formattedId = (player.raw_id || player.id).replace(/-/g, "");
         return res.json({
           success: true,
-          uuid: data.uuid,
-          name: data.username,
+          uuid: player.id,
+          name: player.username,
           skinUrl:
-            data.textures?.skin?.url ||
-            `https://crafatar.com/avatars/${data.uuid}?overlay=true`,
-          avatarUrl: `https://crafatar.com/avatars/${data.uuid}?overlay=true`,
-        });
-      }
-      // 404 = 닉네임 미존재
-      if (ashconRes.status === 404) {
-        return res.status(404).json({
-          success: false,
-          message: `'${cleanName}' 닉네임을 찾을 수 없습니다.`,
+            player.avatar || `https://crafatar.com/avatars/${formattedId}?overlay=true`,
+          avatarUrl:
+            player.avatar || `https://crafatar.com/avatars/${formattedId}?overlay=true`,
         });
       }
     }
   } catch (err) {
-    console.warn("[ashcon.app]", err?.message);
+    console.warn("[playerdb.co]", err?.message);
   }
 
   // 2) crafthead.net — 폴백

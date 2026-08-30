@@ -2,9 +2,11 @@
  * Mojang Official & Fallback API Helper
  * 호출 순서:
  *  1. 서버 프록시 (http://localhost:5000/api/mojang/uuid/nickname) — CORS 우회
- *  2. ashcon.app — UUID + 텍스처 통합 응답 (CORS 허용)
+ *  2. playerdb.co — 레이트리밋 없는 안정적인 대체 API (CORS 허용)
  *  3. crafthead.net — Minecraft 프로필 형식
  *  4. api.mojang.com — 공식 Mojang API (UUID만 반환)
+ *
+ * ※ 2025-06-23부로 ashcon.app이 영구 종료되어 목록에서 제거함.
  */
 
 function formatRawUuid(raw) {
@@ -30,8 +32,6 @@ export async function fetchMojangUuid(username) {
   try {
     const serverUrl = (() => {
       const loc = window.location;
-      // 개발: http://localhost:5173 → http://localhost:5000
-      // 운영: https://example.com → https://example.com (같은 오리진)
       if (loc.port === "5173") {
         return `http://${loc.hostname}:5000/api/mojang/uuid/${encodeURIComponent(cleanName)}`;
       }
@@ -47,7 +47,6 @@ export async function fetchMojangUuid(username) {
         return data;
       }
     }
-    // 서버도 404 반환하면 즉시 실패 처리
     if (res.status === 404) {
       return {
         success: false,
@@ -58,35 +57,38 @@ export async function fetchMojangUuid(username) {
     console.warn("[fetchMojangUuid] 서버 프록시 실패:", err?.message);
   }
 
-  // 1) ashcon.app — 통합 API
+  // 1) playerdb.co — 레이트리밋 없는 안정적인 대체 API
   try {
     const res = await fetch(
-      `https://api.ashcon.app/mojang/v2/user/${encodeURIComponent(cleanName)}`,
+      `https://playerdb.co/api/player/minecraft/${encodeURIComponent(cleanName)}`,
       { signal: AbortSignal.timeout(5000) },
     );
+    if (res.status === 404) {
+      return {
+        success: false,
+        message: `'${cleanName}' 닉네임을 Mojang DB에서 찾을 수 없습니다.`,
+      };
+    }
     if (res.ok) {
       const data = await res.json();
-      if (data?.uuid) {
+      const player = data?.data?.player;
+      if (data?.success && player?.id) {
+        const formattedUuid = formatRawUuid(player.raw_id || player.id);
         return {
           success: true,
-          uuid: data.uuid,
-          name: data.username,
+          uuid: formattedUuid,
+          name: player.username,
           skinUrl:
-            data.textures?.skin?.url ||
-            `https://crafatar.com/avatars/${data.uuid}?overlay=true`,
-          avatarUrl: `https://crafatar.com/avatars/${data.uuid}?overlay=true`,
-        };
-      }
-      // 404 등 — 닉네임 미존재
-      if (res.status === 404) {
-        return {
-          success: false,
-          message: `'${cleanName}' 닉네임을 Mojang DB에서 찾을 수 없습니다.`,
+            player.avatar ||
+            `https://crafatar.com/avatars/${formattedUuid}?overlay=true`,
+          avatarUrl:
+            player.avatar ||
+            `https://crafatar.com/avatars/${formattedUuid}?overlay=true`,
         };
       }
     }
   } catch (err) {
-    console.warn("[fetchMojangUuid] ashcon.app 실패:", err?.message);
+    console.warn("[fetchMojangUuid] playerdb.co 실패:", err?.message);
   }
 
   // 2) crafthead.net — 폴백
