@@ -380,7 +380,7 @@ async function requireCaseScope(req, res, next) {
   }
   // 사무국 계정: PUBLIC 사건만 무조건 통과. PRIVATE 사건은 아래 허용 목록으로 판단.
   const result = await db.execute({
-    sql: `SELECT c.visibility, c.created_by, c.prosecutor_id,
+    sql: `SELECT c.visibility, c.created_by, c.prosecutor_id, c.prosecutor_name,
                  COALESCE(c.private_viewer_ids, '[]') AS private_viewer_ids
           FROM cases c WHERE c.id = ? AND c.deleted_at = ''`,
     args: [req.params.id],
@@ -394,6 +394,7 @@ async function requireCaseScope(req, res, next) {
   const visibility = row.visibility;
   const createdBy = row.created_by;
   const prosecutorId = row.prosecutor_id;
+  const prosecutorName = row.prosecutor_name;
   const privateViewerIds = String(row.private_viewer_ids || "[]");
   const uid = req.user.id;
 
@@ -418,7 +419,7 @@ async function requireCaseScope(req, res, next) {
   // 사무국은 행정 접근(사건번호·처분 확인)은 허용하되 수사 내용은 GET /api/cases 마스킹으로 처리.
   if (visibility === "PRIVATE") {
     const isAllowed =
-      uid === prosecutorId ||
+      prosecutorName === req.user.name ||
       uid === createdBy ||
       parseJsonArray(privateViewerIds).includes(uid) ||
       hasSecretariatWorkAccess(req.user); // 사무국은 PRIVATE 상세도 접근 허용 (마스킹 적용)
@@ -443,7 +444,7 @@ async function requireCaseScope(req, res, next) {
     sql: `SELECT 1 FROM cases c JOIN prosecutors p ON c.prosecutor_id = p.id
           WHERE c.id = ? AND
             (p.dept = (SELECT dept FROM prosecutors WHERE id = ?)
-              OR c.created_by = ? OR c.prosecutor_id = ?
+              OR c.created_by = ? OR c.prosecutor_name = ?
               OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0
               OR (c.visibility = 'PUBLIC' AND (
                 c.disposition LIKE '%불기소%' OR c.disposition LIKE '%종국%' OR
@@ -582,11 +583,11 @@ function scopedQuery(table, user, orderBy = "rowid DESC") {
             WHERE c.deleted_at = '' AND
               (c.is_archived = 1
                 OR (c.visibility = 'PUBLIC' AND p.dept = (SELECT dept FROM prosecutors WHERE id = ?))
-                OR c.created_by = ? OR c.prosecutor_id = ?
+                OR c.created_by = ? OR c.prosecutor_name = ?
                 OR instr(COALESCE(c.private_viewer_ids, '[]'), '"' || ? || '"') > 0
                 OR (c.visibility = 'PUBLIC' AND (${closedCondition})))
             ORDER BY c.${orderBy}`,
-      args: [user.id, user.id, user.id, user.id, ...closedArgs],
+      args: [user.id, user.id, user.name, user.id, ...closedArgs],
     };
   }
   // cases 외 테이블: 사무국이면 전체, 아니면 부서 한정
@@ -2083,13 +2084,13 @@ app.put(
     // 전역권한(검사장 이상)·사무국·직근상급자가 아닌 경우 본인 담당·작성 사건만 수정 가능
     if (!hasGlobalDataAccess(req.user) && !hasSecretariatWorkAccess(req.user)) {
       const ownerCheck = await db.execute({
-        sql: "SELECT prosecutor_id, created_by FROM cases WHERE id = ? AND deleted_at = ''",
+        sql: "SELECT prosecutor_id, prosecutor_name, created_by FROM cases WHERE id = ? AND deleted_at = ''",
         args: [req.params.id],
       });
       const orow = ownerCheck.rows[0];
       if (orow) {
         const isOwner =
-          orow.prosecutor_id === req.user.id || orow.created_by === req.user.id;
+          orow.prosecutor_name === req.user.name || orow.created_by === req.user.id;
         // 직근상급자(동일 부서 + 더 높은 직급) 여부 확인
         let isSuperior = false;
         if (!isOwner && orow.prosecutor_id) {
@@ -2908,7 +2909,7 @@ app.post(
         args: [doc.hyeongjeNo, doc.hyeongjeNo],
       });
       const caseRow = caseCheck.rows[0];
-      if (caseRow && caseRow.prosecutor_id !== req.user.id) {
+      if (caseRow && caseRow.prosecutor_name !== req.user.name) {
         return res.status(403).json({
           success: false,
           message: "담당 사건의 결재만 상신할 수 있습니다.",
@@ -5295,10 +5296,7 @@ app.delete("/api/approval-templates/:id", requireAuth, async (req, res) => {
 const distPath = join(__dirname, "..", "dist");
 app.use(express.static(distPath));
 
-// API 라우트가 아닌 모든 요청은 index.html로 (SPA 라우팅)
-app.get("/{*splat}", (req, res) => {
-  res.sendFile(join(distPath, "index.html"));
-});
+
 
 // ════════════════════════════════════════════════════════════════════
 // 자동보존 설정 API (GET / PATCH /api/settings/auto-archive)
@@ -5461,35 +5459,36 @@ app.get("/api/mojang/uuid/:username", async (req, res) => {
     });
   }
 
-  // 1) ashcon.app — 통합 API (권장)
+// 1) playerdb.co — 레이트리밋 없는 안정적인 대체 API (권장)
   try {
-    const ashconRes = await fetch(
-      `https://api.ashcon.app/mojang/v2/user/${encodeURIComponent(cleanName)}`,
+    const playerdbRes = await fetch(
+      `https://playerdb.co/api/player/minecraft/${encodeURIComponent(cleanName)}`,
       { signal: AbortSignal.timeout(5000) },
     );
-    if (ashconRes.ok) {
-      const data = await ashconRes.json();
-      if (data?.uuid) {
+    if (playerdbRes.status === 404) {
+      return res.status(404).json({
+        success: false,
+        message: `'${cleanName}' 닉네임을 찾을 수 없습니다.`,
+      });
+    }
+    if (playerdbRes.ok) {
+      const data = await playerdbRes.json();
+      const player = data?.data?.player;
+      if (data?.success && player?.id) {
+        const formattedId = (player.raw_id || player.id).replace(/-/g, "");
         return res.json({
           success: true,
-          uuid: data.uuid,
-          name: data.username,
+          uuid: player.id,
+          name: player.username,
           skinUrl:
-            data.textures?.skin?.url ||
-            `https://crafatar.com/avatars/${data.uuid}?overlay=true`,
-          avatarUrl: `https://crafatar.com/avatars/${data.uuid}?overlay=true`,
-        });
-      }
-      // 404 = 닉네임 미존재
-      if (ashconRes.status === 404) {
-        return res.status(404).json({
-          success: false,
-          message: `'${cleanName}' 닉네임을 찾을 수 없습니다.`,
+            player.avatar || `https://crafatar.com/avatars/${formattedId}?overlay=true`,
+          avatarUrl:
+            player.avatar || `https://crafatar.com/avatars/${formattedId}?overlay=true`,
         });
       }
     }
   } catch (err) {
-    console.warn("[ashcon.app]", err?.message);
+    console.warn("[playerdb.co]", err?.message);
   }
 
   // 2) crafthead.net — 폴백
@@ -5548,6 +5547,12 @@ app.get("/api/mojang/uuid/:username", async (req, res) => {
     message:
       "'AndyLab' 조회에 실패했습니다. Mojang 서비스가 일시적으로 사용 불가능합니다. 잠시 후 다시 시도해주세요.",
   });
+});
+
+// API 라우트가 아닌 모든 요청은 index.html로 (SPA 라우팅)
+// ※ 반드시 모든 /api/* 라우트 정의보다 뒤에 위치해야 함
+app.get("/{*splat}", (req, res) => {
+  res.sendFile(join(distPath, "index.html"));
 });
 
 app.use((err, req, res, _next) => {
