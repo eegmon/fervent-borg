@@ -5296,10 +5296,7 @@ app.delete("/api/approval-templates/:id", requireAuth, async (req, res) => {
 const distPath = join(__dirname, "..", "dist");
 app.use(express.static(distPath));
 
-// API 라우트가 아닌 모든 요청은 index.html로 (SPA 라우팅)
-app.get("/{*splat}", (req, res) => {
-  res.sendFile(join(distPath, "index.html"));
-});
+
 
 // ════════════════════════════════════════════════════════════════════
 // 자동보존 설정 API (GET / PATCH /api/settings/auto-archive)
@@ -5550,6 +5547,12 @@ app.get("/api/mojang/uuid/:username", async (req, res) => {
     message:
       "'AndyLab' 조회에 실패했습니다. Mojang 서비스가 일시적으로 사용 불가능합니다. 잠시 후 다시 시도해주세요.",
   });
+});
+
+// API 라우트가 아닌 모든 요청은 index.html로 (SPA 라우팅)
+// ※ 반드시 모든 /api/* 라우트 정의보다 뒤에 위치해야 함
+app.get("/{*splat}", (req, res) => {
+  res.sendFile(join(distPath, "index.html"));
 });
 
 app.use((err, req, res, _next) => {
