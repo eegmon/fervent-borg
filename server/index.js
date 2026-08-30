@@ -380,7 +380,7 @@ async function requireCaseScope(req, res, next) {
   }
   // 사무국 계정: PUBLIC 사건만 무조건 통과. PRIVATE 사건은 아래 허용 목록으로 판단.
   const result = await db.execute({
-    sql: `SELECT c.visibility, c.created_by, c.prosecutor_id,
+    sql: `SELECT c.visibility, c.created_by, c.prosecutor_id, c.prosecutor_name,
                  COALESCE(c.private_viewer_ids, '[]') AS private_viewer_ids
           FROM cases c WHERE c.id = ? AND c.deleted_at = ''`,
     args: [req.params.id],
@@ -394,6 +394,7 @@ async function requireCaseScope(req, res, next) {
   const visibility = row.visibility;
   const createdBy = row.created_by;
   const prosecutorId = row.prosecutor_id;
+  const prosecutorName = row.prosecutor_name;
   const privateViewerIds = String(row.private_viewer_ids || "[]");
   const uid = req.user.id;
 
@@ -418,7 +419,7 @@ async function requireCaseScope(req, res, next) {
   // 사무국은 행정 접근(사건번호·처분 확인)은 허용하되 수사 내용은 GET /api/cases 마스킹으로 처리.
   if (visibility === "PRIVATE") {
     const isAllowed =
-      uid === prosecutorId ||
+      prosecutorName === req.user.name ||
       uid === createdBy ||
       parseJsonArray(privateViewerIds).includes(uid) ||
       hasSecretariatWorkAccess(req.user); // 사무국은 PRIVATE 상세도 접근 허용 (마스킹 적용)
