@@ -5250,12 +5250,19 @@ export default function SecretariatAdmin({
                             <select
                               className="select-field"
                               value={statusForm.status}
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                const nextStatus = e.target.value;
+                                const clearsDelegate =
+                                  nextStatus === "ACTIVE" ||
+                                  nextStatus === "RETIRED";
                                 setStatusForm({
                                   ...statusForm,
-                                  status: e.target.value,
-                                })
-                              }
+                                  status: nextStatus,
+                                  ...(clearsDelegate
+                                    ? { delegateTo: "", delegateReason: "" }
+                                    : {}),
+                                });
+                              }}
                             >
                               <option value="ACTIVE">
                                 🟢 정상 재직 (직접 결재 수행)
@@ -5341,7 +5348,8 @@ export default function SecretariatAdmin({
                             </label>
                           </div>
 
-                          {statusForm.status !== "ACTIVE" && (
+                          {(statusForm.status === "DELEGATED" ||
+                            statusForm.status === "ON_LEAVE") && (
                             <>
                               <div>
                                 <Label>대결자 (대리 결재 승인자) 지정 *</Label>
