@@ -2324,7 +2324,7 @@ export default function App() {
         }}
       >
         도스온라인 검찰청 (Dose Online Prosecution Office) · 검찰사무국 총괄
-        관리 포털 v4.0
+        관리 포털 v4.0 · 오류 등 문의 discord@eegmon.
       </footer>
       {/* Toast Notifications */}
       <Toast toasts={toasts} onDismiss={dismissToast} />

@@ -80,10 +80,10 @@ export async function fetchMojangUuid(username) {
           name: player.username,
           skinUrl:
             player.avatar ||
-            `https://crafatar.com/avatars/${formattedUuid}?overlay=true`,
+            `https://crafthead.com/avatars/${formattedUuid}?overlay=true`,
           avatarUrl:
             player.avatar ||
-            `https://crafatar.com/avatars/${formattedUuid}?overlay=true`,
+            `https://crafthead.net/avatar/${formattedUuid}?overlay=true`,
         };
       }
     }
@@ -128,8 +128,8 @@ export async function fetchMojangUuid(username) {
           success: true,
           uuid: formattedUuid,
           name: data.name,
-          skinUrl: `https://crafatar.com/avatars/${formattedUuid}?overlay=true`,
-          avatarUrl: `https://crafatar.com/avatars/${formattedUuid}?overlay=true`,
+          skinUrl: `https://crafthead.net/avatars/${formattedUuid}?overlay=true`,
+          avatarUrl: `https://crafthead.net/avatars/${formattedUuid}?overlay=true`,
         };
       }
     }

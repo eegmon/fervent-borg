@@ -2090,7 +2090,8 @@ app.put(
       const orow = ownerCheck.rows[0];
       if (orow) {
         const isOwner =
-          orow.prosecutor_name === req.user.name || orow.created_by === req.user.id;
+          orow.prosecutor_name === req.user.name ||
+          orow.created_by === req.user.id;
         // 직근상급자(동일 부서 + 더 높은 직급) 여부 확인
         let isSuperior = false;
         if (!isOwner && orow.prosecutor_id) {
@@ -5296,8 +5297,6 @@ app.delete("/api/approval-templates/:id", requireAuth, async (req, res) => {
 const distPath = join(__dirname, "..", "dist");
 app.use(express.static(distPath));
 
-
-
 // ════════════════════════════════════════════════════════════════════
 // 자동보존 설정 API (GET / PATCH /api/settings/auto-archive)
 // ════════════════════════════════════════════════════════════════════
@@ -5459,7 +5458,7 @@ app.get("/api/mojang/uuid/:username", async (req, res) => {
     });
   }
 
-// 1) playerdb.co — 레이트리밋 없는 안정적인 대체 API (권장)
+  // 1) playerdb.co — 레이트리밋 없는 안정적인 대체 API (권장)
   try {
     const playerdbRes = await fetch(
       `https://playerdb.co/api/player/minecraft/${encodeURIComponent(cleanName)}`,
@@ -5481,9 +5480,11 @@ app.get("/api/mojang/uuid/:username", async (req, res) => {
           uuid: player.id,
           name: player.username,
           skinUrl:
-            player.avatar || `https://crafatar.com/avatars/${formattedId}?overlay=true`,
+            player.avatar ||
+            `https://crafthead.net/avatars/${formattedId}?overlay=true`,
           avatarUrl:
-            player.avatar || `https://crafatar.com/avatars/${formattedId}?overlay=true`,
+            player.avatar ||
+            `https://crafthead.net/avatars/${formattedId}?overlay=true`,
         });
       }
     }
@@ -5526,8 +5527,8 @@ app.get("/api/mojang/uuid/:username", async (req, res) => {
           success: true,
           uuid: data.id,
           name: data.name,
-          skinUrl: `https://crafatar.com/avatars/${data.id}?overlay=true`,
-          avatarUrl: `https://crafatar.com/avatars/${data.id}?overlay=true`,
+          skinUrl: `https://crafthead.net/avatars/${data.id}?overlay=true`,
+          avatarUrl: `https://crafthead.net/avatars/${data.id}?overlay=true`,
         });
       }
     }
