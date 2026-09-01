@@ -139,6 +139,8 @@ export default function DeadlineAlertModal({
         c.incidentDate || c.bookingDate,
       );
 
+      const displayNo = c.sujeNo && c.sujeNo !== "-" ? c.sujeNo : c.hyeongjeNo;
+
       let urgency = "INFO";
       if (sol.dDay <= 3) urgency = "CRITICAL";
       else if (sol.dDay <= 7) urgency = "WARNING";
@@ -147,13 +149,13 @@ export default function DeadlineAlertModal({
         id: `STATUTE-${c.id}`,
         category: "STATUTE",
         categoryLabel: "⏳ 공소시효 D-day (소송법)",
-        title: `${c.hyeongjeNo}호 | ${c.suspectName} (${c.chargeName || "범죄"}) 공소시효 계산`,
+        title: `${displayNo} | ${c.suspectName} (${c.chargeName || "범죄"}) 공소시효 계산`,
         desc: `${sol.lawArticle} · 법정시효: ${sol.periodDays}일 · 시효 만료 예정일: ${sol.expireDateStr} (담당: ${c.prosecutorName || "미지정"})`,
         dDay: sol.dDayText,
         dDayVal: sol.dDay,
         urgency,
         targetTab: "mycases",
-        caseNo: c.hyeongjeNo,
+        caseNo: displayNo,
       });
     });
 
