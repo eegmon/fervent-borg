@@ -48,7 +48,7 @@ function formatIntakeNotice(data) {
       })
     : "-";
   const prosecutorContact = data.prosecutorDiscordId
-    ? ` (@${data.prosecutorDiscordId})`
+    ? ` ${data.prosecutorDiscordId}`
     : "";
 
   return `**[신건 접수 통지]**
@@ -203,28 +203,51 @@ export default function App() {
   const [intakeNoticeData, setIntakeNoticeData] = useState(null);
 
   // Compute total alert counts for Header badge
+  // Note: this should only count genuinely imminent deadlines instead of any active status.
   const totalDeadlineAlertsCount = useMemo(() => {
     let count = 0;
+
     (ledgerData || []).forEach((c) => {
       if (isCaseClosedOrIndicted(c)) return;
-      if ((c.bookingStatus || c.disposition || "").includes("구속")) count++;
+
+      const statusStr = (c.bookingStatus || "").trim();
+      const isArrested =
+        (statusStr.includes("구속") &&
+          !statusStr.includes("불구속") &&
+          !statusStr.includes("미구속")) ||
+        statusStr.includes("체포영장") ||
+        statusStr.includes("구속영장");
+
+      if (!isArrested) return;
+
+      const baseDate = c.bookingDate
+        ? new Date(c.bookingDate.replace(/\./g, "-"))
+        : new Date();
+      const expireDate = new Date(baseDate.getTime() + 48 * 60 * 60 * 1000);
+      const diffHours = Math.ceil((expireDate - new Date()) / (1000 * 60 * 60));
+
+      if (diffHours <= 48 && diffHours >= 0) count++;
     });
+
     (appealsData || []).forEach((a) => {
-      if (
-        (a.appealStatus || a.status || "").includes("접수") ||
-        (a.appealStatus || a.status || "").includes("심리")
-      )
-        count++;
+      const status = (a.appealStatus || a.status || "").trim();
+      if (!(status.includes("접수") || status.includes("심리"))) return;
+
+      const baseDate = a.appealDate
+        ? new Date(a.appealDate.replace(/\./g, "-"))
+        : new Date();
+      const limitDate = new Date(baseDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const diffDays = Math.ceil(
+        (limitDate - new Date()) / (1000 * 60 * 60 * 24),
+      );
+
+      if (diffDays <= 7 && diffDays >= 0) count++;
     });
-    (approvalsData || []).forEach((doc) => {
-      if (
-        (doc.status || "").includes("대기") ||
-        (doc.status || "").includes("진행")
-      )
-        count++;
-    });
+
+    // Pending approvals are shown in the detailed modal but are not treated as
+    // an imminent deadline badge unless explicitly due-soon logic is added.
     return count;
-  }, [ledgerData, appealsData, approvalsData]);
+  }, [ledgerData, appealsData]);
 
   // Inline Login States (For unauthenticated landing screen)
   const [inlineUsername, setInlineUsername] = useState("");

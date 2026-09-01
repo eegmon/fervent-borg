@@ -5021,8 +5021,12 @@ export default function SecretariatAdmin({
                         style={{
                           maxWidth: 460,
                           width: "92%",
+                          maxHeight: "85vh",
+                          overflowY: "auto",
+                          overflowX: "hidden",
                           padding: 24,
                           borderRadius: 14,
+                          boxSizing: "border-box",
                         }}
                       >
                         <div
