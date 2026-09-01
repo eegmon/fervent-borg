@@ -48,7 +48,7 @@ function formatIntakeNotice(data) {
       })
     : "-";
   const prosecutorContact = data.prosecutorDiscordId
-    ? ` ${data.prosecutorDiscordId}`
+    ? `<@${data.prosecutorDiscordId}>`
     : "";
 
   return `**[신건 접수 통지]**
@@ -58,7 +58,7 @@ function formatIntakeNotice(data) {
 피의자명 ${data.suspectName || "-"} ( UUID: ${data.suspectUuid || "-"} )
 접수일시 ${date}
 접수근거 [관련 게시물](${data.bookingBasis || ""})
-담당검사 ${data.prosecutorName || "-"}<@${prosecutorContact}>
+담당검사 ${data.prosecutorName || "-"}(${prosecutorContact})
 --- 이 하 여 백 ---`;
 }
 
