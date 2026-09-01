@@ -1314,13 +1314,18 @@ export default function App() {
             .toISOString()
             .replace("T", " ")
             .substring(0, 16);
-          const updatedApprovals = doc.approvals.map((app, idx) => {
-            const isLast = idx === doc.approvals.length - 1;
+          const updatedApprovals = doc.approvals.map((app, idx, arr) => {
+            const isLast = idx === arr.length - 1;
+            const isPending =
+              /대기/.test(String(app.status || "")) &&
+              !/(승인완료|상신완료|검토승인|최종결재|최종승인|전결승인|대결승인)/.test(
+                String(app.status || ""),
+              );
             return {
               ...app,
               name: isLast
                 ? app.name
-                : app.status.includes("대기")
+                : isPending
                   ? `${app.name} [직권승인]`
                   : app.name,
               status: isLast ? "최종결재(인장날인)" : "승인완료",
@@ -1899,6 +1904,7 @@ export default function App() {
                 currentUser={currentUser}
                 prosecutorsList={operationalProsecutorsList}
                 chargesData={chargesData}
+                departmentsData={departmentsData}
                 isReadOnly={isReadOnly}
                 onSelectEvidence={(url, caseNo, suspectName) =>
                   setEvidenceModalInfo({ url, caseNo, suspectName })

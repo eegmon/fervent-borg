@@ -930,6 +930,7 @@ export default function MyCasesLedger({
   currentUser,
   prosecutorsList = [],
   chargesData = [],
+  departmentsData = [],
   onSelectEvidence,
   onSelectSuspect,
   onOpenApprovalForCase,
@@ -1096,17 +1097,17 @@ export default function MyCasesLedger({
       "SENIOR_PROSECUTOR",
     ].includes(currentUser.roleLevel);
 
-  // 부서장(부장검사) 권한: 동일 부서 인원 휴직처리 + 부서 내 사건 재배당
-  // 지정된 부서장만 접근 가능 (부장검사 제외)
+  // 부서장 권한은 '부장검사' 직급 자체가 아니라,
+  // 검찰사무국에서 명시적으로 부서장으로 지정한 사람만 허용한다.
+  // 부장검사 직급이나 현재 부서장 여부 플래그만으로는 패널을 노출시키지 않는다.
   const isDeptHeadAssigned =
-    !!currentUser?.isDeptHead ||
-    !!currentUser?.isDepartmentHead ||
-    !!currentUser?.departmentHead ||
-    !!currentUser?.isHeadOfDepartment ||
-    (typeof currentUser?.position === "string" &&
-      currentUser.position.includes("부서장")) ||
-    (typeof currentUser?.title === "string" &&
-      currentUser.title.includes("부서장"));
+    Array.isArray(departmentsData) &&
+    departmentsData.some(
+      (dept) =>
+        dept?.headId &&
+        dept.headId === currentUser?.id &&
+        dept.name === currentUser?.dept,
+    );
 
   const isSeniorProsecutor = isDeptHeadAssigned;
   const [seniorTab, setSeniorTab] = useState("leave"); // "leave" | "reassign"

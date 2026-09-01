@@ -3050,11 +3050,27 @@ app.put(
       }
     }
     const now = new Date().toISOString().replace("T", " ").substring(0, 16);
-    const updatedApprovals = JSON.parse(doc.approvalsJson || "[]").map((a) => ({
-      ...a,
-      status: "최종결재(인장날인)",
-      date: now,
-    }));
+    const updatedApprovals = JSON.parse(doc.approvalsJson || "[]").map(
+      (a, idx, arr) => {
+        const isLast = idx === arr.length - 1;
+        const status = String(a.status || "");
+        const isPending =
+          /대기/.test(status) &&
+          !/(승인완료|상신완료|검토승인|최종결재|최종승인|전결승인|대결승인)/.test(
+            status,
+          );
+
+        return {
+          ...a,
+          status: isLast
+            ? "최종결재(인장날인)"
+            : isPending || status === "상신완료" || /검토/.test(status)
+              ? "승인완료"
+              : status,
+          date: a.date === "-" ? now : a.date,
+        };
+      },
+    );
 
     // approvals + cases 업데이트를 하나의 batch로 원자화
     // approvals 업데이트 시 status != '최종승인' 조건을 추가해 중복 결재 방지

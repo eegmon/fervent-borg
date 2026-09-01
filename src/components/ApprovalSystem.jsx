@@ -446,6 +446,16 @@ const S = {
   footerNo: { fontSize: "0.82rem", color: "#6b7280" },
 };
 
+const isApprovalPendingStatus = (value = "") => {
+  const status = String(value || "");
+  return (
+    /대기/.test(status) &&
+    !/(승인완료|상신완료|검토승인|최종결재|최종승인|전결승인|대결승인)/.test(
+      status,
+    )
+  );
+};
+
 export default function ApprovalSystem({
   approvals,
   onApproveDoc,
@@ -757,13 +767,14 @@ export default function ApprovalSystem({
       "DEPUTY_CHIEF",
     ].includes(currentUser?.roleLevel);
 
-    const updatedLine = selectedDoc.approvals.map((app, idx) => {
-      const isLast = idx === selectedDoc.approvals.length - 1;
+    const updatedLine = selectedDoc.approvals.map((app, idx, arr) => {
+      const isLast = idx === arr.length - 1;
+      const isPending = isApprovalPendingStatus(app.status);
       return {
         ...app,
         name: isLast
           ? currentUser?.name || app.name
-          : app.status.includes("대기")
+          : isPending
             ? `${app.name} [직권승인]`
             : app.name,
         status: isLast ? "최종결재(인장날인)" : "승인완료",
