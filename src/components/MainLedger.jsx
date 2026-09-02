@@ -80,6 +80,7 @@ export default function MainLedger({
   onUndesignateCase,
   onOpenTimeline,
   onOpenMemo,
+  onOpenIndictmentComposer,
   isReadOnly = false,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -1024,6 +1025,27 @@ export default function MainLedger({
                       <FileCheck size={12} />
                       결재
                     </button>
+                    )}
+
+                    {/* HWP 공소장 작성 버튼 */}
+                    {onOpenIndictmentComposer && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenIndictmentComposer(item);
+                        }}
+                        className="btn btn-outline"
+                        style={{
+                          padding: "5px 10px",
+                          fontSize: "0.75rem",
+                          color: "#93c5fd",
+                          border: "1px solid rgba(147,197,253,0.35)",
+                        }}
+                        title="표준 HWP 공소장 자동 작성"
+                      >
+                        <Scale size={12} />
+                        공소장
+                      </button>
                     )}
 
                     {/* 지정/해제 버튼 — 상급자만 표시 */}

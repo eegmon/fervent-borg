@@ -1572,6 +1572,18 @@ app.post(
       actorName: req.user.name,
       detail: `피의자: ${c.suspectName || ""}, 죄명: ${c.chargeName || ""}`,
     });
+
+    if (assignedId && assignedId !== req.user.id) {
+      sendNotificationToUser({
+        userId: assignedId,
+        type: "CASE_ASSIGNED",
+        title: "📁 신규 사건 배당",
+        message: `${req.user.name}님이 [${c.hyeongjeNo || c.sujeNo || "사건"}] 피의자 ${c.suspectName || "미지정"} 사건을 배당했습니다.`,
+        linkTab: "mycases",
+        linkId: id,
+      }).catch(() => {});
+    }
+
     res.json({ success: true, case: { ...c, id } });
   }),
 );
@@ -2959,6 +2971,24 @@ app.post(
       actorName: req.user.name,
       detail: `결재 문서 상신: ${doc.docTypeName || doc.docType || "서식"}`,
     });
+
+    // 첫 번째 결재자에게 알림 전송
+    try {
+      const firstPendingStep = (doc.approvals || []).find(
+        (s) => s && (s.status === "PENDING" || s.status === "대기" || (typeof s.status === "string" && s.status.includes("대기"))),
+      );
+      if (firstPendingStep?.approverId && firstPendingStep.approverId !== req.user.id) {
+        sendNotificationToUser({
+          userId: firstPendingStep.approverId,
+          type: "APPROVAL_REQ",
+          title: "📄 신규 결재 상신",
+          message: `${req.user.name}님이 [${doc.title || doc.docTypeName || "결재문서"}] 결재를 요청했습니다.`,
+          linkTab: "approvals",
+          linkId: approvalId,
+        }).catch(() => {});
+      }
+    } catch {}
+
     res.json({ success: true, doc: { ...doc, id: approvalId } });
   }),
 );
@@ -3105,6 +3135,18 @@ app.put(
       actorName: req.user.name,
       detail: `문서유형: ${doc.docTypeName || doc.docType}, 처분: ${doc.dispositionType}`,
     });
+
+    // 기안자(담당검사)에게 결재 완료 알림
+    if (doc.prosecutorId && doc.prosecutorId !== req.user.id) {
+      sendNotificationToUser({
+        userId: doc.prosecutorId,
+        type: "APPROVAL_RESULT",
+        title: "✅ 전자결재 승인 완료",
+        message: `${req.user.name}님이 [${doc.title || doc.docTypeName || "결재문서"}] 문서를 최종 승인했습니다.`,
+        linkTab: "approvals",
+        linkId: req.params.id,
+      }).catch(() => {});
+    }
 
     res.json({ success: true });
   },
@@ -4272,6 +4314,426 @@ async function writeAuditLog({
     .catch((e) => console.warn("[audit_log write error]", e.message));
 }
 
+// ════════════════════════════════════════════════════════════════════
+// 11-1. 실시간 SSE (Server-Sent Events) 알림 관리자 및 헬퍼
+// ════════════════════════════════════════════════════════════════════
+const sseClients = new Map(); // userId -> Set<Response>
+
+function addSseClient(userId, res) {
+  if (!sseClients.has(userId)) {
+    sseClients.set(userId, new Set());
+  }
+  sseClients.get(userId).add(res);
+}
+
+function removeSseClient(userId, res) {
+  if (sseClients.has(userId)) {
+    const set = sseClients.get(userId);
+    set.delete(res);
+    if (set.size === 0) sseClients.delete(userId);
+  }
+}
+
+/** 특정 사용자에게 알림 전송 및 DB 영속화 */
+async function sendNotificationToUser({
+  userId,
+  type,
+  title,
+  message,
+  linkTab = "",
+  linkId = "",
+}) {
+  if (!userId) return null;
+  const id = `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const now = new Date().toISOString();
+
+  try {
+    await db.execute({
+      sql: `INSERT INTO notifications (id, user_id, type, title, message, link_tab, link_id, is_read, created_at, deleted_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, '')`,
+      args: [id, userId, type, title, message, linkTab, linkId, now],
+    });
+  } catch (err) {
+    console.error("[Notification DB Insert Error]", err);
+  }
+
+  const payload = {
+    id,
+    userId,
+    type,
+    title,
+    message,
+    linkTab,
+    linkId,
+    isRead: 0,
+    createdAt: now,
+  };
+
+  const clients = sseClients.get(userId);
+  if (clients && clients.size > 0) {
+    const data = `data: ${JSON.stringify(payload)}\n\n`;
+    for (const res of clients) {
+      try {
+        res.write(data);
+      } catch {
+        // 무효 커넥션 무시
+      }
+    }
+  }
+  return payload;
+}
+
+/** 다수 사용자 또는 전체 사용자에게 브로드캐스트 */
+async function broadcastNotification({
+  type,
+  title,
+  message,
+  linkTab = "",
+  linkId = "",
+  targetUserIds = null,
+}) {
+  try {
+    let ids = targetUserIds;
+    if (!ids || !Array.isArray(ids)) {
+      const allUsers = await db.execute(
+        "SELECT id FROM prosecutors WHERE status != 'RETIRED'",
+      );
+      ids = allUsers.rows.map((r) => r.id);
+    }
+    for (const uId of ids) {
+      await sendNotificationToUser({
+        userId: uId,
+        type,
+        title,
+        message,
+        linkTab,
+        linkId,
+      });
+    }
+  } catch (err) {
+    console.error("[Broadcast Notification Error]", err);
+  }
+}
+
+// ── GET /api/events (실시간 SSE 스트림 연결) ──────────────────────────
+app.get("/api/events", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const queryToken = req.query.token;
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : typeof queryToken === "string"
+      ? queryToken
+      : null;
+
+  if (!token) {
+    return res
+      .status(401)
+      .json({ success: false, message: "인증 토큰이 필요합니다." });
+  }
+
+  let userId = null;
+  try {
+    const claims = jwt.verify(token, JWT_SECRET);
+    userId = claims.id;
+  } catch {
+    return res
+      .status(401)
+      .json({ success: false, message: "유효하지 않은 토큰입니다." });
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  res.write(
+    `data: ${JSON.stringify({ type: "CONNECTED", message: "실시간 알림 스트림 연결됨" })}\n\n`,
+  );
+
+  addSseClient(userId, res);
+
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(": keep-alive\n\n");
+    } catch {
+      clearInterval(heartbeat);
+      removeSseClient(userId, res);
+    }
+  }, 25000);
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    removeSseClient(userId, res);
+  });
+});
+
+// ── GET /api/notifications (사용자 알림 목록 조회) ────────────────────
+app.get(
+  "/api/notifications",
+  requireAuth,
+  asyncWrap(async (req, res) => {
+    const result = await db.execute({
+      sql: `SELECT id, user_id, type, title, message, link_tab, link_id, is_read, created_at
+            FROM notifications
+            WHERE user_id = ? AND deleted_at = ''
+            ORDER BY created_at DESC LIMIT 60`,
+      args: [req.user.id],
+    });
+    res.json({
+      success: true,
+      notifications: result.rows.map(toCamel),
+    });
+  }),
+);
+
+// ── PATCH /api/notifications/:id/read (개별 알림 읽음 처리) ────────────
+app.patch(
+  "/api/notifications/:id/read",
+  requireAuth,
+  asyncWrap(async (req, res) => {
+    await db.execute({
+      sql: `UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?`,
+      args: [req.params.id, req.user.id],
+    });
+    res.json({ success: true });
+  }),
+);
+
+// ── POST /api/notifications/read-all (전체 알림 읽음 처리) ───────────
+app.post(
+  "/api/notifications/read-all",
+  requireAuth,
+  asyncWrap(async (req, res) => {
+    await db.execute({
+      sql: `UPDATE notifications SET is_read = 1 WHERE user_id = ? AND deleted_at = ''`,
+      args: [req.user.id],
+    });
+    res.json({ success: true });
+  }),
+);
+
+// ── DELETE /api/notifications/:id (알림 삭제) ────────────────────────
+app.delete(
+  "/api/notifications/:id",
+  requireAuth,
+  asyncWrap(async (req, res) => {
+    await db.execute({
+      sql: `UPDATE notifications SET deleted_at = datetime('now') WHERE id = ? AND user_id = ?`,
+      args: [req.params.id, req.user.id],
+    });
+    res.json({ success: true });
+  }),
+);
+
+// ════════════════════════════════════════════════════════════════════
+// 11-2. 조사/신문 일정 (Investigation Schedules) API
+// ════════════════════════════════════════════════════════════════════
+
+// GET /api/schedules — 조사 일정 목록 조회
+app.get(
+  "/api/schedules",
+  requireAuth,
+  asyncWrap(async (req, res) => {
+    const result = await db.execute(
+      `SELECT * FROM investigation_schedules WHERE deleted_at = '' ORDER BY scheduled_at ASC`,
+    );
+    res.json({
+      success: true,
+      schedules: result.rows.map(toCamel),
+    });
+  }),
+);
+
+// POST /api/schedules — 조사 일정 등록
+app.post(
+  "/api/schedules",
+  requireAuth,
+  requireReadWrite,
+  asyncWrap(async (req, res) => {
+    const body = req.body || {};
+    const id = `SCH-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+
+    const caseId = String(body.caseId || "").trim();
+    const hyeongjeNo = String(body.hyeongjeNo || "").trim();
+    const targetType = String(body.targetType || "SUSPECT").trim();
+    const targetName = String(body.targetName || "").trim();
+    const targetContact = String(body.targetContact || "").trim();
+    const scheduledAt = String(body.scheduledAt || "").trim();
+    const location = String(body.location || "검사실").trim();
+    const investigatorId = String(body.investigatorId || req.user.id).trim();
+    const investigatorName = String(body.investigatorName || req.user.name).trim();
+    const purpose = String(body.purpose || "").trim();
+    const notes = String(body.notes || "").trim();
+
+    if (!targetName || !scheduledAt) {
+      return res.status(400).json({
+        success: false,
+        message: "대상자 성명과 조사 일시를 입력해주세요.",
+      });
+    }
+
+    await db.execute({
+      sql: `INSERT INTO investigation_schedules
+            (id, case_id, hyeongje_no, target_type, target_name, target_contact, scheduled_at, location, investigator_id, investigator_name, purpose, status, summons_doc_no, summons_issued_at, notes, created_by, created_at, deleted_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', '', '', ?, ?, ?, '')`,
+      args: [
+        id,
+        caseId,
+        hyeongjeNo,
+        targetType,
+        targetName,
+        targetContact,
+        scheduledAt,
+        location,
+        investigatorId,
+        investigatorName,
+        purpose,
+        notes,
+        req.user.name,
+        now,
+      ],
+    });
+
+    const newSchedule = {
+      id,
+      caseId,
+      hyeongjeNo,
+      targetType,
+      targetName,
+      targetContact,
+      scheduledAt,
+      location,
+      investigatorId,
+      investigatorName,
+      purpose,
+      status: "SCHEDULED",
+      summonsDocNo: "",
+      summonsIssuedAt: "",
+      notes,
+      createdBy: req.user.name,
+      createdAt: now,
+    };
+
+    // 감사 로그 기록
+    await writeAuditLog({
+      action: "CREATE",
+      entityType: "schedule",
+      entityId: id,
+      entityLabel: `${hyeongjeNo || "조사"} | ${targetName}`,
+      actorId: req.user.id,
+      actorName: req.user.name,
+      detail: `조사 일정 등록: ${targetType === "SUSPECT" ? "피의자" : "참고인"} ${targetName} (${scheduledAt})`,
+    });
+
+    // 담당 수사관에게 알림 전송 (본인이 등록한 경우 제외)
+    if (investigatorId && investigatorId !== req.user.id) {
+      await sendNotificationToUser({
+        userId: investigatorId,
+        type: "SCHEDULE",
+        title: "📅 신규 조사·신문 일정 등록",
+        message: `${req.user.name}님이 [${hyeongjeNo || "사건"}] ${targetName} 조사 일정(${scheduledAt})을 배정/등록했습니다.`,
+        linkTab: "schedule",
+        linkId: id,
+      });
+    }
+
+    res.json({ success: true, schedule: newSchedule });
+  }),
+);
+
+// PATCH /api/schedules/:id — 조사 일정 수정
+app.patch(
+  "/api/schedules/:id",
+  requireAuth,
+  requireReadWrite,
+  asyncWrap(async (req, res) => {
+    const id = req.params.id;
+    const existing = await db.execute({
+      sql: "SELECT * FROM investigation_schedules WHERE id = ? AND deleted_at = ''",
+      args: [id],
+    });
+    if (existing.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "일정을 찾을 수 없습니다." });
+    }
+
+    const current = toCamel(existing.rows[0]);
+    const body = req.body || {};
+
+    const targetType = body.targetType !== undefined ? body.targetType : current.targetType;
+    const targetName = body.targetName !== undefined ? body.targetName : current.targetName;
+    const targetContact = body.targetContact !== undefined ? body.targetContact : current.targetContact;
+    const scheduledAt = body.scheduledAt !== undefined ? body.scheduledAt : current.scheduledAt;
+    const location = body.location !== undefined ? body.location : current.location;
+    const investigatorId = body.investigatorId !== undefined ? body.investigatorId : current.investigatorId;
+    const investigatorName = body.investigatorName !== undefined ? body.investigatorName : current.investigatorName;
+    const purpose = body.purpose !== undefined ? body.purpose : current.purpose;
+    const status = body.status !== undefined ? body.status : current.status;
+    const summonsDocNo = body.summonsDocNo !== undefined ? body.summonsDocNo : current.summonsDocNo;
+    const summonsIssuedAt = body.summonsIssuedAt !== undefined ? body.summonsIssuedAt : current.summonsIssuedAt;
+    const notes = body.notes !== undefined ? body.notes : current.notes;
+
+    await db.execute({
+      sql: `UPDATE investigation_schedules SET
+              target_type = ?, target_name = ?, target_contact = ?,
+              scheduled_at = ?, location = ?, investigator_id = ?, investigator_name = ?,
+              purpose = ?, status = ?, summons_doc_no = ?, summons_issued_at = ?, notes = ?
+            WHERE id = ?`,
+      args: [
+        targetType,
+        targetName,
+        targetContact,
+        scheduledAt,
+        location,
+        investigatorId,
+        investigatorName,
+        purpose,
+        status,
+        summonsDocNo,
+        summonsIssuedAt,
+        notes,
+        id,
+      ],
+    });
+
+    const updated = {
+      ...current,
+      targetType,
+      targetName,
+      targetContact,
+      scheduledAt,
+      location,
+      investigatorId,
+      investigatorName,
+      purpose,
+      status,
+      summonsDocNo,
+      summonsIssuedAt,
+      notes,
+    };
+
+    res.json({ success: true, schedule: updated });
+  }),
+);
+
+// DELETE /api/schedules/:id — 조사 일정 삭제
+app.delete(
+  "/api/schedules/:id",
+  requireAuth,
+  requireReadWrite,
+  asyncWrap(async (req, res) => {
+    const id = req.params.id;
+    await db.execute({
+      sql: `UPDATE investigation_schedules SET deleted_at = datetime('now') WHERE id = ?`,
+      args: [id],
+    });
+    res.json({ success: true });
+  }),
+);
+
 // GET /api/audit-logs — 최근 500건 (사무국·검사장 이상)
 app.get(
   "/api/audit-logs",
@@ -4661,6 +5123,19 @@ app.put(
         actorName: req.user.name,
         detail: reason,
       });
+
+      // 기안자(담당검사)에게 결재 반려 알림
+      if (doc.prosecutorId && doc.prosecutorId !== req.user.id) {
+        sendNotificationToUser({
+          userId: doc.prosecutorId,
+          type: "APPROVAL_RESULT",
+          title: "❌ 전자결재 반려",
+          message: `${req.user.name}님이 [${doc.title || doc.docTypeName || "결재문서"}] 문서를 반려했습니다. 사유: ${reason}`,
+          linkTab: "approvals",
+          linkId: req.params.id,
+        }).catch(() => {});
+      }
+
       res.json({ success: true, status: rejectStatus });
     } catch (err) {
       console.error("[PUT /approvals/reject]", err);

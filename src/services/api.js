@@ -561,3 +561,74 @@ export function updateAutoArchiveSettings(settings) {
     body: JSON.stringify(settings),
   });
 }
+
+// ════════════════════════════════════════════════════════════════════
+// Notifications & SSE — 실시간 알림
+// ════════════════════════════════════════════════════════════════════
+
+/** 알림 목록 조회 */
+export function fetchNotifications() {
+  return apiFetch("/notifications");
+}
+
+/** 개별 알림 읽음 처리 */
+export function markNotificationReadApi(id) {
+  return apiFetch(`/notifications/${encodeURIComponent(id)}/read`, {
+    method: "PATCH",
+  });
+}
+
+/** 전체 알림 읽음 처리 */
+export function markAllNotificationsReadApi() {
+  return apiFetch("/notifications/read-all", {
+    method: "POST",
+  });
+}
+
+/** 알림 삭제 */
+export function deleteNotificationApi(id) {
+  return apiFetch(`/notifications/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+/** SSE 연결 팩토리 */
+export function createSseEventSource(token) {
+  const isDev = import.meta.env.DEV;
+  const baseUrl = isDev ? "" : (import.meta.env.VITE_API_URL || "");
+  const url = `${baseUrl}/api/events?token=${encodeURIComponent(token)}`;
+  return new EventSource(url);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Investigation Schedules — 조사/신문 일정 및 소환
+// ════════════════════════════════════════════════════════════════════
+
+/** 조사 일정 목록 조회 */
+export function fetchSchedules() {
+  return apiFetch("/schedules");
+}
+
+/** 조사 일정 등록 */
+export function createScheduleApi(data) {
+  return apiFetch("/schedules", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+/** 조사 일정 수정 (상태 변경/소환장 발급 기록 포함) */
+export function updateScheduleApi(id, data) {
+  return apiFetch(`/schedules/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+/** 조사 일정 삭제 */
+export function deleteScheduleApi(id) {
+  return apiFetch(`/schedules/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+

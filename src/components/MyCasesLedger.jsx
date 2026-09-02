@@ -943,6 +943,7 @@ export default function MyCasesLedger({
   onUndesignateCase,
   onOpenTimeline,
   onOpenMemo,
+  onOpenIndictmentComposer,
   isReadOnly = false,
 }) {
   const [selectedProsecutorFilter, setSelectedProsecutorFilter] = useState(
@@ -1097,19 +1098,29 @@ export default function MyCasesLedger({
       "SENIOR_PROSECUTOR",
     ].includes(currentUser.roleLevel);
 
-  // 부서장 권한은 '부장검사' 직급 자체가 아니라,
-  // 검찰사무국에서 명시적으로 부서장으로 지정한 사람만 허용한다.
-  // 부장검사 직급이나 현재 부서장 여부 플래그만으로는 패널을 노출시키지 않는다.
-  const isDeptHeadAssigned =
-    Array.isArray(departmentsData) &&
-    departmentsData.some(
+  // 관장 부서 목록 (본인 소속 부서 + 겸직/직무대리로 부서장 지정된 부서)
+  const managedDepts = useMemo(() => {
+    if (!Array.isArray(departmentsData)) return [];
+    return departmentsData.filter(
       (dept) =>
-        dept?.headId &&
-        dept.headId === currentUser?.id &&
-        dept.name === currentUser?.dept,
+        (dept.headId && dept.headId === currentUser?.id) ||
+        (dept.headName && dept.headName.includes(currentUser?.name)),
     );
+  }, [departmentsData, currentUser]);
 
+  const isDeptHeadAssigned = managedDepts.length > 0;
   const isSeniorProsecutor = isDeptHeadAssigned;
+
+  const managedDeptNames = useMemo(
+    () =>
+      new Set(
+        managedDepts
+          .map((d) => d.name)
+          .concat(currentUser?.dept ? [currentUser.dept] : []),
+      ),
+    [managedDepts, currentUser],
+  );
+
   const [seniorTab, setSeniorTab] = useState("leave"); // "leave" | "reassign"
   const [leaveTarget, setLeaveTarget] = useState("");
   const [leaveStatus, setLeaveStatus] = useState("LEAVE");
@@ -1119,7 +1130,7 @@ export default function MyCasesLedger({
   const [reassignLoading, setReassignLoading] = useState(false);
   const [seniorMsg, setSeniorMsg] = useState(null);
 
-  // 부서 내 하위 직급 검사 목록 (부장검사용)
+  // 관장 부서 내 하위 직급 검사 목록 (겸직·직무대리 포함)
   const ROLE_AUTHORITY_CLIENT = {
     PROBATIONARY: 10,
     ADMIN_PROBATIONARY: 15,
@@ -1134,7 +1145,7 @@ export default function MyCasesLedger({
   };
   const deptMembers = prosecutorsList.filter(
     (p) =>
-      p.dept === currentUser.dept &&
+      managedDeptNames.has(p.dept) &&
       p.id !== currentUser.id &&
       (ROLE_AUTHORITY_CLIENT[p.roleLevel] || 0) <
         (ROLE_AUTHORITY_CLIENT[currentUser.roleLevel] || 0),
@@ -2269,6 +2280,24 @@ export default function MyCasesLedger({
                     >
                       <ClipboardList size={13} /> 전자 결재 상신
                     </button>
+
+                    {/* HWP 공소장 자동작성 */}
+                    {onOpenIndictmentComposer && (
+                      <button
+                        onClick={() => onOpenIndictmentComposer(item)}
+                        className="btn btn-outline"
+                        style={{
+                          fontSize: "0.78rem",
+                          padding: "5px 12px",
+                          color: "#93c5fd",
+                          border: "1px solid rgba(147,197,253,0.4)",
+                          gap: 5,
+                        }}
+                        title="대한민국 검찰 표준 HWP 공소장 자동 작성"
+                      >
+                        <Scale size={13} /> 공소장 작성
+                      </button>
+                    )}
 
                     {/* 사건 보존 / 보존 해제 버튼 */}
                     {onArchiveCase && (

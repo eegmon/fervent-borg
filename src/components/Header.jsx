@@ -20,10 +20,13 @@ import {
   Archive,
   Sun,
   Moon,
+  Calendar,
 } from "lucide-react";
+import NotificationDropdown from "./NotificationDropdown";
 
 const TABS = [
   { id: "mycases", label: "내 담당 사건", icon: UserCheck },
+  { id: "schedule", label: "수사 캘린더", icon: Calendar },
   { id: "ledger", label: "사건 원부", icon: FileSpreadsheet },
   { id: "preserved", label: "보존사건", icon: Archive },
   { id: "warrants", label: "영장 관리", icon: ShieldAlert },
@@ -54,6 +57,12 @@ export default function Header({
   onToggleTheme,
   isReadOnly = false,
   onReturnToActive,
+  notifications = [],
+  unreadNotificationsCount = 0,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead,
+  onDeleteNotification,
+  onNavigateFromNotification,
 }) {
   return (
     <header
@@ -191,6 +200,16 @@ export default function Header({
             <PlusCircle size={15} />
             신규 사건 접수
           </button>
+
+          {/* Real-time Web Notifications Center */}
+          <NotificationDropdown
+            notifications={notifications}
+            unreadCount={unreadNotificationsCount}
+            onMarkAsRead={onMarkNotificationRead}
+            onMarkAllAsRead={onMarkAllNotificationsRead}
+            onDeleteNotification={onDeleteNotification}
+            onNavigate={onNavigateFromNotification}
+          />
 
           {/* Notification Bell -> Deadline Alert Dashboard */}
           <button

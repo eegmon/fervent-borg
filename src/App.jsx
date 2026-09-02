@@ -32,6 +32,9 @@ import OfficialTemplateModal from "./components/OfficialTemplateModal";
 import RegisterModal from "./components/RegisterModal";
 import CaseTimelineModal from "./components/CaseTimelineModal";
 import CaseMemoModal from "./components/CaseMemoModal";
+import InvestigationCalendar from "./components/InvestigationCalendar";
+import SummonsModal from "./components/SummonsModal";
+import IndictmentComposerModal from "./components/IndictmentComposerModal";
 
 import AuditLogViewer from "./components/AuditLogViewer";
 import Toast from "./components/Toast";
@@ -127,6 +130,15 @@ import {
   fetchCharges,
   bulkReassignApi,
   returnToActiveApi,
+  fetchNotifications,
+  markNotificationReadApi,
+  markAllNotificationsReadApi,
+  deleteNotificationApi,
+  createSseEventSource,
+  fetchSchedules,
+  createScheduleApi,
+  updateScheduleApi,
+  deleteScheduleApi,
 } from "./services/api";
 
 export default function App() {
@@ -201,6 +213,17 @@ export default function App() {
   const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [intakeNoticeData, setIntakeNoticeData] = useState(null);
+
+  // 실시간 알림 & 조사 일정 상태
+  const [notifications, setNotifications] = useState([]);
+  const [schedules, setSchedules] = useState([]);
+  const [isIndictmentModalOpen, setIsIndictmentModalOpen] = useState(false);
+  const [indictmentCaseItem, setIndictmentCaseItem] = useState(null);
+  const [summonsModalInfo, setSummonsModalInfo] = useState(null);
+
+  const unreadNotificationsCount = useMemo(() => {
+    return (notifications || []).filter((n) => !n.isRead).length;
+  }, [notifications]);
 
   // Compute total alert counts for Header badge
   // Note: this should only count genuinely imminent deadlines instead of any active status.
@@ -325,6 +348,8 @@ export default function App() {
         fetchCaseNumberSettings(),
         fetchDepartments(),
         fetchCharges(),
+        fetchNotifications(),
+        fetchSchedules(),
       ]);
 
       if (Array.isArray(serverCases)) setLedgerData(serverCases);
@@ -341,6 +366,10 @@ export default function App() {
       if (Array.isArray(serverDepartments) && serverDepartments.length > 0)
         setDepartmentsData(serverDepartments);
       if (Array.isArray(serverCharges)) setChargesData(serverCharges);
+      if (Array.isArray(serverNotifications?.notifications))
+        setNotifications(serverNotifications.notifications);
+      if (Array.isArray(serverSchedules?.schedules))
+        setSchedules(serverSchedules.schedules);
 
       // 문서번호 카운터 서버 동기화
       if (nextDocNoRes && nextDocNoRes.seq) {
@@ -349,6 +378,88 @@ export default function App() {
     }
     loadDbData();
   }, [currentUser]);
+
+  // 실시간 SSE 알림 스트림 구독
+  useEffect(() => {
+    if (!currentUser) return;
+    const token = sessionStorage.getItem("dose_pros_token");
+    if (!token) return;
+
+    let eventSource = null;
+    try {
+      eventSource = createSseEventSource(token);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "CONNECTED") return;
+
+          // 알림 목록에 추가
+          setNotifications((prev) => [data, ...prev]);
+
+          // 실시간 토스트 팝업
+          showToast(`🔔 [${data.title}] ${data.message}`, "info", 5000);
+
+          // 관련 데이터 자동 갱신
+          if (data.type === "CASE_ASSIGNED") {
+            fetchCases().then((res) => {
+              if (Array.isArray(res)) setLedgerData(res);
+            });
+          } else if (
+            data.type === "APPROVAL_REQ" ||
+            data.type === "APPROVAL_RESULT"
+          ) {
+            fetchApprovals().then((res) => {
+              if (Array.isArray(res)) setApprovalsData(res);
+            });
+          } else if (data.type === "SCHEDULE") {
+            fetchSchedules().then((res) => {
+              if (Array.isArray(res?.schedules)) setSchedules(res.schedules);
+            });
+          }
+        } catch (err) {
+          console.warn("[SSE Message Parse Error]", err);
+        }
+      };
+
+      eventSource.onerror = () => {
+        // 브라우저가 자동 재연결 시도
+      };
+    } catch (err) {
+      console.warn("[SSE Connection Error]", err);
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [currentUser]);
+
+  // 알림 액션 핸들러
+  const handleMarkNotificationRead = async (id) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: 1 } : n)),
+    );
+    await markNotificationReadApi(id).catch(() => {});
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: 1 })));
+    await markAllNotificationsReadApi().catch(() => {});
+    showToast("모든 알림을 읽음 처리했습니다.", "success");
+  };
+
+  const handleDeleteNotification = async (id) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    await deleteNotificationApi(id).catch(() => {});
+  };
+
+  const handleNavigateFromNotification = (linkTab, linkId) => {
+    if (linkTab) {
+      setActiveTab(linkTab);
+    }
+  };
 
   const operationalProsecutorsList = useMemo(
     () =>
@@ -1563,6 +1674,12 @@ export default function App() {
         onToggleTheme={toggleTheme}
         isReadOnly={isReadOnly}
         onReturnToActive={handleReturnToActive}
+        notifications={notifications}
+        unreadNotificationsCount={unreadNotificationsCount}
+        onMarkNotificationRead={handleMarkNotificationRead}
+        onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+        onDeleteNotification={handleDeleteNotification}
+        onNavigateFromNotification={handleNavigateFromNotification}
       />
 
       {/* Main Container */}
@@ -1914,6 +2031,10 @@ export default function App() {
                 onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
                 onOpenMemo={(caseItem) => setMemoCaseItem(caseItem)}
                 onOpenApprovalForCase={handleCreateApprovalForCase}
+                onOpenIndictmentComposer={(caseItem) => {
+                  setIndictmentCaseItem(caseItem);
+                  setIsIndictmentModalOpen(true);
+                }}
                 onUpdateCase={handleUpdateCase}
                 onArchiveCase={handleArchiveCase}
                 onOpenLoginModal={() => setIsLoginModalOpen(true)}
@@ -1923,6 +2044,28 @@ export default function App() {
                   handleDesignateCase(caseId, currentUser)
                 }
                 onUndesignateCase={handleUndesignateCase}
+              />
+            )}
+
+            {activeTab === "schedule" && (
+              <InvestigationCalendar
+                schedules={schedules}
+                ledgerData={scopedLedgerData}
+                currentUser={currentUser}
+                showToast={showToast}
+                onOpenSummonsModal={(scheduleItem, caseItem) =>
+                  setSummonsModalInfo({ scheduleItem, caseItem })
+                }
+                onSchedulesUpdated={() => {
+                  fetchSchedules().then((res) => {
+                    if (Array.isArray(res?.schedules))
+                      setSchedules(res.schedules);
+                  });
+                }}
+                onNavigateToCase={(caseItem) => {
+                  setActiveTab("mycases");
+                  setTimelineCaseItem(caseItem);
+                }}
               />
             )}
 
@@ -1954,6 +2097,10 @@ export default function App() {
                 onOpenTimeline={(caseItem) => setTimelineCaseItem(caseItem)}
                 onOpenMemo={(caseItem) => setMemoCaseItem(caseItem)}
                 onCreateApproval={handleCreateApprovalForCase}
+                onOpenIndictmentComposer={(caseItem) => {
+                  setIndictmentCaseItem(caseItem);
+                  setIsIndictmentModalOpen(true);
+                }}
                 onUpdateCase={handleUpdateCase}
                 onArchiveCase={handleArchiveCase}
                 currentRole={currentUser?.id || ""}
@@ -2340,6 +2487,88 @@ export default function App() {
           setActiveTab("approvals");
         }}
       />
+
+      {/* HWP 공소장 자동작성기 모달 */}
+      {isIndictmentModalOpen && (
+        <IndictmentComposerModal
+          isOpen={isIndictmentModalOpen}
+          onClose={() => {
+            setIsIndictmentModalOpen(false);
+            setIndictmentCaseItem(null);
+          }}
+          initialCase={indictmentCaseItem}
+          ledgerData={scopedLedgerData}
+          chargesData={chargesData}
+          currentUser={currentUser}
+          showToast={showToast}
+          onCreateApprovalFromIndictment={({
+            templateHtml,
+            caseItem,
+            docTitle,
+            dispositionType,
+          }) => {
+            const newDoc = {
+              docNo: `공소-${new Date().getFullYear()}-${String(docNoCounter).padStart(4, "0")}`,
+              docType: "indictment",
+              docTypeName: "공소장",
+              title:
+                docTitle ||
+                `공소장 (${caseItem?.sujeNo || caseItem?.hyeongjeNo || ""})`,
+              hyeongjeNo: caseItem?.sujeNo || caseItem?.hyeongjeNo || "",
+              prosecutorId: currentUser.id,
+              prosecutorName: currentUser.name,
+              suspectName: caseItem?.suspectName || "",
+              dispositionType: dispositionType || "구공판(기소)",
+              chargeName: caseItem?.chargeName || "",
+              summary: "공소 제기 및 공소장 결재 상신",
+              status: "대기",
+              hwpHtml: templateHtml,
+              approvals: [
+                {
+                  role: "주임검사",
+                  name: currentUser.name,
+                  status: "상신완료",
+                  date: new Date()
+                    .toISOString()
+                    .replace("T", " ")
+                    .substring(0, 16),
+                },
+                {
+                  role: "부장검사",
+                  name: "부장검사",
+                  status: "결재대기",
+                  date: "-",
+                },
+                {
+                  role: "지검장",
+                  name: "지검장",
+                  status: "결재대기",
+                  date: "-",
+                },
+              ],
+            };
+            handleSaveNewApproval(newDoc);
+            setActiveTab("approvals");
+          }}
+        />
+      )}
+
+      {/* 소환통지서(출석요구서) 서식 및 발급 모달 */}
+      {summonsModalInfo && (
+        <SummonsModal
+          isOpen={Boolean(summonsModalInfo)}
+          onClose={() => setSummonsModalInfo(null)}
+          scheduleItem={summonsModalInfo.scheduleItem}
+          caseItem={summonsModalInfo.caseItem}
+          currentUser={currentUser}
+          showToast={showToast}
+          onScheduleUpdated={() => {
+            fetchSchedules().then((res) => {
+              if (Array.isArray(res?.schedules)) setSchedules(res.schedules);
+            });
+          }}
+        />
+      )}
 
       {/* Footer */}
       <footer

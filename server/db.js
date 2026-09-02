@@ -456,5 +456,45 @@ export async function initDb() {
     )
   `);
 
+  // ── notifications (실시간 웹 알림 영속화) ────────────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id          TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL,
+      type        TEXT NOT NULL,
+      title       TEXT NOT NULL,
+      message     TEXT NOT NULL,
+      link_tab    TEXT DEFAULT '',
+      link_id     TEXT DEFAULT '',
+      is_read     INTEGER DEFAULT 0,
+      created_at  TEXT DEFAULT (datetime('now')),
+      deleted_at  TEXT DEFAULT ''
+    )
+  `);
+
+  // ── investigation_schedules (조사/신문 일정 및 소환 관리) ─────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS investigation_schedules (
+      id                TEXT PRIMARY KEY,
+      case_id           TEXT NOT NULL,
+      hyeongje_no       TEXT NOT NULL,
+      target_type       TEXT NOT NULL DEFAULT 'SUSPECT',
+      target_name       TEXT NOT NULL,
+      target_contact    TEXT DEFAULT '',
+      scheduled_at      TEXT NOT NULL,
+      location          TEXT DEFAULT '검사실',
+      investigator_id   TEXT NOT NULL,
+      investigator_name TEXT NOT NULL,
+      purpose           TEXT DEFAULT '',
+      status            TEXT DEFAULT 'SCHEDULED',
+      summons_doc_no    TEXT DEFAULT '',
+      summons_issued_at TEXT DEFAULT '',
+      notes             TEXT DEFAULT '',
+      created_by        TEXT NOT NULL,
+      created_at        TEXT DEFAULT (datetime('now')),
+      deleted_at        TEXT DEFAULT ''
+    )
+  `);
+
   console.log("[DB] 테이블 초기화 완료");
 }
