@@ -589,11 +589,35 @@ export default function App() {
     return map;
   }, [prosecutorsList]);
 
+  // 관장 부서 목록 (본인 소속 부서 + 겸직/직무대리로 부서장 지정된 부서)
+  const userManagedDeptNames = useMemo(() => {
+    if (!currentUser) return new Set();
+    const set = new Set(currentUser.dept ? [currentUser.dept] : []);
+    if (Array.isArray(departmentsData)) {
+      departmentsData.forEach((d) => {
+        if (!d) return;
+        const matchId = Boolean(
+          currentUser.id && d.headId && d.headId === currentUser.id,
+        );
+        const matchName = Boolean(
+          currentUser.name &&
+            d.headName &&
+            typeof d.headName === "string" &&
+            d.headName.includes(currentUser.name),
+        );
+        if (matchId || matchName) {
+          set.add(d.name);
+        }
+      });
+    }
+    return set;
+  }, [departmentsData, currentUser]);
+
   const isProsecutorInUserDept = (prosecutorNameOrId) => {
     if (isGlobalAdmin || !currentUser) return true;
     if (!prosecutorNameOrId) return true;
     const dept = prosecutorDeptMap.get(prosecutorNameOrId);
-    return dept !== undefined ? dept === currentUser.dept : true;
+    return dept !== undefined ? userManagedDeptNames.has(dept) : true;
   };
 
   const CLOSED_KEYWORDS = [

@@ -1076,36 +1076,46 @@ export default function MyCasesLedger({
     );
   }
 
-  const isHighAdmin =
-    currentUser.isSuperAdmin ||
-    [
-      "SUPER_ADMIN",
-      "PROSECUTOR_GENERAL",
-      "CHIEF_PROSECUTOR",
-      "DEPUTY_CHIEF",
-      "CHIEF_ADMINISTRATOR",
-    ].includes(currentUser.roleLevel);
+  const isHighAdmin = Boolean(
+    currentUser?.isSuperAdmin ||
+      [
+        "SUPER_ADMIN",
+        "PROSECUTOR_GENERAL",
+        "CHIEF_PROSECUTOR",
+        "DEPUTY_CHIEF",
+        "CHIEF_ADMINISTRATOR",
+      ].includes(currentUser?.roleLevel),
+  );
 
   // 결재 필수 지정/해제 권한 — 수사지휘 라인(부장검사 이상)만 허용.
   // 검찰관리관(CHIEF_ADMINISTRATOR) 등 행정 직급은 수사 지휘권이 없으므로 제외.
-  const canDesignate =
-    currentUser.isSuperAdmin ||
-    [
-      "SUPER_ADMIN",
-      "PROSECUTOR_GENERAL",
-      "CHIEF_PROSECUTOR",
-      "DEPUTY_CHIEF",
-      "SENIOR_PROSECUTOR",
-    ].includes(currentUser.roleLevel);
+  const canDesignate = Boolean(
+    currentUser?.isSuperAdmin ||
+      [
+        "SUPER_ADMIN",
+        "PROSECUTOR_GENERAL",
+        "CHIEF_PROSECUTOR",
+        "DEPUTY_CHIEF",
+        "SENIOR_PROSECUTOR",
+      ].includes(currentUser?.roleLevel),
+  );
 
   // 관장 부서 목록 (본인 소속 부서 + 겸직/직무대리로 부서장 지정된 부서)
   const managedDepts = useMemo(() => {
-    if (!Array.isArray(departmentsData)) return [];
-    return departmentsData.filter(
-      (dept) =>
-        (dept.headId && dept.headId === currentUser?.id) ||
-        (dept.headName && dept.headName.includes(currentUser?.name)),
-    );
+    if (!Array.isArray(departmentsData) || !currentUser) return [];
+    const userId = currentUser.id || "";
+    const userName = currentUser.name || "";
+    return departmentsData.filter((dept) => {
+      if (!dept) return false;
+      const matchId = Boolean(userId && dept.headId && dept.headId === userId);
+      const matchName = Boolean(
+        userName &&
+          dept.headName &&
+          typeof dept.headName === "string" &&
+          dept.headName.includes(userName),
+      );
+      return matchId || matchName;
+    });
   }, [departmentsData, currentUser]);
 
   const isDeptHeadAssigned = managedDepts.length > 0;
@@ -1115,7 +1125,8 @@ export default function MyCasesLedger({
     () =>
       new Set(
         managedDepts
-          .map((d) => d.name)
+          .map((d) => d?.name)
+          .filter(Boolean)
           .concat(currentUser?.dept ? [currentUser.dept] : []),
       ),
     [managedDepts, currentUser],
@@ -1143,12 +1154,13 @@ export default function MyCasesLedger({
     PROSECUTOR_GENERAL: 80,
     SUPER_ADMIN: 100,
   };
-  const deptMembers = prosecutorsList.filter(
+  const deptMembers = (prosecutorsList || []).filter(
     (p) =>
+      p &&
       managedDeptNames.has(p.dept) &&
-      p.id !== currentUser.id &&
+      p.id !== currentUser?.id &&
       (ROLE_AUTHORITY_CLIENT[p.roleLevel] || 0) <
-        (ROLE_AUTHORITY_CLIENT[currentUser.roleLevel] || 0),
+        (ROLE_AUTHORITY_CLIENT[currentUser?.roleLevel] || 0),
   );
 
   const handleLeaveChange = async () => {
