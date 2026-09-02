@@ -616,6 +616,14 @@ export default function App() {
   const isProsecutorInUserDept = (prosecutorNameOrId) => {
     if (isGlobalAdmin || !currentUser) return true;
     if (!prosecutorNameOrId) return true;
+    if (
+      prosecutorNameOrId === currentUser.id ||
+      (currentUser.name &&
+        (prosecutorNameOrId.includes(currentUser.name) ||
+          currentUser.name.includes(prosecutorNameOrId)))
+    ) {
+      return true;
+    }
     const dept = prosecutorDeptMap.get(prosecutorNameOrId);
     return dept !== undefined ? userManagedDeptNames.has(dept) : true;
   };
@@ -641,9 +649,23 @@ export default function App() {
   const scopeRecords = (records, includeOwnRecord = false) => {
     if (isGlobalAdmin) return records;
     return records.filter((item) => {
-      if (includeOwnRecord && item.prosecutorId === currentUser?.id)
+      if (!item) return false;
+      if (
+        includeOwnRecord &&
+        currentUser &&
+        ((item.prosecutorId && item.prosecutorId === currentUser.id) ||
+          (item.prosecutorName &&
+            currentUser.name &&
+            (item.prosecutorName.includes(currentUser.name) ||
+              currentUser.name.includes(item.prosecutorName))))
+      ) {
         return true;
-      if (isProsecutorInUserDept(item.prosecutorName)) return true;
+      }
+      if (
+        isProsecutorInUserDept(item.prosecutorName) ||
+        isProsecutorInUserDept(item.prosecutorId)
+      )
+        return true;
       if (item.isArchived) return true;
       const disp = (item.disposition || "").toLowerCase();
       const status = (item.bookingStatus || "").toLowerCase();
@@ -655,7 +677,7 @@ export default function App() {
 
   const scopedLedgerData = useMemo(
     () => scopeRecords(ledgerData, true),
-    [ledgerData, isGlobalAdmin, currentUser, prosecutorDeptMap],
+    [ledgerData, isGlobalAdmin, currentUser, prosecutorDeptMap, userManagedDeptNames],
   );
   const scopedApprovalsData = useMemo(
     () => scopeRecords(approvalsData, true),

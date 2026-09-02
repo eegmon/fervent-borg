@@ -284,10 +284,12 @@ export function calculateStatuteOfLimitations(
   const mm = String(expireDate.getMonth() + 1).padStart(2, "0");
   const dd = String(expireDate.getDate()).padStart(2, "0");
   const expireStr = `${yyyy}.${mm}.${dd} (KST)`;
+  const expireIso = `${yyyy}-${mm}-${dd}`;
 
   return {
     periodDays,
     expireDateStr: expireStr,
+    expireDateIso: expireIso,
     dDay,
     isExpired: dDay <= 0,
     dDayText: dDay <= 0 ? "공소시효 완성 (만료)" : `시효 만료 D-${dDay}`,

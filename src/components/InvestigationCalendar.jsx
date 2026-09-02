@@ -37,6 +37,14 @@ const STATUS_CONFIG = {
   CANCELLED: { label: "취소", bg: "rgba(148,163,184,0.15)", color: "#94a3b8" },
 };
 
+function formatLocalYmd(d) {
+  if (!d || isNaN(d.getTime())) return "";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function InvestigationCalendar({
   schedules = [],
   ledgerData = [],
@@ -90,7 +98,11 @@ export default function InvestigationCalendar({
         c.chargeName,
         c.incidentDate || c.bookingDate,
       );
-      if (sol.isUnlimited || !sol.expireDateStr) return;
+      if (sol.periodDays === Infinity || (!sol.expireDateIso && !sol.expireDateStr)) return;
+
+      const eventDateStr =
+        sol.expireDateIso ||
+        (sol.expireDateStr ? sol.expireDateStr.slice(0, 10).replace(/\./g, "-") : "");
 
       const isMyCase =
         c.prosecutorId === currentUser?.id ||
@@ -99,9 +111,9 @@ export default function InvestigationCalendar({
       list.push({
         id: `STATUTE-${c.id}`,
         type: "STATUTE",
-        dateStr: sol.expireDateStr, // YYYY-MM-DD
+        dateStr: eventDateStr,
         title: `[공소시효 만료] ${c.sujeNo || c.hyeongjeNo}`,
-        subtitle: `${c.suspectName} · ${c.chargeName}`,
+        subtitle: `${c.suspectName || "-"} · ${c.chargeName || "-"}`,
         dDay: sol.dDay,
         dDayText: sol.dDayText,
         lawArticle: sol.lawArticle,
@@ -134,7 +146,7 @@ export default function InvestigationCalendar({
         ? new Date(c.bookingDate.replace(/\./g, "-"))
         : now;
       const expireDate = new Date(baseDate.getTime() + 48 * 60 * 60 * 1000);
-      const expireDateStr = expireDate.toISOString().slice(0, 10);
+      const expireDateStr = formatLocalYmd(expireDate);
       const diffHours = Math.ceil((expireDate - now) / (1000 * 60 * 60));
 
       const isMyCase =
@@ -182,21 +194,21 @@ export default function InvestigationCalendar({
   const allEvents = useMemo(() => {
     let list = [];
     if (selectedCategory === "ALL" || selectedCategory === "SCHEDULE") {
-      list = list.concat(scheduleEvents);
+      list.push(...scheduleEvents);
     }
     if (selectedCategory === "ALL" || selectedCategory === "STATUTE") {
-      list = list.concat(statuteEvents);
+      list.push(...statuteEvents);
     }
     if (selectedCategory === "ALL" || selectedCategory === "ARREST") {
-      list = list.concat(arrestEvents);
+      list.push(...arrestEvents);
     }
 
     if (myOnly) {
-      list = list.filter((e) => e.isMyCase || e.isMySchedule);
+      list = list.filter((e) => e.isMySchedule || e.isMyCase);
     }
 
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
       list = list.filter(
         (e) =>
           e.title.toLowerCase().includes(q) ||
@@ -233,7 +245,7 @@ export default function InvestigationCalendar({
       const prevDate = new Date(year, month - 1, d);
       days.push({
         date: prevDate,
-        dateStr: prevDate.toISOString().slice(0, 10),
+        dateStr: formatLocalYmd(prevDate),
         dayNum: d,
         isCurrentMonth: false,
       });
@@ -244,7 +256,7 @@ export default function InvestigationCalendar({
       const thisDate = new Date(year, month, d);
       days.push({
         date: thisDate,
-        dateStr: thisDate.toISOString().slice(0, 10),
+        dateStr: formatLocalYmd(thisDate),
         dayNum: d,
         isCurrentMonth: true,
       });
@@ -256,7 +268,7 @@ export default function InvestigationCalendar({
       const nextDate = new Date(year, month + 1, d);
       days.push({
         date: nextDate,
-        dateStr: nextDate.toISOString().slice(0, 10),
+        dateStr: formatLocalYmd(nextDate),
         dayNum: d,
         isCurrentMonth: false,
       });

@@ -1232,22 +1232,48 @@ export default function MyCasesLedger({
     });
   };
 
-  const targetProsecutorName =
-    isHighAdmin && selectedProsecutorFilter
-      ? selectedProsecutorFilter
-      : currentUser.name;
+  const canSelectProsecutor = Boolean(
+    isHighAdmin || isDeptHeadAssigned || isSeniorProsecutor,
+  );
 
-  // 담당자 필터 적용 (전체 목록 — 보존 포함)
-  const myCases = ledgerData.filter((item) => {
-    if (!item) return false;
-    // targetProsecutorName이 비어 있으면 본인 사건만
-    const target = targetProsecutorName || currentUser.name;
-    const pName = item.prosecutorName || "";
-    return pName.includes(target) || target.includes(pName);
-  });
+  const targetProsecutorName =
+    canSelectProsecutor && selectedProsecutorFilter
+      ? selectedProsecutorFilter
+      : currentUser?.name || "";
+
+  // 담당자 필터 적용 (본인이 명의인 사건만 엄격 매칭)
+  const myCases = useMemo(() => {
+    if (!Array.isArray(ledgerData) || !currentUser) return [];
+
+    const target = targetProsecutorName || currentUser?.name || "";
+    const userId = currentUser?.id || "";
+
+    return ledgerData.filter((item) => {
+      if (!item) return false;
+      const pName = item.prosecutorName || "";
+      const pId = item.prosecutorId || "";
+
+      const matchId = Boolean(
+        (userId && pId === userId) || (target && pId === target),
+      );
+      const matchName = Boolean(
+        target && (pName.includes(target) || target.includes(pName)),
+      );
+
+      return matchId || matchName;
+    });
+  }, [ledgerData, currentUser, targetProsecutorName]);
+
+  const prosecutorOptions = useMemo(() => {
+    if (!canSelectProsecutor) return [];
+    const sourceList = isHighAdmin ? prosecutorsList : deptMembers;
+    return (sourceList || []).filter(
+      (p) => p && p.name && p.name !== currentUser?.name,
+    );
+  }, [canSelectProsecutor, isHighAdmin, prosecutorsList, deptMembers, currentUser]);
 
   // 현재 처리중 사건 = 보존 제외
-  const myActiveCases = myCases.filter((c) => !c.isArchived);
+  const myActiveCases = myCases.filter((c) => !c?.isArchived);
 
   const filteredMyCases = myCases.filter((item) => {
     const q = searchTerm.toLowerCase().trim();
@@ -1444,7 +1470,7 @@ export default function MyCasesLedger({
               </div>
             </div>
           </div>
-          {isHighAdmin && (
+          {canSelectProsecutor && (
             <div
               style={{
                 display: "flex",
@@ -1461,20 +1487,18 @@ export default function MyCasesLedger({
               </span>
               <select
                 className="select-field"
-                style={{ width: 150, fontSize: "0.78rem" }}
+                style={{ width: 160, fontSize: "0.78rem" }}
                 value={selectedProsecutorFilter}
                 onChange={(e) => setSelectedProsecutorFilter(e.target.value)}
               >
-                <option value={currentUser.name}>
-                  {currentUser.name} (나)
+                <option value={currentUser?.name}>
+                  {currentUser?.name} (나)
                 </option>
-                {prosecutorsList
-                  .filter((p) => p.name !== currentUser.name)
-                  .map((p) => (
-                    <option key={p.id} value={p.name}>
-                      {p.name} ({p.title})
-                    </option>
-                  ))}
+                {prosecutorOptions.map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.name} ({p.position || p.title || "검사"})
+                  </option>
+                ))}
               </select>
             </div>
           )}
