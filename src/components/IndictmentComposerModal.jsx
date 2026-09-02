@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { fetchEvidence } from "../services/api";
+import { HWP_TEMPLATES } from "../data/hwpTemplates";
 
 export default function IndictmentComposerModal({
   isOpen,
@@ -181,108 +182,119 @@ export default function IndictmentComposerModal({
       selectedEvidenceIds.has(e.id),
     );
 
-    const defendantsHtml = defendants
-      .map(
-        (d, idx) => `
-      <tr>
-        <td style="border: 1px solid #000; padding: 8px 12px; font-weight: bold; background: #f8fafc; text-align: center; width: 20%;">피 고 인 ${defendants.length > 1 ? idx + 1 : ""}</td>
-        <td style="border: 1px solid #000; padding: 8px 12px;" colspan="3">
-          <strong>${d.name || "(성명 미상)"}</strong> (UUID: ${d.uuid || "미상"})<br/>
-          주거: ${d.address || "주거부정"} · 직업: ${d.job || "무직"}<br/>
-          신병 상태: <span style="font-weight: bold; color: ${d.detentionStatus === "구속" ? "#b91c1c" : "#1e3a8a"};">[${d.detentionStatus}]</span>
-        </td>
-      </tr>
-    `,
-      )
-      .join("");
-
-    const chargeNamesStr = chargesList.map((c) => c.name).filter(Boolean).join(", ");
+    const chargeNamesStr = chargesList
+      .map((c) => c.name)
+      .filter(Boolean)
+      .join(", ");
     const lawArticlesStr = chargesList
       .map((c) => c.lawArticle)
       .filter(Boolean)
-      .join("<br/>");
+      .join(", ");
 
     let evidenceRows = "";
     if (selectedEvidences.length > 0) {
       evidenceRows = selectedEvidences
-        .map((e, idx) => `<div>${idx + 1}. ${e.title} (${e.evidenceType || "증거기록"})</div>`)
-        .join("");
+        .map(
+          (e, idx) =>
+            `${idx + 1}. ${e.title} (${e.evidenceType || "증거기록"})`,
+        )
+        .join("<br/>");
     }
     if (customEvidenceText) {
-      evidenceRows += `<div style="margin-top: 4px;">${customEvidenceText.replace(/\n/g, "<br/>")}</div>`;
+      evidenceRows +=
+        (evidenceRows ? "<br/>" : "") +
+        customEvidenceText.replace(/\n/g, "<br/>");
     }
     if (!evidenceRows) {
-      evidenceRows = "<div>1. 피고인의 일부 법정진술<br/>2. 사법경찰관 작성의 수사보고서 및 관련 증거</div>";
+      evidenceRows =
+        "1. 피고인의 일부 법정진술<br/>2. 사법경찰관 작성의 수사보고서 및 관련 증거";
     }
 
+    if (!form14) {
+      return `<div>서식을 불러올 수 없습니다.</div>`;
+    }
+
+    const firstDef = defendants[0] || {};
+    const defName = firstDef.name || "(성명 미상)";
+    const defUuid = firstDef.uuid || "";
+    const defJob = firstDef.job || "무직";
+    const defAddr = firstDef.address || "주거 부정";
+    const defDetention = firstDef.detentionStatus || "불구속";
+
+    let html = form14.html;
+
+    // 1. 사건번호 및 일자
+    html = html.replace(/2025년 형제0000호/g, docNo || `${year}년 형제0000호`);
+    html = html.replace(/2025\. 00\. 00\./g, `${year}. ${month}. ${day}.`);
+    html = html.replace(/도스온라인 법원/g, courtName);
+    html = html.replace(
+      /검사 ○○○은\(는\)/g,
+      `검사 ${prosecutorName}은(는)`,
+    );
+
+    // 2. 피고인 인적사항
+    html = html.replace(
+      /○○○\(UUID\)/g,
+      `<strong>${defName}</strong>${defUuid ? ` (${defUuid})` : ""}`,
+    );
+    html = html.replace(/직업&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; , 연락처 discord@/g, `직업: ${defJob}`);
+    html = html.replace(/주거/g, `주거: ${defAddr}`);
+    html = html.replace(
+      /2025\. 00\. 00\. 구속 \(2025\. 00\. 00\. 체포\)/g,
+      defDetention === "구속"
+        ? `<strong style="color:#b91c1c;">[구속]</strong>`
+        : `[불구속]`,
+    );
+
+    // 3. 죄명 & 적용법조 (테이블 내 빈 <td> 영역 치환)
+    const tdPattern = /(<td[^>]*>\s*<p class=HStyle0>\s*<span[^>]*>&nbsp;<\/span><\/p>\s*<\/td>)/gi;
+    let tdMatches = 0;
+    html = html.replace(tdPattern, (match) => {
+      tdMatches++;
+      if (tdMatches === 1) {
+        // 죄명
+        return `<td colspan="3" valign="middle" style="padding:4pt 8pt;"><p class=HStyle0><span style="font-size:11pt;font-family:'한컴바탕';font-weight:bold;">${chargeNamesStr || "형법 위반"}</span></p></td>`;
+      }
+      if (tdMatches === 2) {
+        // 적용법조
+        return `<td colspan="3" valign="middle" style="padding:4pt 8pt;"><p class=HStyle0><span style="font-size:10.5pt;font-family:'한컴바탕';">${lawArticlesStr || "형법 및 해당 법령 조항"}</span></p></td>`;
+      }
+      return match;
+    });
+
+    // 4. Ⅱ. 공소사실 영역
+    const crimeFactsContent = crimeFacts
+      ? crimeFacts.replace(/\n/g, "<br/>")
+      : "공소사실을 입력해주세요.";
+    html = html.replace(
+      /(Ⅱ\. 공소사실[\s\S]*?<td[^>]*>)([\s\S]*?)(<\/td>)/i,
+      `$1<div style="font-size:11pt;font-family:'한컴바탕';line-height:200%;padding:10px;">${crimeFactsContent}</div>$3`,
+    );
+
+    // 5. Ⅲ. 첨부서류 (증거의 요지 & 압수물) 영역
+    const attachedDocsContent =
+      `<div style="font-weight:bold;margin-bottom:6px;">[ 증 거 의  요 지 ]</div>` +
+      `<div style="line-height:180%;margin-bottom:12px;">${evidenceRows}</div>` +
+      (confiscationText
+        ? `<div style="font-weight:bold;margin-bottom:6px;">[ 압 수 물 ]</div><div style="line-height:180%;">${confiscationText.replace(/\n/g, "<br/>")}</div>`
+        : "");
+
+    html = html.replace(
+      /(Ⅲ\. 첨부서류[\s\S]*?<td[^>]*>)([\s\S]*?)(<\/td>)/i,
+      `$1<div style="font-size:10.5pt;font-family:'한컴바탕';line-height:180%;padding:10px;">${attachedDocsContent}</div>$3`,
+    );
+
+    // 6. 검사 서명란
+    html = html.replace(
+      /○&nbsp; ○&nbsp; ○/g,
+      `${prosecutorName}`,
+    );
+
     return `
-<div style="font-family: '한컴바탕', 'Batang', serif; max-width: 760px; margin: 0 auto; padding: 40px 30px; background: #fff; color: #000; line-height: 1.8; border: 1px solid #cbd5e1;">
-  <div style="text-align: center; margin-bottom: 25px;">
-    <div style="font-size: 13pt; letter-spacing: 2px; font-weight: bold; color: #1e3a8a;">도스온라인 검찰청</div>
-    <div style="font-size: 26pt; font-weight: 900; letter-spacing: 16px; margin: 15px 0 10px; border-bottom: 2px solid #000; padding-bottom: 12px;">공 소 장</div>
-    <div style="font-size: 11pt; text-align: right; color: #475569; font-weight: bold;">사건번호: ${docNo || "2026형제0000호"}</div>
-  </div>
-
-  <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 11pt;">
-    ${defendantsHtml}
-    <tr>
-      <td style="border: 1px solid #000; padding: 8px 12px; font-weight: bold; background: #f8fafc; text-align: center;">죄    명</td>
-      <td style="border: 1px solid #000; padding: 8px 12px;" colspan="3"><strong>${chargeNamesStr || "형법 위반"}</strong></td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #000; padding: 8px 12px; font-weight: bold; background: #f8fafc; text-align: center;">적 용 법 조</td>
-      <td style="border: 1px solid #000; padding: 8px 12px;" colspan="3">${lawArticlesStr || "소송법 및 형법 해당 조항"}</td>
-    </tr>
-  </table>
-
-  <div style="margin-bottom: 25px;">
-    <div style="font-size: 13pt; font-weight: bold; margin-bottom: 10px; border-bottom: 1.5px solid #000; padding-bottom: 4px; display: inline-block;">
-      [ 공 소 사 실 ]
-    </div>
-    <div style="font-size: 11pt; text-indent: 12px; white-space: pre-wrap; line-height: 2; padding: 4px 6px;">
-${crimeFacts || "범죄 사실을 입력해주세요."}
-    </div>
-  </div>
-
-  <div style="margin-bottom: 25px;">
-    <div style="font-size: 13pt; font-weight: bold; margin-bottom: 10px; border-bottom: 1.5px solid #000; padding-bottom: 4px; display: inline-block;">
-      [ 증 거 의  요 지 ]
-    </div>
-    <div style="font-size: 10.5pt; line-height: 1.9; padding: 4px 6px; background: #f8fafc; border-left: 3px solid #1e3a8a;">
-      ${evidenceRows}
-    </div>
-  </div>
-
-  ${
-    confiscationText
-      ? `
-  <div style="margin-bottom: 25px;">
-    <div style="font-size: 13pt; font-weight: bold; margin-bottom: 10px; border-bottom: 1.5px solid #000; padding-bottom: 4px; display: inline-block;">
-      [ 압 수 물 ]
-    </div>
-    <div style="font-size: 10.5pt; line-height: 1.8; padding: 4px 6px;">
-      ${confiscationText}
-    </div>
-  </div>`
-      : ""
-  }
-
-  <div style="margin: 40px 0 20px; font-size: 12pt; text-align: center; font-weight: bold;">
-    위와 같이 공소를 제기합니다.
-  </div>
-
-  <div style="text-align: center; margin-top: 30px; font-size: 12pt;">
-    <div style="margin-bottom: 20px; letter-spacing: 2px;">${year}년 ${month}월 ${day}일</div>
-    <div style="font-size: 14pt; font-weight: bold; letter-spacing: 3px;">
-      도스온라인 검찰청 ${prosecutorRank} ${prosecutorName}
-      <span style="display: inline-block; width: 40px; height: 40px; border: 2.5px solid #b91c1c; border-radius: 50%; color: #b91c1c; font-size: 12px; line-height: 38px; text-align: center; vertical-align: middle; margin-left: 10px; font-weight: 900;">(인)</span>
-    </div>
-  </div>
-
-  <div style="margin-top: 45px; font-size: 14pt; font-weight: 900; letter-spacing: 4px; text-align: left;">
-    ${courtName}
-  </div>
-</div>
+      <style>${form14.style}</style>
+      <div style="font-family:'한컴바탕', 'Batang', serif; max-width: 780px; margin: 0 auto; background: #fff; padding: 25px; border: 1px solid #cbd5e1; box-sizing: border-box; color: #000;">
+        ${html}
+      </div>
     `.trim();
   }, [
     defendants,
