@@ -2719,6 +2719,16 @@ export default function SecretariatAdmin({
   const [selectedDeptId, setSelectedDeptId] = useState(
     departmentsData[0]?.id || "dept_tech",
   );
+  const [headSelectId, setHeadSelectId] = useState("");
+  const [headMode, setHeadMode] = useState("normal");
+
+  useEffect(() => {
+    const selectedDept = departmentsData.find(
+      (department) => department.id === selectedDeptId,
+    );
+    setHeadSelectId(selectedDept?.headId || "");
+    setHeadMode(selectedDept?.headMode || "normal");
+  }, [departmentsData, selectedDeptId]);
 
   const [selectedCaseNo, setSelectedCaseNo] = useState(
     ledgerData[0]?.sujeNo || "",
@@ -3866,139 +3876,129 @@ export default function SecretariatAdmin({
                             겸직 · 직무대리 포함 — 전체 검사 中 지정 가능
                           </span>
                         </div>
-                        {(() => {
-                          const [headSelectId, setHeadSelectId] =
-                            React.useState(currentDeptObj?.headId || "");
-                          const [headMode, setHeadMode] = React.useState(
-                            currentDeptObj?.headMode || "normal",
-                          );
-                          return (
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            flexWrap: "wrap",
+                            alignItems: "flex-end",
+                          }}
+                        >
+                          <div style={{ flex: "1 1 180px" }}>
                             <div
                               style={{
-                                display: "flex",
-                                gap: 8,
-                                flexWrap: "wrap",
-                                alignItems: "flex-end",
+                                fontSize: "0.7rem",
+                                color: "var(--text-muted)",
+                                marginBottom: 4,
                               }}
                             >
-                              <div style={{ flex: "1 1 180px" }}>
-                                <div
-                                  style={{
-                                    fontSize: "0.7rem",
-                                    color: "var(--text-muted)",
-                                    marginBottom: 4,
-                                  }}
-                                >
-                                  부서장 (전 소속 포함)
-                                </div>
-                                <select
-                                  className="select-field"
-                                  style={{ width: "100%", fontSize: "0.8rem" }}
-                                  value={headSelectId}
-                                  onChange={(e) =>
-                                    setHeadSelectId(e.target.value)
-                                  }
-                                >
-                                  <option value="">— 미지정 —</option>
-                                  {/* 현재 부서 부원 먼저 */}
-                                  {members.length > 0 && (
-                                    <optgroup label={`${deptName} 소속`}>
-                                      {members.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                          {p.name} ({ROLE_LABELS[p.roleLevel] || p.roleLevel})
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                  )}
-                                  {/* 타 부서 / 겸직 가능 인원 */}
-                                  {nonMembers.filter(
-                                    (p) => !p.isSuperAdmin,
-                                  ).length > 0 && (
-                                    <optgroup label="타 부서 (겸직 / 직무대리)">
-                                      {nonMembers
-                                        .filter((p) => !p.isSuperAdmin)
-                                        .map((p) => (
-                                          <option key={p.id} value={p.id}>
-                                            {p.name} [{p.dept}] ({ROLE_LABELS[p.roleLevel] || p.roleLevel})
-                                          </option>
-                                        ))}
-                                    </optgroup>
-                                  )}
-                                </select>
-                              </div>
-                              <div style={{ flex: "0 0 auto" }}>
-                                <div
-                                  style={{
-                                    fontSize: "0.7rem",
-                                    color: "var(--text-muted)",
-                                    marginBottom: 4,
-                                  }}
-                                >
-                                  지정 형태
-                                </div>
-                                <select
-                                  className="select-field"
-                                  style={{ fontSize: "0.8rem" }}
-                                  value={headMode}
-                                  onChange={(e) =>
-                                    setHeadMode(e.target.value)
-                                  }
-                                >
-                                  <option value="normal">정식 부서장</option>
-                                  <option value="acting">직무대리 (Acting)</option>
-                                  <option value="concurrent">겸직</option>
-                                </select>
-                              </div>
-                              <button
-                                type="button"
-                                className="btn btn-outline"
-                                style={{
-                                  padding: "7px 14px",
-                                  fontSize: "0.8rem",
-                                  color: "#a78bfa",
-                                  border: "1px solid rgba(167,139,250,0.45)",
-                                  flexShrink: 0,
-                                }}
-                                onClick={() => {
-                                  if (!onUpdateDepartment) return;
-                                  const selected = prosecutorsList.find(
-                                    (p) => p.id === headSelectId,
-                                  );
-                                  const modeLabel =
-                                    headMode === "acting"
-                                      ? "(직무대리)"
-                                      : headMode === "concurrent"
-                                        ? "(겸직)"
-                                        : "";
-                                  if (
-                                    !window.confirm(
-                                      headSelectId
-                                        ? `${selected?.name}${modeLabel}을(를) ${deptName} 부서장으로 지정하시겠습니까?`
-                                        : `${deptName} 부서장 지정을 해제하시겠습니까?`,
-                                    )
-                                  )
-                                    return;
-                                  onUpdateDepartment({
-                                    ...currentDeptObj,
-                                    headId: headSelectId,
-                                    headName: selected
-                                      ? `${selected.name}${modeLabel}`
-                                      : "",
-                                    headMode: headMode,
-                                  });
-                                  addLog(
-                                    "부서장 지정",
-                                    selected
-                                      ? `${selected.name}${modeLabel} → '${deptName}' 부서장 지정`
-                                      : `'${deptName}' 부서장 해제`,
-                                  );
-                                }}
-                              >
-                                <Crown size={13} /> 지정 저장
-                              </button>
+                              부서장 (전 소속 포함)
                             </div>
-                          );
-                        })()}
+                            <select
+                              className="select-field"
+                              style={{ width: "100%", fontSize: "0.8rem" }}
+                              value={headSelectId}
+                              onChange={(e) => setHeadSelectId(e.target.value)}
+                            >
+                              <option value="">— 미지정 —</option>
+                              {/* 현재 부서 부원 먼저 */}
+                              {members.length > 0 && (
+                                <optgroup label={`${deptName} 소속`}>
+                                  {members.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name} (
+                                      {ROLE_LABELS[p.roleLevel] || p.roleLevel})
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {/* 타 부서 / 겸직 가능 인원 */}
+                              {nonMembers.filter((p) => !p.isSuperAdmin)
+                                .length > 0 && (
+                                <optgroup label="타 부서 (겸직 / 직무대리)">
+                                  {nonMembers
+                                    .filter((p) => !p.isSuperAdmin)
+                                    .map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.name} [{p.dept}] (
+                                        {ROLE_LABELS[p.roleLevel] ||
+                                          p.roleLevel}
+                                        )
+                                      </option>
+                                    ))}
+                                </optgroup>
+                              )}
+                            </select>
+                          </div>
+                          <div style={{ flex: "0 0 auto" }}>
+                            <div
+                              style={{
+                                fontSize: "0.7rem",
+                                color: "var(--text-muted)",
+                                marginBottom: 4,
+                              }}
+                            >
+                              지정 형태
+                            </div>
+                            <select
+                              className="select-field"
+                              style={{ fontSize: "0.8rem" }}
+                              value={headMode}
+                              onChange={(e) => setHeadMode(e.target.value)}
+                            >
+                              <option value="normal">정식 부서장</option>
+                              <option value="acting">직무대리 (Acting)</option>
+                              <option value="concurrent">겸직</option>
+                            </select>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{
+                              padding: "7px 14px",
+                              fontSize: "0.8rem",
+                              color: "#a78bfa",
+                              border: "1px solid rgba(167,139,250,0.45)",
+                              flexShrink: 0,
+                            }}
+                            onClick={() => {
+                              if (!onUpdateDepartment) return;
+                              const selected = prosecutorsList.find(
+                                (p) => p.id === headSelectId,
+                              );
+                              const modeLabel =
+                                headMode === "acting"
+                                  ? "(직무대리)"
+                                  : headMode === "concurrent"
+                                    ? "(겸직)"
+                                    : "";
+                              if (
+                                !window.confirm(
+                                  headSelectId
+                                    ? `${selected?.name}${modeLabel}을(를) ${deptName} 부서장으로 지정하시겠습니까?`
+                                    : `${deptName} 부서장 지정을 해제하시겠습니까?`,
+                                )
+                              )
+                                return;
+                              onUpdateDepartment({
+                                ...currentDeptObj,
+                                headId: headSelectId,
+                                headName: selected
+                                  ? `${selected.name}${modeLabel}`
+                                  : "",
+                                headMode: headMode,
+                              });
+                              addLog(
+                                "부서장 지정",
+                                selected
+                                  ? `${selected.name}${modeLabel} → '${deptName}' 부서장 지정`
+                                  : `'${deptName}' 부서장 해제`,
+                              );
+                            }}
+                          >
+                            <Crown size={13} /> 지정 저장
+                          </button>
+                        </div>
                         <div
                           style={{
                             fontSize: "0.68rem",
@@ -4006,8 +4006,11 @@ export default function SecretariatAdmin({
                             marginTop: 8,
                           }}
                         >
-                          💡 <strong>겸직/직무대리</strong> 선택 시 타 부서 소속 상급자도 이 부서의 부서장 권한(사건 재배당·부원 휴직 처리)을 부여받습니다.
-                          부원 명단 테이블의 <strong>👑 현 부서장</strong> 배지는 정식 부원인 경우에만 표시됩니다.
+                          💡 <strong>겸직/직무대리</strong> 선택 시 타 부서 소속
+                          상급자도 이 부서의 부서장 권한(사건 재배당·부원 휴직
+                          처리)을 부여받습니다. 부원 명단 테이블의{" "}
+                          <strong>👑 현 부서장</strong> 배지는 정식 부원인
+                          경우에만 표시됩니다.
                         </div>
                       </div>
 
@@ -4238,7 +4241,8 @@ export default function SecretariatAdmin({
                                             borderRadius: 20,
                                             background: "rgba(245,158,11,0.15)",
                                             color: "var(--primary-amber)",
-                                            border: "1px solid rgba(245,158,11,0.4)",
+                                            border:
+                                              "1px solid rgba(245,158,11,0.4)",
                                             whiteSpace: "nowrap",
                                           }}
                                         >
@@ -4252,7 +4256,8 @@ export default function SecretariatAdmin({
                                             fontSize: "0.7rem",
                                             padding: "3px 10px",
                                             color: "#a78bfa",
-                                            border: "1px solid rgba(167,139,250,0.4)",
+                                            border:
+                                              "1px solid rgba(167,139,250,0.4)",
                                           }}
                                           title={`${p.name}을(를) ${deptName} 부서장으로 지정합니다`}
                                           onClick={() => {

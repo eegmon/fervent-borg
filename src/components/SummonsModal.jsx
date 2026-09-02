@@ -13,6 +13,7 @@ import {
   Shield,
 } from "lucide-react";
 import { updateScheduleApi } from "../services/api";
+import { HWP_TEMPLATES } from "../data/hwpTemplates";
 
 export default function SummonsModal({
   isOpen,
@@ -23,20 +24,22 @@ export default function SummonsModal({
   showToast,
   onScheduleUpdated,
 }) {
-  if (!isOpen || !scheduleItem) return null;
-
-  const [targetType, setTargetType] = useState(scheduleItem.targetType || "SUSPECT");
-  const [targetName, setTargetName] = useState(scheduleItem.targetName || "");
-  const [targetContact, setTargetContact] = useState(scheduleItem.targetContact || "");
-  const [scheduledAt, setScheduledAt] = useState(scheduleItem.scheduledAt || "");
-  const [location, setLocation] = useState(scheduleItem.location || "검찰청 검사실");
+  const [targetType, setTargetType] = useState(scheduleItem?.targetType || "SUSPECT");
+  const [targetName, setTargetName] = useState(scheduleItem?.targetName || "");
+  const [targetContact, setTargetContact] = useState(scheduleItem?.targetContact || "");
+  const [scheduledAt, setScheduledAt] = useState(scheduleItem?.scheduledAt || "");
+  const [location, setLocation] = useState(scheduleItem?.location || "검찰청 검사실");
   const [prosecutorName, setProsecutorName] = useState(
-    scheduleItem.investigatorName || caseItem?.prosecutorName || currentUser?.name || "담당검사",
+    scheduleItem?.investigatorName || caseItem?.prosecutorName || currentUser?.name || "담당검사",
   );
   const [chargeName, setChargeName] = useState(caseItem?.chargeName || "형사 피고사건");
-  const [purpose, setPurpose] = useState(scheduleItem.purpose || "피고사건에 관한 피의자 신문 조사");
+  const [crimeFactsSummary, setCrimeFactsSummary] = useState(
+    scheduleItem?.purpose || caseItem?.chargeName
+      ? `피의자 ${scheduleItem?.targetName || ""}에 대한 ${caseItem?.chargeName || "형사 피의사건"} 피의사실 요지\n\n피의자는 도스온라인 관할 구역 내에서 ${caseItem?.chargeName || "해당 범죄"}를 저질렀다는 혐의를 받고 있습니다.`
+      : "피의사실 요지를 입력하세요.",
+  );
   const [docNo, setDocNo] = useState(
-    scheduleItem.summonsDocNo ||
+    scheduleItem?.summonsDocNo ||
       `출석-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
   );
   const [isSaving, setIsSaving] = useState(false);
@@ -48,95 +51,104 @@ export default function SummonsModal({
   const day = todayStr.slice(8, 10);
 
   const isSuspect = targetType === "SUSPECT";
-  const displayCaseNo = caseItem?.sujeNo || caseItem?.hyeongjeNo || scheduleItem.hyeongjeNo || "2026형제0000호";
+  const displayCaseNo = caseItem?.sujeNo || caseItem?.hyeongjeNo || scheduleItem?.hyeongjeNo || `${year}형제0000호`;
+
+  // FORM_01 서식 가져오기
+  const form01 = HWP_TEMPLATES.find((t) => t.id === "FORM_01") || null;
+
+  // isOpen 가드: 모든 훅 이후에 배치 (React 훅 규칙 준수)
+  if (!isOpen || !scheduleItem) return null;
 
   // 포맷팅된 조사일시
-  const formattedScheduledAt = useMemo(() => {
-    if (!scheduledAt) return "2026년   월   일   시   분";
+  const formattedScheduledAt = (() => {
+    if (!scheduledAt) return "       .  .      (  )   시";
     try {
       const d = new Date(scheduledAt);
       if (isNaN(d)) return scheduledAt;
-      return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, "0")}시 ${String(d.getMinutes()).padStart(2, "0")}분`;
+      const ampm = d.getHours() < 12 ? "오전" : "오후";
+      const hour = d.getHours() % 12 || 12;
+      return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}. ${ampm} ${hour}시 ${String(d.getMinutes()).padStart(2, "0")}분`;
     } catch {
       return scheduledAt;
     }
-  }, [scheduledAt]);
+  })();
 
-  // HWP 및 복사용 HTML 서식
-  const summonsHtml = useMemo(() => {
-    const title = isSuspect ? "출 석 요 구 서" : "참고인 출석요구서";
-    const subNotice = isSuspect
-      ? `※ 정당한 사유 없이 출석요구에 응하지 아니하는 때에는 형사소송법 제200조의2의 규정에 의하여 체포영장이 발부될 수 있습니다.`
-      : `※ 부득이한 사유로 지정된 일시에 출석할 수 없는 때에는 미리 담당자에게 연락하여 일시를 변경하시기 바랍니다.`;
+  // HWP 공식 별지 제1호서식 기반 출석요구서 HTML 생성
+  const summonsHtml = (() => {
+    if (!form01) {
+      // 폴백: 기존 스타일 HTML
+      return `<div style="font-family:'한컴바탕','Batang',serif;max-width:720px;margin:0 auto;padding:30px;background:#fff;color:#000;border:1px solid #ccc;">
+        <div style="text-align:center;font-size:20pt;font-weight:900;letter-spacing:10px;margin:20px 0;">출 석 요 구 서</div>
+        <p>사건번호: ${displayCaseNo} / 죄명: ${chargeName} / 대상: ${targetName} / 출석일시: ${formattedScheduledAt}</p>
+      </div>`;
+    }
 
-    return `
-<div style="font-family: '한컴바탕', 'Batang', serif; max-width: 720px; margin: 0 auto; padding: 30px; background: #fff; color: #000; line-height: 1.8; border: 1px solid #ccc;">
-  <div style="text-align: center; margin-bottom: 25px;">
-    <div style="font-size: 13pt; letter-spacing: 2px; font-weight: bold; color: #1e3a8a;">도스온라인 검찰청</div>
-    <div style="font-size: 22pt; font-weight: 900; letter-spacing: 12px; margin: 15px 0 10px; border-bottom: 2px solid #000; padding-bottom: 10px;">${title}</div>
-    <div style="font-size: 10pt; text-align: right; color: #555;">문서번호: ${docNo}</div>
-  </div>
+    let html = form01.html;
 
-  <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11pt;">
-    <tr>
-      <td style="border: 1px solid #000; padding: 8px 12px; width: 22%; background: #f1f5f9; font-weight: bold; text-align: center;">사 건 번 호</td>
-      <td style="border: 1px solid #000; padding: 8px 12px; width: 28%;">${displayCaseNo}</td>
-      <td style="border: 1px solid #000; padding: 8px 12px; width: 22%; background: #f1f5f9; font-weight: bold; text-align: center;">죄    명</td>
-      <td style="border: 1px solid #000; padding: 8px 12px; width: 28%;">${chargeName}</td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #000; padding: 8px 12px; background: #f1f5f9; font-weight: bold; text-align: center;">피출석인 성명</td>
-      <td style="border: 1px solid #000; padding: 8px 12px;"><strong>${targetName}</strong> (${isSuspect ? "피의자" : "참고인"})</td>
-      <td style="border: 1px solid #000; padding: 8px 12px; background: #f1f5f9; font-weight: bold; text-align: center;">연  락  처</td>
-      <td style="border: 1px solid #000; padding: 8px 12px;">${targetContact || "미기재"}</td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #000; padding: 8px 12px; background: #f1f5f9; font-weight: bold; text-align: center;">출 석 일 시</td>
-      <td colspan="3" style="border: 1px solid #000; padding: 8px 12px; font-weight: bold; color: #1e3a8a;">${formattedScheduledAt}</td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #000; padding: 8px 12px; background: #f1f5f9; font-weight: bold; text-align: center;">출 석 장 소</td>
-      <td colspan="3" style="border: 1px solid #000; padding: 8px 12px;">${location}</td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #000; padding: 8px 12px; background: #f1f5f9; font-weight: bold; text-align: center;">출 석 목 적</td>
-      <td colspan="3" style="border: 1px solid #000; padding: 8px 12px;">${purpose}</td>
-    </tr>
-  </table>
+    // 1. 사건번호 치환: "2025형제0000호" 패턴
+    html = html.replace(
+      /\u00a0?2025<\/span><span[^>]*>형제0000호/,
+      `\u00a0${displayCaseNo}</span><span style='position:relative;font-size:11.0pt;font-family:"돋움체";line-height:230%'>`,
+    );
+    // 더 간단한 패턴으로 추가 시도
+    html = html.replace(/2025<\/span><span[^>]*>형제0000호<\/span>/, `${displayCaseNo}</span>`);
 
-  <div style="margin: 25px 0 35px; font-size: 11pt; text-indent: 10px; line-height: 2;">
-    귀하에 대한 위 사건의 조사를 위하여 위 일시 및 장소에 출석하여 주시기 바랍니다.<br/>
-    출석 시 신분증(주민등록증, 운전면허증 등) 및 사건 관련 소명자료가 있는 경우 이를 지참하시기 바랍니다.
-  </div>
+    // 2. 제목 치환: 피의자/참고인에 따라
+    if (!isSuspect) {
+      html = html.replace(
+        /출\&nbsp;\s*석\&nbsp;\s*요\&nbsp;\s*구\s*서/,
+        "참고인 출석요구서",
+      );
+    }
 
-  <div style="background: #f8fafc; border: 1px dashed #64748b; padding: 12px 16px; margin-bottom: 30px; font-size: 9.5pt; color: #334155; line-height: 1.6;">
-    ${subNotice}
-  </div>
+    // 3. 출석일시 치환: 본문 내 "    .    .    . 오전(후)   시에 우리청   호 검사실로" 부분
+    // 원문: "문의할 일이 있으니      .   .   . 오전(후)  시에 우리청   호 검사실로 출석하여"
+    html = html.replace(
+      /문의할 일이 있으니[\s\S]*?오전\(후\)&nbsp;\s*시에 우리청&nbsp;\s*호 검사실로 출석하여 주시기/,
+      `문의할 일이 있으니 <strong>${formattedScheduledAt}</strong>에 <strong>${location}</strong>으로 출석하여 주시기`,
+    );
 
-  <div style="text-align: center; margin-top: 40px; font-size: 12pt;">
-    <div style="margin-bottom: 15px; letter-spacing: 2px;">${year}년 ${month}월 ${day}일</div>
-    <div style="font-size: 14pt; font-weight: bold; letter-spacing: 4px; margin-top: 10px;">
-      도스온라인 검찰청 검사 ${prosecutorName}
-      <span style="display: inline-block; width: 36px; height: 36px; border: 2px solid #b91c1c; border-radius: 50%; color: #b91c1c; font-size: 11px; line-height: 34px; text-align: center; vertical-align: middle; margin-left: 8px; font-weight: bold;">(인)</span>
-    </div>
-  </div>
-</div>
-    `.trim();
-  }, [
-    isSuspect,
-    docNo,
-    displayCaseNo,
-    chargeName,
-    targetName,
-    targetContact,
-    formattedScheduledAt,
-    location,
-    purpose,
-    year,
-    month,
-    day,
-    prosecutorName,
-  ]);
+    // 4. 피의사실 요지 박스 (border solid td, height:108px) 치환
+    html = html.replace(
+      /(<td colspan="4" valign="top"[^>]*border[^>]*solid[^>]*height:108px[^>]*>)([\s\S]*?)(<\/td>)/,
+      `$1<div style="padding:8px;font-family:'돋움체';font-size:11pt;line-height:200%;">
+        <div style="margin-bottom:6px;"><strong>죄명:</strong> ${chargeName}</div>
+        <div><strong>피의사실 요지:</strong><br/>${crimeFactsSummary.replace(/\n/g, "<br/>")}</div>
+      </div>$3`,
+    );
+
+    // 5. 하단 날짜 "." 3개 패턴 → 실제 날짜
+    html = html.replace(
+      /\.<\/span><\/p>\s*<\/td>\s*<\/tr>\s*<tr>\s*<td valign="middle"[^>]*>\s*<p class=HStyle0 style='text-align:right/,
+      (match) => match, // 이 패턴은 유지
+    );
+    // 서명란 날짜 ("    .    .    ." 패턴)
+    html = html.replace(
+      /style='text-align:center;line-height:280%;'><span[^>]*>\.<\/span><\/p>/,
+      `style='text-align:center;line-height:280%;'><span style='position:relative;font-size:12.0pt;font-family:"한컴바탕";line-height:280%'>${year}. ${month}. ${day}.</span></p>`,
+    );
+
+    // 6. "검사이름" → 실제 검사 이름
+    html = html.replace(/검사이름/g, prosecutorName);
+
+    // 7. 담당검사/담당검찰사무관 연락처 치환
+    html = html.replace(
+      /담당 검사 discord@, 담당 검찰사무관 discord@/g,
+      `담당 검사 ${prosecutorName}${targetContact ? `, 연락처 ${targetContact}` : ""}`,
+    );
+
+    // 8. 문서번호 추가 (서식 최상단에 주입)
+    html = html.replace(
+      /■ 검찰사건사무규칙 \[별지 제1호서식\] 출석요구서/,
+      `■ 검찰사건사무규칙 [별지 제1호서식] 출석요구서 &nbsp;&nbsp;&nbsp; 문서번호: ${docNo}`,
+    );
+
+    return `<style>${form01.style}</style>
+      <div style="font-family:'한컴바탕','Batang',serif;max-width:760px;margin:0 auto;background:#fff;padding:20px;box-sizing:border-box;color:#000;">
+        ${html}
+      </div>`.trim();
+  })();
+
 
   // 클립보드 복사
   const handleCopy = async () => {
@@ -214,7 +226,7 @@ ${summonsHtml}
         targetContact,
         scheduledAt,
         location,
-        purpose,
+        purpose: crimeFactsSummary,
       });
       if (res?.success) {
         showToast?.("✅ 출석요구서 발급 이력이 기록되었습니다.", "success");
@@ -428,13 +440,14 @@ ${summonsHtml}
 
             <div>
               <label style={{ fontSize: "0.76rem", fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 4 }}>
-                출석 목적 및 요지
+                피의사실 요지 <span style={{ color: "var(--primary-amber)" }}>(서식 내 삽입)</span>
               </label>
               <textarea
                 className="input-field"
-                style={{ width: "100%", minHeight: 60, fontSize: "0.8rem" }}
-                value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
+                style={{ width: "100%", minHeight: 90, fontSize: "0.8rem" }}
+                placeholder="피의사실 요지를 입력하세요. 서식 내 피의사실 요지 박스에 자동 삽입됩니다."
+                value={crimeFactsSummary}
+                onChange={(e) => setCrimeFactsSummary(e.target.value)}
               />
             </div>
 

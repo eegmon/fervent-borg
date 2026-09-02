@@ -28,8 +28,6 @@ export default function IndictmentComposerModal({
   showToast,
   onCreateApprovalFromIndictment,
 }) {
-  if (!isOpen) return null;
-
   const [selectedCaseId, setSelectedCaseId] = useState(initialCase?.id || "");
   const [courtName, setCourtName] = useState("도스온라인 지방법원 형사부 귀중");
   const [docNo, setDocNo] = useState("");
@@ -176,6 +174,9 @@ export default function IndictmentComposerModal({
     });
   };
 
+  // HWP 공소장 서식 (별지 제14호서식)
+  const form14 = HWP_TEMPLATES.find((t) => t.id === "FORM_14") || null;
+
   // 공소장 HWP 규격 HTML 생성
   const indictmentHtml = useMemo(() => {
     const selectedEvidences = evidenceList.filter((e) =>
@@ -312,6 +313,9 @@ export default function IndictmentComposerModal({
     prosecutorName,
     courtName,
   ]);
+
+  // isOpen 가드: 모든 훅(useState, useEffect, useMemo) 이후 배치 (React 훅 규칙 준수)
+  if (!isOpen) return null;
 
   // 클립보드 복사
   const handleCopy = async () => {
