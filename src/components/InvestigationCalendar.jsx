@@ -196,7 +196,7 @@ export default function InvestigationCalendar({
     onSchedulesUpdated?.();
   }, []);
 
-  // 3. 조사 일정 이벤트 변환
+  // 3. 조사 및 공판 일정 이벤트 변환
   const scheduleEvents = useMemo(() => {
     return schedules.map((s) => {
       const dateStr = s.scheduledAt ? normalizeYmd(s.scheduledAt) : "";
@@ -206,12 +206,19 @@ export default function InvestigationCalendar({
         s.investigatorName === currentUser?.name ||
         s.createdBy === currentUser?.name;
 
+      const targetLabel =
+        s.targetType === "SUSPECT"
+          ? "피의자"
+          : s.targetType === "TRIAL"
+          ? "공판"
+          : "참고인";
+
       return {
         id: `SCH-${s.id}`,
         type: "SCHEDULE",
         dateStr,
         timeStr,
-        title: `[${s.targetType === "SUSPECT" ? "피의자" : "참고인"}] ${s.targetName}`,
+        title: `[${targetLabel}] ${s.targetName}`,
         subtitle: `${s.hyeongjeNo ? s.hyeongjeNo + " · " : ""}${s.location}`,
         schedule: s,
         isMySchedule,
@@ -222,13 +229,15 @@ export default function InvestigationCalendar({
   // 필터 적용된 전체 이벤트 목록
   const allEvents = useMemo(() => {
     let list = [];
-    if (selectedCategory === "ALL" || selectedCategory === "SCHEDULE") {
-      list.push(...scheduleEvents);
-    }
-    if (selectedCategory === "ALL" || selectedCategory === "STATUTE") {
+    if (selectedCategory === "ALL") {
+      list.push(...scheduleEvents, ...statuteEvents, ...arrestEvents);
+    } else if (selectedCategory === "SCHEDULE") {
+      list.push(...scheduleEvents.filter((e) => e.schedule.targetType !== "TRIAL"));
+    } else if (selectedCategory === "TRIAL") {
+      list.push(...scheduleEvents.filter((e) => e.schedule.targetType === "TRIAL"));
+    } else if (selectedCategory === "STATUTE") {
       list.push(...statuteEvents);
-    }
-    if (selectedCategory === "ALL" || selectedCategory === "ARREST") {
+    } else if (selectedCategory === "ARREST") {
       list.push(...arrestEvents);
     }
 
@@ -440,7 +449,8 @@ export default function InvestigationCalendar({
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           {[
             { id: "ALL", label: "전체" },
-            { id: "SCHEDULE", label: "📅 조사·신문", color: "#c084fc" },
+            { id: "SCHEDULE", label: "📅 조사·신문", color: "#60a5fa" },
+            { id: "TRIAL", label: "⚖️ 공판일정", color: "#c084fc" },
             { id: "STATUTE", label: "⏳ 공소시효 만료", color: "var(--primary-amber)" },
             { id: "ARREST", label: "🚨 구속 48h", color: "#ef4444" },
           ].map((cat) => (
@@ -702,6 +712,7 @@ export default function InvestigationCalendar({
                   <div style={{ display: "flex", flexDirection: "column", gap: 3, overflow: "hidden" }}>
                     {dayEvents.slice(0, 3).map((e) => {
                       if (e.type === "SCHEDULE") {
+                        const isTrial = e.schedule.targetType === "TRIAL";
                         const st = STATUS_CONFIG[e.schedule.status] || STATUS_CONFIG.SCHEDULED;
                         return (
                           <div
@@ -710,8 +721,8 @@ export default function InvestigationCalendar({
                               fontSize: "0.68rem",
                               padding: "2px 5px",
                               borderRadius: 4,
-                              background: st.bg,
-                              color: st.color,
+                              background: isTrial ? "rgba(168,85,247,0.25)" : st.bg,
+                              color: isTrial ? "#e9d5ff" : st.color,
                               fontWeight: 700,
                               whiteSpace: "nowrap",
                               overflow: "hidden",
@@ -721,7 +732,7 @@ export default function InvestigationCalendar({
                               gap: 3,
                             }}
                           >
-                            <span>🕒 {e.timeStr}</span> {e.title}
+                            <span>{isTrial ? "⚖️" : "🕒"} {e.timeStr}</span> {e.title}
                           </div>
                         );
                       }
@@ -1362,10 +1373,24 @@ export default function InvestigationCalendar({
                     className="select-field"
                     style={{ width: "100%", fontSize: "0.78rem" }}
                     value={formData.targetType}
-                    onChange={(e) => setFormData({ ...formData, targetType: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      let loc = formData.location;
+                      let pur = formData.purpose;
+                      if (val === "TRIAL") {
+                        if (!formData.location || formData.location === "검찰청 제1검사실") {
+                          loc = "도스온라인 지방법원 형사단독 법정";
+                        }
+                        if (!formData.purpose || formData.purpose.includes("신문")) {
+                          pur = "제1회 공판기일 (공판 진행 및 증인신문)";
+                        }
+                      }
+                      setFormData({ ...formData, targetType: val, location: loc, purpose: pur });
+                    }}
                   >
-                    <option value="SUSPECT">🚨 피의자</option>
-                    <option value="WITNESS">👤 참고인</option>
+                    <option value="SUSPECT">🚨 피의자 (조사)</option>
+                    <option value="WITNESS">👤 참고인 (조사)</option>
+                    <option value="TRIAL">⚖️ 공판 (재판/기일)</option>
                   </select>
                 </div>
                 <div>

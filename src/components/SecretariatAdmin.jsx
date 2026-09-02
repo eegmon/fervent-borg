@@ -2715,6 +2715,9 @@ export default function SecretariatAdmin({
     headId: "",
     canIntake: true,
   });
+
+  // 부서원 특정 사건 선택 재배당 모달 상태
+  const [memberReassignModal, setMemberReassignModal] = useState(null);
   // 선택된 부서 (부원 관리용)
   const [selectedDeptId, setSelectedDeptId] = useState(
     departmentsData[0]?.id || "dept_tech",
@@ -7482,6 +7485,168 @@ function ExcelImportTab({ onBulkImport }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* ── 부서원 특정 사건 선택 재배당 모달 ── */}
+      {memberReassignModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: 14,
+              width: "100%",
+              maxWidth: 720,
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxShadow: "0 24px 70px rgba(0,0,0,0.7)",
+            }}
+          >
+            {/* 모달 헤더 */}
+            <div
+              style={{
+                padding: "14px 18px",
+                borderBottom: "1px solid var(--border-subtle)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: "var(--bg-elevated)",
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: 800,
+                  fontSize: "0.98rem",
+                  color: "var(--text-main)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <RefreshCw size={18} color="var(--primary-amber)" />
+                {memberReassignModal.member.name} 검사 담당 사건 재배당 (총 {memberReassignModal.cases.length}건)
+              </div>
+              <button
+                type="button"
+                onClick={() => setMemberReassignModal(null)}
+                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+
+            {/* 모달 바디 */}
+            <div style={{ padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div
+                style={{
+                  fontSize: "0.78rem",
+                  color: "var(--text-muted)",
+                  background: "rgba(96,165,250,0.08)",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(96,165,250,0.2)",
+                }}
+              >
+                💡 {memberReassignModal.member.name} 검사에게 배정된 활성 사건 목록입니다. 특정 사건을 선택하여 타 검사에게 즉시 재배당할 수 있습니다.
+              </div>
+
+              {memberReassignModal.cases.length === 0 ? (
+                <div style={{ textAlign: "center", padding: 30, color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                  현재 이 검사에 배정된 활성 사건이 없습니다.
+                </div>
+              ) : (
+                memberReassignModal.cases.map((c) => (
+                  <div
+                    key={c.id}
+                    style={{
+                      background: "var(--bg-elevated)",
+                      border: "1px solid var(--border-subtle)",
+                      borderRadius: 10,
+                      padding: "12px 16px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 14,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "var(--text-main)" }}>
+                        {c.sujeNo || c.hyeongjeNo} · {c.suspectName}
+                      </div>
+                      <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: 2 }}>
+                        죄명: {c.chargeName || "형사피의사건"} · 접수일: {c.bookingDate || "-"} · 상태:{" "}
+                        <span style={{ color: "var(--primary-amber)", fontWeight: 700 }}>
+                          {c.bookingStatus || c.status || "수사중"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 개별 사건 재배당 셀렉트 */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <select
+                        className="select-field"
+                        style={{ fontSize: "0.76rem", padding: "5px 10px", minWidth: 160 }}
+                        onChange={async (e) => {
+                          const toProsecutorId = e.target.value;
+                          if (!toProsecutorId) return;
+                          const toProsecutor = (propProsecutorsList || []).find((p) => String(p.id) === String(toProsecutorId));
+                          if (!toProsecutor) return;
+
+                          if (
+                            window.confirm(
+                              `사건 [${c.sujeNo || c.hyeongjeNo}] (${c.suspectName})을(를)\n'${toProsecutor.name}' 검사에게 재배당하시겠습니까?`,
+                            )
+                          ) {
+                            if (onBulkReassign) {
+                              await onBulkReassign(
+                                [c.id],
+                                toProsecutor.id,
+                                toProsecutor.name,
+                                `부서원 특정 사건 재배당 (${memberReassignModal.member.name} → ${toProsecutor.name})`,
+                              );
+                            } else if (onReassignCase) {
+                              await onReassignCase(c.hyeongjeNo, toProsecutor.name, toProsecutor.id);
+                            }
+                            addLog("사건 재배당", `사건 [${c.sujeNo || c.hyeongjeNo}] (${memberReassignModal.member.name} → ${toProsecutor.name})`);
+                            // 팝업 내부 목록 실시간 업데이트
+                            setMemberReassignModal((prev) => ({
+                              ...prev,
+                              cases: prev.cases.filter((item) => item.id !== c.id),
+                            }));
+                          }
+                        }}
+                        defaultValue=""
+                      >
+                        <option value="" disabled>
+                          재배당할 검사 선택...
+                        </option>
+                        {(propProsecutorsList || [])
+                          .filter((p) => p.id !== memberReassignModal.member.id)
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.dept || "부서미지정"})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
