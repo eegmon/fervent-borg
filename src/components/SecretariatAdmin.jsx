@@ -4496,6 +4496,467 @@ export default function SecretariatAdmin({
           </div>
         </div>
       )}
+      {activeSubTab === "reassign" && (
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
+        >
+          <div className="glass-panel" style={{ padding: 20 }}>
+            <div style={{ fontWeight: 800, marginBottom: 14 }}>
+              <RefreshCw size={15} color="var(--primary-amber)" /> 단건 사건
+              재배당
+            </div>
+            <form
+              onSubmit={handleReassign}
+              style={{ display: "flex", flexDirection: "column", gap: 12 }}
+            >
+              <div>
+                <Label>재배당할 사건 *</Label>
+                <select
+                  className="select-field"
+                  value={selectedCaseNo}
+                  onChange={(e) => setSelectedCaseNo(e.target.value)}
+                  required
+                >
+                  {ledgerData.map((item) => (
+                    <option key={item.id} value={item.hyeongjeNo}>
+                      {item.hyeongjeNo} ({item.suspectName} /{" "}
+                      {item.prosecutorName || "미배정"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>변경할 담당검사 *</Label>
+                <select
+                  className="select-field"
+                  value={targetPId}
+                  onChange={(e) => setTargetPId(e.target.value)}
+                  required
+                >
+                  <option value="">담당검사 선택...</option>
+                  {prosecutorsList
+                    .filter((p) => ["ACTIVE", "ON_LEAVE"].includes(p.status))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.title || p.position} / {p.dept})
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <button type="submit" className="btn btn-gold">
+                <CheckCircle2 size={14} /> 단건 재배당 실행
+              </button>
+            </form>
+          </div>
+          <div className="glass-panel" style={{ padding: 20 }}>
+            <div style={{ fontWeight: 800, marginBottom: 14 }}>
+              <Users size={15} color="#818cf8" /> 검사별 사건 일괄 재배당
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <Label>기존 담당검사 *</Label>
+                <select
+                  className="select-field"
+                  value={bulkSourcePName}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setBulkSourcePName(name);
+                    setSelectedBulkCaseIds(
+                      ledgerData
+                        .filter((item) => item.prosecutorName === name)
+                        .map((item) => item.id),
+                    );
+                  }}
+                >
+                  <option value="">검사 선택...</option>
+                  {[
+                    ...new Set(
+                      ledgerData
+                        .map((item) => item.prosecutorName)
+                        .filter(Boolean),
+                    ),
+                  ].map((name) => (
+                    <option key={name} value={name}>
+                      {name} (
+                      {
+                        ledgerData.filter(
+                          (item) => item.prosecutorName === name,
+                        ).length
+                      }
+                      건)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {bulkSourcePName && (
+                <div
+                  style={{
+                    maxHeight: 180,
+                    overflowY: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 5,
+                  }}
+                >
+                  {ledgerData
+                    .filter((item) => item.prosecutorName === bulkSourcePName)
+                    .map((item) => (
+                      <label key={item.id} style={{ fontSize: "0.78rem" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedBulkCaseIds.includes(item.id)}
+                          onChange={(e) =>
+                            setSelectedBulkCaseIds((prev) =>
+                              e.target.checked
+                                ? [...prev, item.id]
+                                : prev.filter((id) => id !== item.id),
+                            )
+                          }
+                        />{" "}
+                        {item.hyeongjeNo} · {item.suspectName}
+                      </label>
+                    ))}
+                </div>
+              )}
+              <div>
+                <Label>새 담당검사 *</Label>
+                <select
+                  className="select-field"
+                  value={bulkTargetPId}
+                  onChange={(e) => setBulkTargetPId(e.target.value)}
+                >
+                  <option value="">담당검사 선택...</option>
+                  {prosecutorsList
+                    .filter((p) => p.status === "ACTIVE")
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.dept})
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <button
+                className="btn btn-gold"
+                disabled={!selectedBulkCaseIds.length || !bulkTargetPId}
+                onClick={async () => {
+                  const target = prosecutorsList.find(
+                    (p) => p.id === bulkTargetPId,
+                  );
+                  const ok = await onBulkReassign?.(
+                    selectedBulkCaseIds,
+                    target.id,
+                    target.name,
+                    bulkReason,
+                  );
+                  if (ok !== false) {
+                    addLog(
+                      "사건 일괄 재배당",
+                      `${selectedBulkCaseIds.length}건 → ${target.name}`,
+                    );
+                    setSelectedBulkCaseIds([]);
+                  }
+                }}
+              >
+                <RefreshCw size={14} /> 선택 사건 재배당
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {activeSubTab === "docmgmt" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div
+            className="glass-panel"
+            style={{
+              padding: 16,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 10,
+            }}
+          >
+            <div style={{ fontWeight: 800 }}>
+              <FileBox size={16} color="var(--primary-amber)" /> 문서 관리
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {[
+                ["receive", "문서 접수", receivedDocs],
+                ["send", "문서 발송", sentDocs],
+                ["archive", "문서 보존", archivedDocs],
+              ].map(([id, label, docs]) => (
+                <button
+                  key={id}
+                  onClick={() => setDocMgmtTab(id)}
+                  className={
+                    docMgmtTab === id ? "btn btn-gold" : "btn btn-secondary"
+                  }
+                  style={{ fontSize: "0.78rem", padding: "5px 10px" }}
+                >
+                  {label} ({docs.length})
+                </button>
+              ))}
+            </div>
+          </div>
+          {(() => {
+            const isReceive = docMgmtTab === "receive";
+            const isArchive = docMgmtTab === "archive";
+            const docs = isReceive
+              ? receivedDocs
+              : isArchive
+                ? archivedDocs
+                : sentDocs;
+            const setDocs = isReceive
+              ? setReceivedDocs
+              : isArchive
+                ? setArchivedDocs
+                : setSentDocs;
+            const [draft, setDraft] = isReceive
+              ? [newReceive, setNewReceive]
+              : isArchive
+                ? [newArchive, setNewArchive]
+                : [newSend, setNewSend];
+            const fields = isReceive
+              ? [
+                  ["title", "문서 제목"],
+                  ["from", "발신처"],
+                  ["to", "수신처"],
+                ]
+              : isArchive
+                ? [
+                    ["title", "문서 제목"],
+                    ["caseNo", "사건번호"],
+                  ]
+                : [
+                    ["title", "문서 제목"],
+                    ["to", "수신처"],
+                  ];
+            return (
+              <div className="glass-panel" style={{ padding: 18 }}>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!draft.title) return;
+                    const item = {
+                      id: `${docMgmtTab.toUpperCase()}-${Date.now()}`,
+                      docNo:
+                        draft.docNo ||
+                        `2026-${docMgmtTab}-${String(docs.length + 1).padStart(3, "0")}`,
+                      date: today,
+                      type: draft.type || "공문",
+                      status: isArchive
+                        ? "보존"
+                        : isReceive
+                          ? "접수완료"
+                          : "발송완료",
+                      ...draft,
+                    };
+                    const result = await createOfficeDocumentApi(
+                      docMgmtTab,
+                      item,
+                    );
+                    if (!result?.success)
+                      return alert(
+                        result?.message || "문서 저장에 실패했습니다.",
+                      );
+                    setDocs((prev) => [result.document || item, ...prev]);
+                    addLog("문서 관리 등록", `[${item.docNo}] ${item.title}`);
+                    setDraft(
+                      isReceive
+                        ? {
+                            docNo: "",
+                            title: "",
+                            from: "",
+                            to: "",
+                            type: "공문",
+                            note: "",
+                          }
+                        : isArchive
+                          ? {
+                              docNo: "",
+                              title: "",
+                              caseNo: "",
+                              retentionYears: 10,
+                              category: "형사사건기록",
+                              note: "",
+                            }
+                          : {
+                              docNo: "",
+                              title: "",
+                              to: "",
+                              type: "공문",
+                              note: "",
+                            },
+                    );
+                  }}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+                    gap: 10,
+                    alignItems: "end",
+                  }}
+                >
+                  <div>
+                    <Label>문서번호</Label>
+                    <input
+                      className="input-field"
+                      value={draft.docNo}
+                      onChange={(e) =>
+                        setDraft({ ...draft, docNo: e.target.value })
+                      }
+                    />
+                  </div>
+                  {fields.map(([key, label]) => (
+                    <div key={key}>
+                      <Label>{label} *</Label>
+                      <input
+                        className="input-field"
+                        value={draft[key] || ""}
+                        onChange={(e) =>
+                          setDraft({ ...draft, [key]: e.target.value })
+                        }
+                        required={key === "title"}
+                      />
+                    </div>
+                  ))}
+                  <button className="btn btn-gold">
+                    <Plus size={14} /> 등록
+                  </button>
+                </form>
+                <div
+                  className="ledger-table-container"
+                  style={{ marginTop: 16 }}
+                >
+                  <table className="ledger-table">
+                    <thead>
+                      <tr>
+                        <th>문서번호</th>
+                        <th>제목</th>
+                        <th>일자</th>
+                        <th>관리</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {docs.map((doc) => (
+                        <tr key={doc.id}>
+                          <td>{doc.docNo}</td>
+                          <td>{doc.title}</td>
+                          <td>{doc.date || "-"}</td>
+                          <td>
+                            <button
+                              className="btn btn-outline"
+                              style={{ padding: "3px 7px" }}
+                              onClick={async () => {
+                                const result = await deleteOfficeDocumentApi(
+                                  doc.id,
+                                );
+                                if (result?.success !== false)
+                                  setDocs((prev) =>
+                                    prev.filter((item) => item.id !== doc.id),
+                                  );
+                              }}
+                            >
+                              삭제
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+      {activeSubTab === "docnos" && (
+        <div className="glass-panel" style={{ padding: 18 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 10,
+              marginBottom: 14,
+            }}
+          >
+            <div style={{ fontWeight: 800 }}>
+              <FilePen size={15} color="var(--primary-amber)" /> 문서번호 관리
+            </div>
+            <button
+              className="btn btn-gold"
+              onClick={() => {
+                (approvalsData || []).forEach((doc, index) =>
+                  onUpdateDocNo(
+                    doc.id,
+                    `2026-결재-${String(index + 1).padStart(3, "0")}`,
+                  ),
+                );
+                if (setDocNoCounter)
+                  setDocNoCounter((approvalsData || []).length + 1);
+                addLog(
+                  "문서번호 일괄 재채번",
+                  `${approvalsData?.length || 0}건`,
+                );
+              }}
+            >
+              <RefreshCw size={13} /> 전체 재채번
+            </button>
+          </div>
+          <div className="ledger-table-container">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>문서번호</th>
+                  <th>제목</th>
+                  <th>상태</th>
+                  <th>저장</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(approvalsData || []).map((doc) => (
+                  <tr key={doc.id}>
+                    <td>
+                      <input
+                        className="input-field"
+                        value={
+                          editingDocId === doc.id
+                            ? editingDocNoValue
+                            : doc.docNo || ""
+                        }
+                        onChange={(e) => {
+                          setEditingDocId(doc.id);
+                          setEditingDocNoValue(e.target.value);
+                        }}
+                      />
+                    </td>
+                    <td>{doc.title || doc.caseNo || "처분 결의서"}</td>
+                    <td>{doc.status || "-"}</td>
+                    <td>
+                      <button
+                        className="btn btn-outline"
+                        style={{ padding: "3px 7px" }}
+                        onClick={() => {
+                          onUpdateDocNo(
+                            doc.id,
+                            editingDocId === doc.id
+                              ? editingDocNoValue
+                              : doc.docNo,
+                          );
+                          setEditingDocId(null);
+                        }}
+                      >
+                        저장
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       {/* Sub Tab Content */}
       {activeSubTab === "prosecutors" && (
         <div
