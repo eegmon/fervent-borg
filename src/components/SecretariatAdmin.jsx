@@ -3735,6 +3735,7 @@ export default function SecretariatAdmin({
                 );
                 const deptCases = ledgerData.filter(
                   (c) =>
+                    !Boolean(c.isArchived) &&
                     c.prosecutorName &&
                     members.some(
                       (m) =>
