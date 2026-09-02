@@ -944,6 +944,8 @@ export default function MyCasesLedger({
   onOpenTimeline,
   onOpenMemo,
   onOpenIndictmentComposer,
+  onUpdateProsecutorStatus,
+  onBulkReassign,
   isReadOnly = false,
 }) {
   const [selectedProsecutorFilter, setSelectedProsecutorFilter] = useState(
@@ -1118,8 +1120,21 @@ export default function MyCasesLedger({
     });
   }, [departmentsData, currentUser]);
 
+  // 부서장 판정: 명시적 부서장 지정 외에도 부장급 역할/직책 타이틀이면 패널 표시
+  const DEPT_HEAD_ROLE_LEVELS = new Set([
+    "SENIOR_PROSECUTOR",
+    "CHIEF_PROSECUTOR",
+    "DEPUTY_CHIEF",
+    "CHIEF_ADMINISTRATOR",
+    "PROSECUTOR_GENERAL",
+    "SUPER_ADMIN",
+  ]);
   const isDeptHeadAssigned = managedDepts.length > 0;
-  const isSeniorProsecutor = isDeptHeadAssigned;
+  const isSeniorProsecutor =
+    isDeptHeadAssigned ||
+    DEPT_HEAD_ROLE_LEVELS.has(currentUser?.roleLevel) ||
+    (currentUser?.position || "").includes("부장") ||
+    (currentUser?.position || "").includes("부서장");
 
   const managedDeptNames = useMemo(
     () =>
@@ -1141,26 +1156,17 @@ export default function MyCasesLedger({
   const [reassignLoading, setReassignLoading] = useState(false);
   const [seniorMsg, setSeniorMsg] = useState(null);
 
-  // 관장 부서 내 하위 직급 검사 목록 (겸직·직무대리 포함)
-  const ROLE_AUTHORITY_CLIENT = {
-    PROBATIONARY: 10,
-    ADMIN_PROBATIONARY: 15,
-    ADMINISTRATOR: 30,
-    PROSECUTOR: 40,
-    SENIOR_PROSECUTOR: 50,
-    DEPUTY_CHIEF: 60,
-    CHIEF_ADMINISTRATOR: 65,
-    CHIEF_PROSECUTOR: 70,
-    PROSECUTOR_GENERAL: 80,
-    SUPER_ADMIN: 100,
-  };
-  const deptMembers = (prosecutorsList || []).filter(
-    (p) =>
-      p &&
-      managedDeptNames.has(p.dept) &&
-      p.id !== currentUser?.id &&
-      (ROLE_AUTHORITY_CLIENT[p.roleLevel] || 0) <
-        (ROLE_AUTHORITY_CLIENT[currentUser?.roleLevel] || 0),
+  // 관장 부서 내 검사 목록 — 권한 레벨 비교 제거(부서 소속 여부만 판단)
+  const deptMembers = useMemo(
+    () =>
+      (prosecutorsList || []).filter(
+        (p) =>
+          p &&
+          p.id !== currentUser?.id &&
+          (managedDeptNames.has(p.dept) ||
+            (currentUser?.dept && p.dept === currentUser.dept)),
+      ),
+    [prosecutorsList, currentUser, managedDeptNames],
   );
 
   const handleLeaveChange = async () => {
@@ -1170,7 +1176,13 @@ export default function MyCasesLedger({
     const res = await updateProsecutorApi(leaveTarget, { status: leaveStatus });
     setLeaveLoading(false);
     if (res?.success) {
-      const target = deptMembers.find((p) => p.id === leaveTarget);
+      // 부모 App.jsx의 prosecutorsList 상태를 즉시 반영
+      if (onUpdateProsecutorStatus) {
+        onUpdateProsecutorStatus(leaveTarget, { status: leaveStatus });
+      }
+      const target =
+        deptMembers.find((p) => p.id === leaveTarget) ||
+        prosecutorsList.find((p) => p.id === leaveTarget);
       const statusLabel =
         leaveStatus === "LEAVE"
           ? "휴직"
@@ -1181,6 +1193,7 @@ export default function MyCasesLedger({
         type: "success",
         text: `✅ ${target?.name || leaveTarget} 검사를 ${statusLabel} 처리했습니다.`,
       });
+      setLeaveTarget(""); // 적용 후 선택 초기화
     } else {
       setSeniorMsg({
         type: "error",
@@ -1640,62 +1653,118 @@ export default function MyCasesLedger({
             ))}
           </div>
 
-          {/* 휴직 처리 탭 */}
+          {/* 휴직 / 복직 처리 탭 */}
           {seniorTab === "leave" && (
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "flex-end",
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <label className="input-label">대상 검사</label>
-                <select
-                  className="select-field"
-                  style={{ width: 180 }}
-                  value={leaveTarget}
-                  onChange={(e) => setLeaveTarget(e.target.value)}
-                >
-                  <option value="">-- 선택 --</option>
-                  {deptMembers.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.position || p.title}) ·{" "}
-                      {p.status === "LEAVE"
-                        ? "휴직중"
-                        : p.status === "INACTIVE"
-                          ? "비활성"
-                          : "재직중"}
-                    </option>
-                  ))}
-                </select>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* 부서원 카드 목록 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {deptMembers.map((p) => {
+                  const statusLabel =
+                    p.status === "LEAVE"
+                      ? "휴직중"
+                      : p.status === "INACTIVE"
+                        ? "비활성"
+                        : "재직중";
+                  const statusColor =
+                    p.status === "LEAVE"
+                      ? "#fbbf24"
+                      : p.status === "INACTIVE"
+                        ? "#6b7280"
+                        : "#34d399";
+                  return (
+                    <div
+                      key={p.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        flexWrap: "wrap",
+                        background: "var(--bg-elevated)",
+                        border:
+                          leaveTarget === p.id
+                            ? "1px solid rgba(245,158,11,0.5)"
+                            : "1px solid var(--border-subtle)",
+                        borderRadius: 8,
+                        padding: "9px 14px",
+                      }}
+                    >
+                      {/* 이름 + 직책 + 현재 상태 */}
+                      <div style={{ flex: 1, minWidth: 160 }}>
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            fontSize: "0.85rem",
+                            color: "var(--text-main)",
+                          }}
+                        >
+                          {p.name}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.72rem",
+                            color: "var(--text-muted)",
+                            marginLeft: 6,
+                          }}
+                        >
+                          {p.position || p.title || p.rank || ""}
+                        </span>
+                        <span
+                          style={{
+                            marginLeft: 8,
+                            fontSize: "0.7rem",
+                            fontWeight: 800,
+                            color: statusColor,
+                            background: `${statusColor}20`,
+                            padding: "1px 6px",
+                            borderRadius: 4,
+                          }}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+
+                      {/* 처리 구분 선택 */}
+                      <select
+                        className="select-field"
+                        style={{ fontSize: "0.76rem", padding: "5px 8px", width: 130 }}
+                        value={leaveTarget === p.id ? leaveStatus : ""}
+                        onChange={(e) => {
+                          setLeaveTarget(p.id);
+                          setLeaveStatus(e.target.value);
+                        }}
+                        onClick={() => setLeaveTarget(p.id)}
+                      >
+                        <option value="">-- 처리 선택 --</option>
+                        <option value="ACTIVE">🟢 복직 (재직)</option>
+                        <option value="LEAVE">🟡 휴직 처리</option>
+                        <option value="INACTIVE">⚫ 비활성 처리</option>
+                      </select>
+
+                      {/* 적용 버튼 */}
+                      <button
+                        onClick={() => {
+                          if (leaveTarget !== p.id) {
+                            setLeaveTarget(p.id);
+                            return;
+                          }
+                          handleLeaveChange();
+                        }}
+                        disabled={leaveTarget !== p.id || !leaveStatus || leaveLoading}
+                        className="btn btn-gold"
+                        style={{
+                          padding: "5px 14px",
+                          fontSize: "0.76rem",
+                          fontWeight: 700,
+                          opacity: leaveTarget !== p.id || leaveLoading ? 0.45 : 1,
+                        }}
+                      >
+                        <UserMinus size={13} />
+                        {leaveLoading && leaveTarget === p.id ? "처리 중..." : "적용"}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-              <div>
-                <label className="input-label">처리 구분</label>
-                <select
-                  className="select-field"
-                  style={{ width: 140 }}
-                  value={leaveStatus}
-                  onChange={(e) => setLeaveStatus(e.target.value)}
-                >
-                  <option value="ACTIVE">복직 (재직)</option>
-                  <option value="LEAVE">휴직 처리</option>
-                  <option value="INACTIVE">비활성 처리</option>
-                </select>
-              </div>
-              <button
-                onClick={handleLeaveChange}
-                disabled={!leaveTarget || leaveLoading}
-                className="btn btn-gold"
-                style={{
-                  padding: "8px 18px",
-                  fontWeight: 700,
-                  opacity: leaveLoading ? 0.6 : 1,
-                }}
-              >
-                <UserMinus size={14} /> {leaveLoading ? "처리 중..." : "적용"}
-              </button>
             </div>
           )}
 

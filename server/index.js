@@ -3347,10 +3347,22 @@ app.patch(
       hasSecretariatWorkAccess(req.user);
 
     // 본인이 자기 프로필(제한 필드 제외)을 수정하는 경우는 허용
-    // 부서장(SENIOR_PROSECUTOR): 동일 부서 하위 직급의 status(휴직처리)만 변경 가능
-    const isSeniorProsecutor =
-      effectiveRoleLevel(req.user) === "SENIOR_PROSECUTOR";
-    if (!isSelf && !isSuperAdmin && !isSecretariat && isSeniorProsecutor) {
+    // 부서장(부장검사, 차장검사, 직무대리/겸직 부서장 포함): 관장 부서 부원의 status(휴직/복직/비활성) 변경 허용
+    const userRole = effectiveRoleLevel(req.user);
+    const DEPT_HEAD_ROLES = new Set([
+      "SENIOR_PROSECUTOR",
+      "CHIEF_PROSECUTOR",
+      "DEPUTY_CHIEF",
+      "CHIEF_ADMINISTRATOR",
+      "PROSECUTOR_GENERAL",
+      "SUPER_ADMIN",
+    ]);
+    const isDeptHeadRole =
+      DEPT_HEAD_ROLES.has(userRole) ||
+      (req.user.position || "").includes("부장") ||
+      (req.user.position || "").includes("부서장");
+
+    if (!isSelf && !isSuperAdmin && !isSecretariat && isDeptHeadRole) {
       // status 필드만 요청했는지 확인
       const requestedFields = Object.keys(req.body).filter(
         (f) => f !== undefined && req.body[f] !== undefined,
@@ -3358,28 +3370,38 @@ app.patch(
       const onlyStatus =
         requestedFields.length === 1 && requestedFields[0] === "status";
       const allowedStatuses = new Set(["ACTIVE", "LEAVE", "INACTIVE"]);
+
       if (onlyStatus && allowedStatuses.has(req.body.status)) {
-        // 대상자가 동일 부서 + 하위 직급인지 확인
+        // 대상자가 관장 부서 소속인지 확인
         const targetRes = await db.execute({
-          sql: "SELECT role_level, dept FROM prosecutors WHERE id = ?",
+          sql: "SELECT id, role_level, dept FROM prosecutors WHERE id = ?",
           args: [req.params.id],
         });
         if (targetRes.rows.length > 0) {
           const target = toCamel(targetRes.rows[0]);
+
+          const deptRes = await db.execute("SELECT * FROM departments");
+          const depts = deptRes.rows.map(toCamel);
+          const isHeadOfTargetDept = depts.some(
+            (d) =>
+              d.name === target.dept &&
+              (d.headId === req.user.id || (d.headName && d.headName.includes(req.user.name)))
+          );
+
           const sameDept =
-            (req.user.dept || "") && req.user.dept === target.dept;
-          const isLower =
-            (ROLE_AUTHORITY[effectiveRoleLevel(req.user)] || 0) >
-            (ROLE_AUTHORITY[target.roleLevel] || 0);
-          if (sameDept && isLower) {
-            return next(); // 부서장 경로 통과 → 아래 PATCH 핸들러로 직접
+            ((req.user.dept || "") && req.user.dept === target.dept) ||
+            ((req.user.dualDept || "") && req.user.dualDept === target.dept) ||
+            isHeadOfTargetDept;
+
+          if (sameDept) {
+            return next(); // 부서장 권한 통과 → 아래 PATCH 핸들러로 이동
           }
         }
       }
       return res.status(403).json({
         success: false,
         message:
-          "부서장은 동일 부서 하위 직급의 재직상태(휴직처리)만 변경할 수 있습니다.",
+          "부서장은 관장 부서원의 재직상태(휴직/복직)만 변경할 수 있습니다.",
       });
     }
 

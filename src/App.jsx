@@ -2097,6 +2097,8 @@ export default function App() {
                   handleDesignateCase(caseId, currentUser)
                 }
                 onUndesignateCase={handleUndesignateCase}
+                onUpdateProsecutorStatus={handleUpdateProsecutorStatus}
+                onBulkReassign={handleBulkReassignCases}
               />
             )}
 
