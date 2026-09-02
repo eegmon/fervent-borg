@@ -424,7 +424,13 @@ export default function Header({
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                if (!currentUser) {
+                  onOpenLoginModal();
+                  return;
+                }
+                setActiveTab(tab.id);
+              }}
               className="site-header-tab"
               style={{
                 display: "flex",

@@ -601,9 +601,9 @@ export default function App() {
         );
         const matchName = Boolean(
           currentUser.name &&
-            d.headName &&
-            typeof d.headName === "string" &&
-            d.headName.includes(currentUser.name),
+          d.headName &&
+          typeof d.headName === "string" &&
+          d.headName.includes(currentUser.name),
         );
         if (matchId || matchName) {
           set.add(d.name);
@@ -677,7 +677,13 @@ export default function App() {
 
   const scopedLedgerData = useMemo(
     () => scopeRecords(ledgerData, true),
-    [ledgerData, isGlobalAdmin, currentUser, prosecutorDeptMap, userManagedDeptNames],
+    [
+      ledgerData,
+      isGlobalAdmin,
+      currentUser,
+      prosecutorDeptMap,
+      userManagedDeptNames,
+    ],
   );
   const scopedApprovalsData = useMemo(
     () => scopeRecords(approvalsData, true),
@@ -720,6 +726,7 @@ export default function App() {
     // 비밀번호 필드를 세션에 저장하지 않음
     const { password: _pw, ...safeUser } = loggedUser;
     setCurrentUser(safeUser);
+    setActiveTab("mycases");
     try {
       sessionStorage.setItem("dose_pros_session", JSON.stringify(safeUser));
     } catch {}
