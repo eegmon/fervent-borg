@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -43,6 +43,30 @@ function formatLocalYmd(d) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+/** 날짜 문자열 정규화 (YYYY-MM-DD) */
+function normalizeYmd(str) {
+  if (!str) return "";
+  const cleaned = String(str).trim().replace(/\./g, "-");
+  const datePart = cleaned.split(/[ T]/)[0];
+  const parts = datePart.split("-");
+  if (parts.length === 3) {
+    const y = parts[0];
+    const m = String(parts[1]).padStart(2, "0");
+    const d = String(parts[2]).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  return datePart.slice(0, 10);
+}
+
+/** 시간 문자열 추출 (HH:mm) */
+function extractTimeStr(str) {
+  if (!str) return "";
+  const s = String(str).trim();
+  if (s.includes("T")) return s.split("T")[1]?.slice(0, 5) || "";
+  if (s.includes(" ")) return s.split(" ")[1]?.slice(0, 5) || "";
+  return "";
 }
 
 export default function InvestigationCalendar({
@@ -167,11 +191,16 @@ export default function InvestigationCalendar({
     return list;
   }, [ledgerData, currentUser]);
 
+  // 마운트 시 최신 조사 일정 자동 조회
+  useEffect(() => {
+    onSchedulesUpdated?.();
+  }, []);
+
   // 3. 조사 일정 이벤트 변환
   const scheduleEvents = useMemo(() => {
     return schedules.map((s) => {
-      const dateStr = s.scheduledAt ? s.scheduledAt.slice(0, 10) : "";
-      const timeStr = s.scheduledAt ? s.scheduledAt.slice(11, 16) : "";
+      const dateStr = s.scheduledAt ? normalizeYmd(s.scheduledAt) : "";
+      const timeStr = s.scheduledAt ? extractTimeStr(s.scheduledAt) : "";
       const isMySchedule =
         s.investigatorId === currentUser?.id ||
         s.investigatorName === currentUser?.name ||
@@ -340,13 +369,19 @@ export default function InvestigationCalendar({
 
   // 일정 삭제
   const handleDeleteSchedule = async (scheduleId) => {
-    if (!window.confirm("해당 조사 일정을 삭제하시겠습니까?")) return;
+    if (!window.confirm("해당 조사 일정을 정말 삭제하시겠습니까?")) return;
     try {
       const res = await deleteScheduleApi(scheduleId);
       if (res?.success) {
         showToast?.("조사 일정이 삭제되었습니다.", "success");
         if (onSchedulesUpdated) onSchedulesUpdated();
-        setSelectedDayEvents(null);
+        setSelectedDayEvents((prev) => {
+          if (!prev) return null;
+          const remaining = prev.events.filter((e) => e.schedule?.id !== scheduleId);
+          return remaining.length > 0 ? { ...prev, events: remaining } : null;
+        });
+      } else {
+        showToast?.(res?.message || "삭제 실패", "error");
       }
     } catch (err) {
       showToast?.("삭제 실패: " + err.message, "error");
@@ -1046,39 +1081,198 @@ export default function InvestigationCalendar({
               </button>
             </div>
 
-            <div style={{ padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-              {selectedDayEvents.events.map((e) => (
-                <div
-                  key={e.id}
-                  style={{
-                    padding: 12,
-                    borderRadius: 8,
-                    background: "var(--bg-elevated)",
-                    border: "1px solid var(--border-subtle)",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span style={{ fontWeight: 800, fontSize: "0.85rem", color: "var(--text-main)" }}>
-                      {e.title}
-                    </span>
-                    {e.type === "SCHEDULE" && (
+            <div style={{ padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+              {selectedDayEvents.events.map((e) => {
+                if (e.type === "SCHEDULE") {
+                  const st = STATUS_CONFIG[e.schedule.status] || STATUS_CONFIG.SCHEDULED;
+                  return (
+                    <div
+                      key={e.id}
+                      style={{
+                        padding: 14,
+                        borderRadius: 10,
+                        background: "var(--bg-card)",
+                        border: "1px solid var(--border-subtle)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
+                      {/* 카드 상단: 상태 배지 + 제목 + 액션 버튼들 */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span
+                            style={{
+                              background: st.bg,
+                              color: st.color,
+                              padding: "3px 8px",
+                              borderRadius: 6,
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                            }}
+                          >
+                            {st.label}
+                          </span>
+                          <span style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--text-main)" }}>
+                            {e.title}
+                          </span>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          {/* 소환장 발급 */}
+                          <button
+                            onClick={() => {
+                              const relatedCase = ledgerData.find((c) => String(c.id) === String(e.schedule.caseId));
+                              onOpenSummonsModal?.(e.schedule, relatedCase);
+                            }}
+                            className="btn btn-outline"
+                            style={{ fontSize: "0.72rem", padding: "4px 8px", color: "#60a5fa" }}
+                            title="출석요구서(소환장) 서식 생성"
+                          >
+                            <FileText size={13} /> 소환장
+                          </button>
+
+                          {/* 일정 수정 */}
+                          <button
+                            onClick={() => {
+                              setSelectedDayEvents(null);
+                              setEditingSchedule(e.schedule);
+                              setFormData({
+                                caseId: e.schedule.caseId || "",
+                                hyeongjeNo: e.schedule.hyeongjeNo || "",
+                                targetType: e.schedule.targetType || "SUSPECT",
+                                targetName: e.schedule.targetName || "",
+                                targetContact: e.schedule.targetContact || "",
+                                scheduledAt: e.schedule.scheduledAt || "",
+                                location: e.schedule.location || "",
+                                investigatorId: e.schedule.investigatorId || "",
+                                investigatorName: e.schedule.investigatorName || "",
+                                purpose: e.schedule.purpose || "",
+                                notes: e.schedule.notes || "",
+                              });
+                              setIsAddModalOpen(true);
+                            }}
+                            className="btn btn-outline"
+                            style={{ padding: "4px 8px" }}
+                            title="일정 수정"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+
+                          {/* 일정 삭제 */}
+                          <button
+                            onClick={() => handleDeleteSchedule(e.schedule.id)}
+                            className="btn btn-outline"
+                            style={{ padding: "4px 8px", color: "#f87171", borderColor: "rgba(239,68,68,0.3)" }}
+                            title="일정 삭제"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 세부 정보 */}
+                      <div style={{ fontSize: "0.76rem", color: "var(--text-muted)", display: "flex", flexDirection: "column", gap: 3 }}>
+                        <div>📅 일시: <strong>{e.dateStr} {e.timeStr}</strong> · 📍 장소: <strong>{e.schedule.location}</strong></div>
+                        <div>👤 담당수사관: {e.schedule.investigatorName} {e.schedule.targetContact ? `(연락처: ${e.schedule.targetContact})` : ""}</div>
+                        {e.schedule.purpose && <div>📝 목적: {e.schedule.purpose}</div>}
+                        {e.schedule.notes && <div>📌 메모: {e.schedule.notes}</div>}
+                      </div>
+
+                      {/* 상태 조절 셀렉트 */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, paddingTop: 6, borderTop: "1px dashed var(--border-subtle)" }}>
+                        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 700 }}>조사 상태 변경:</span>
+                        <select
+                          className="select-field"
+                          value={e.schedule.status}
+                          onChange={(ev) => handleChangeStatus(e.schedule.id, ev.target.value)}
+                          style={{ fontSize: "0.74rem", padding: "3px 8px", background: "var(--bg-elevated)" }}
+                        >
+                          <option value="SCHEDULED">예정</option>
+                          <option value="ATTENDED">출석완료</option>
+                          <option value="NO_SHOW">불출석</option>
+                          <option value="POSTPONED">연기</option>
+                          <option value="CANCELLED">취소</option>
+                        </select>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (e.type === "STATUTE") {
+                  return (
+                    <div
+                      key={e.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 8,
+                        background: "rgba(245,158,11,0.06)",
+                        border: "1px solid rgba(245,158,11,0.3)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: "0.85rem", color: "var(--text-main)" }}>
+                          {e.title}
+                        </div>
+                        <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: 2 }}>
+                          {e.subtitle} · 만료예정일: {e.dateStr}
+                        </div>
+                      </div>
                       <button
                         onClick={() => {
-                          const relatedCase = ledgerData.find((c) => String(c.id) === String(e.schedule.caseId));
-                          onOpenSummonsModal?.(e.schedule, relatedCase);
+                          setSelectedDayEvents(null);
+                          onNavigateToCase?.(e.caseItem);
+                        }}
+                        className="btn btn-gold"
+                        style={{ fontSize: "0.72rem", padding: "4px 10px" }}
+                      >
+                        사건 열람 →
+                      </button>
+                    </div>
+                  );
+                }
+
+                if (e.type === "ARREST") {
+                  return (
+                    <div
+                      key={e.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 8,
+                        background: "rgba(239,68,68,0.08)",
+                        border: "1px solid rgba(239,68,68,0.3)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: "0.85rem", color: "#fca5a5" }}>
+                          {e.title}
+                        </div>
+                        <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: 2 }}>
+                          {e.subtitle}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedDayEvents(null);
+                          onNavigateToCase?.(e.caseItem);
                         }}
                         className="btn btn-outline"
-                        style={{ fontSize: "0.7rem", padding: "3px 8px", color: "#60a5fa" }}
+                        style={{ fontSize: "0.72rem", padding: "4px 10px", color: "#f87171" }}
                       >
-                        소환장 발급
+                        사건 처리 →
                       </button>
-                    )}
-                  </div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 4 }}>
-                    {e.subtitle}
-                  </div>
-                </div>
-              ))}
+                    </div>
+                  );
+                }
+
+                return null;
+              })}
             </div>
           </div>
         </div>

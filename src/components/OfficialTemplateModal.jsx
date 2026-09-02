@@ -258,7 +258,11 @@ export default function OfficialTemplateModal({
     const liveBody = iframeRef.current?.contentDocument?.body;
     const editedBody = liveBody
       ? Array.from(liveBody.children)
-          .filter((element) => !element.classList.contains("auto-fill-bar") && element.tagName !== "SCRIPT")
+          .filter(
+            (element) =>
+              !element.classList.contains("auto-fill-bar") &&
+              element.tagName !== "SCRIPT",
+          )
           .map((element) => element.outerHTML)
           .join("")
       : "";
