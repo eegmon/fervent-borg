@@ -137,11 +137,11 @@ function buildIframeDoc(template, caseItem, currentUser, today) {
 </style>
 <style>${template.style}</style>
 </head>
-<body>
+<body contenteditable="true" spellcheck="false">
 ${
   caseItem
     ? `
-<div class="auto-fill-bar">
+<div class="auto-fill-bar" contenteditable="false">
   ✨ 자동입력 적용됨:
   <span class="fill-chip">사건번호: ${safeCaseNo || "(미지정)"}</span>
   <span class="fill-chip">피의자: ${safeSuspectName || "(미지정)"}</span>
@@ -230,6 +230,7 @@ export default function OfficialTemplateModal({
   const [selectedId, setSelectedId] = useState(HWP_TEMPLATES[0]?.id || "");
   const [selectedCaseId, setSelectedCaseId] = useState("");
   const [copied, setCopied] = useState(false);
+  const iframeRef = useRef(null);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -254,7 +255,16 @@ export default function OfficialTemplateModal({
 
   const handleCopy = async () => {
     if (!selected) return;
-    const html = buildCopyHtml(selected, selectedCase, currentUser, today);
+    const liveBody = iframeRef.current?.contentDocument?.body;
+    const editedBody = liveBody
+      ? Array.from(liveBody.children)
+          .filter((element) => !element.classList.contains("auto-fill-bar") && element.tagName !== "SCRIPT")
+          .map((element) => element.outerHTML)
+          .join("")
+      : "";
+    const html = editedBody
+      ? `<style>${selected.style}</style>${editedBody}`
+      : buildCopyHtml(selected, selectedCase, currentUser, today);
     try {
       const blob = new Blob([html], { type: "text/html" });
       await navigator.clipboard.write([
@@ -680,6 +690,7 @@ export default function OfficialTemplateModal({
                 {iframeDoc ? (
                   <iframe
                     key={`${selectedId}-${selectedCaseId}`}
+                    ref={iframeRef}
                     srcDoc={iframeDoc}
                     style={{ width: "100%", height: "100%", border: "none" }}
                     title="서식 미리보기"
