@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   getDisplayCaseNumber,
   getMasterCaseNumber,
@@ -1078,26 +1078,26 @@ export default function MyCasesLedger({
 
   const isHighAdmin = Boolean(
     currentUser?.isSuperAdmin ||
-      [
-        "SUPER_ADMIN",
-        "PROSECUTOR_GENERAL",
-        "CHIEF_PROSECUTOR",
-        "DEPUTY_CHIEF",
-        "CHIEF_ADMINISTRATOR",
-      ].includes(currentUser?.roleLevel),
+    [
+      "SUPER_ADMIN",
+      "PROSECUTOR_GENERAL",
+      "CHIEF_PROSECUTOR",
+      "DEPUTY_CHIEF",
+      "CHIEF_ADMINISTRATOR",
+    ].includes(currentUser?.roleLevel),
   );
 
   // 결재 필수 지정/해제 권한 — 수사지휘 라인(부장검사 이상)만 허용.
   // 검찰관리관(CHIEF_ADMINISTRATOR) 등 행정 직급은 수사 지휘권이 없으므로 제외.
   const canDesignate = Boolean(
     currentUser?.isSuperAdmin ||
-      [
-        "SUPER_ADMIN",
-        "PROSECUTOR_GENERAL",
-        "CHIEF_PROSECUTOR",
-        "DEPUTY_CHIEF",
-        "SENIOR_PROSECUTOR",
-      ].includes(currentUser?.roleLevel),
+    [
+      "SUPER_ADMIN",
+      "PROSECUTOR_GENERAL",
+      "CHIEF_PROSECUTOR",
+      "DEPUTY_CHIEF",
+      "SENIOR_PROSECUTOR",
+    ].includes(currentUser?.roleLevel),
   );
 
   // 관장 부서 목록 (본인 소속 부서 + 겸직/직무대리로 부서장 지정된 부서)
@@ -1110,9 +1110,9 @@ export default function MyCasesLedger({
       const matchId = Boolean(userId && dept.headId && dept.headId === userId);
       const matchName = Boolean(
         userName &&
-          dept.headName &&
-          typeof dept.headName === "string" &&
-          dept.headName.includes(userName),
+        dept.headName &&
+        typeof dept.headName === "string" &&
+        dept.headName.includes(userName),
       );
       return matchId || matchName;
     });
@@ -1270,7 +1270,13 @@ export default function MyCasesLedger({
     return (sourceList || []).filter(
       (p) => p && p.name && p.name !== currentUser?.name,
     );
-  }, [canSelectProsecutor, isHighAdmin, prosecutorsList, deptMembers, currentUser]);
+  }, [
+    canSelectProsecutor,
+    isHighAdmin,
+    prosecutorsList,
+    deptMembers,
+    currentUser,
+  ]);
 
   // 현재 처리중 사건 = 보존 제외
   const myActiveCases = myCases.filter((c) => !c?.isArchived);
