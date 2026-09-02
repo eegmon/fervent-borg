@@ -1154,6 +1154,7 @@ export default function MyCasesLedger({
   const [reassignFromId, setReassignFromId] = useState("");
   const [reassignToId, setReassignToId] = useState("");
   const [reassignLoading, setReassignLoading] = useState(false);
+  const [reassignSingleMap, setReassignSingleMap] = useState({}); // { caseId: toProsecutorId }
   const [seniorMsg, setSeniorMsg] = useState(null);
 
   // 관장 부서 내 검사 목록 — 권한 레벨 비교 제거(부서 소속 여부만 판단)
@@ -1769,88 +1770,198 @@ export default function MyCasesLedger({
           )}
 
           {/* 사건 재배당 탭 */}
-          {seniorTab === "reassign" && (
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "flex-end",
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <label className="input-label">
-                  현재 담당 검사 (이관 출발)
-                </label>
-                <select
-                  className="select-field"
-                  style={{ width: 200 }}
-                  value={reassignFromId}
-                  onChange={(e) => setReassignFromId(e.target.value)}
-                >
-                  <option value="">-- 선택 --</option>
-                  {deptMembers.map((p) => {
-                    const cases = ledgerData.filter(
-                      (c) => c.prosecutorId === p.id && !c.isArchived,
-                    );
-                    const caseNos = cases
-                      .slice(0, 3)
-                      .map(
-                        (c) =>
-                          (c.hyeongjeNo && c.hyeongjeNo !== "-"
-                            ? c.hyeongjeNo
-                            : c.sujeNo) || "번호미부여",
-                      )
-                      .join(", ");
-                    const more =
-                      cases.length > 3 ? ` 외 ${cases.length - 3}건` : "";
-                    return (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.position || p.title}) · {cases.length}건
-                        {cases.length > 0 ? ` [${caseNos}${more}]` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
+          {seniorTab === "reassign" && (() => {
+            const fromCases = reassignFromId
+              ? ledgerData.filter(
+                  (c) => c.prosecutorId === reassignFromId && !c.isArchived,
+                )
+              : [];
+            const toOptions = deptMembers.filter(
+              (p) => p.id !== reassignFromId,
+            );
+
+            const handleSingleReassign = async (caseItem) => {
+              const toProsecutorId = reassignSingleMap[caseItem.id];
+              if (!toProsecutorId) return;
+              const toP =
+                toOptions.find((p) => p.id === toProsecutorId) ||
+                prosecutorsList.find((p) => p.id === toProsecutorId);
+              setSeniorMsg(null);
+              const res = await updateCaseApi(caseItem.id, {
+                ...caseItem,
+                prosecutorId: toProsecutorId,
+                prosecutorName: toP?.name || toProsecutorId,
+                forceReassign: true,
+              });
+              if (res?.success) {
+                // 처리된 사건을 맵에서 제거
+                setReassignSingleMap((prev) => {
+                  const next = { ...prev };
+                  delete next[caseItem.id];
+                  return next;
+                });
+                setSeniorMsg({
+                  type: "success",
+                  text: `✅ [${caseItem.hyeongjeNo || caseItem.sujeNo}] (${caseItem.suspectName}) → ${toP?.name || toProsecutorId} 재배당 완료`,
+                });
+              } else {
+                setSeniorMsg({
+                  type: "error",
+                  text: `❌ 재배당 실패: ${res?.message || "서버 오류"}`,
+                });
+              }
+            };
+
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* 1단계: 출발 검사 선택 */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <label className="input-label">이관 출발 검사</label>
+                    <select
+                      className="select-field"
+                      style={{ width: 200 }}
+                      value={reassignFromId}
+                      onChange={(e) => {
+                        setReassignFromId(e.target.value);
+                        setReassignToId("");
+                        setReassignSingleMap({});
+                        setSeniorMsg(null);
+                      }}
+                    >
+                      <option value="">-- 검사 선택 --</option>
+                      {deptMembers.map((p) => {
+                        const cnt = ledgerData.filter(
+                          (c) => c.prosecutorId === p.id && !c.isArchived,
+                        ).length;
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.position || p.title}) · {cnt}건
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* 전체 일괄 재배당 */}
+                  {reassignFromId && fromCases.length > 0 && (
+                    <>
+                      <div style={{ color: "var(--text-muted)", marginTop: 18 }}>→ 전체 일괄</div>
+                      <div>
+                        <label className="input-label">도착 검사 (전체)</label>
+                        <select
+                          className="select-field"
+                          style={{ width: 180 }}
+                          value={reassignToId}
+                          onChange={(e) => setReassignToId(e.target.value)}
+                        >
+                          <option value="">-- 검사 선택 --</option>
+                          {toOptions.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.position || p.title})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        onClick={handleDeptReassign}
+                        disabled={!reassignToId || reassignLoading}
+                        className="btn btn-outline"
+                        style={{
+                          padding: "6px 14px",
+                          fontSize: "0.76rem",
+                          fontWeight: 700,
+                          marginTop: 18,
+                          opacity: !reassignToId || reassignLoading ? 0.5 : 1,
+                        }}
+                      >
+                        <ArrowRightLeft size={13} />
+                        {reassignLoading ? "처리 중..." : `전체 ${fromCases.length}건 재배당`}
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* 2단계: 사건별 단일 재배당 카드 */}
+                {reassignFromId && fromCases.length === 0 && (
+                  <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", padding: "6px 0" }}>
+                    해당 검사에게 배정된 활성 사건이 없습니다.
+                  </div>
+                )}
+                {fromCases.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                    <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginBottom: 2 }}>
+                      📋 사건별 단일 재배당 — 각 사건 행에서 도착 검사를 선택 후 재배당 버튼을 누르세요
+                    </div>
+                    {fromCases.map((c) => {
+                      const caseNo = (c.hyeongjeNo && c.hyeongjeNo !== "-" ? c.hyeongjeNo : c.sujeNo) || "번호미부여";
+                      const selectedTo = reassignSingleMap[c.id] || "";
+                      return (
+                        <div
+                          key={c.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            flexWrap: "wrap",
+                            background: "var(--bg-elevated)",
+                            border: "1px solid var(--border-subtle)",
+                            borderRadius: 8,
+                            padding: "8px 12px",
+                          }}
+                        >
+                          {/* 사건 정보 */}
+                          <div style={{ flex: 1, minWidth: 160 }}>
+                            <span style={{ fontWeight: 700, fontSize: "0.83rem", color: "var(--text-main)" }}>
+                              {caseNo}
+                            </span>
+                            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginLeft: 8 }}>
+                              {c.suspectName} · {c.chargeName || "형사피의사건"}
+                            </span>
+                          </div>
+
+                          {/* 도착 검사 선택 */}
+                          <select
+                            className="select-field"
+                            style={{ fontSize: "0.75rem", padding: "4px 8px", width: 160 }}
+                            value={selectedTo}
+                            onChange={(e) =>
+                              setReassignSingleMap((prev) => ({
+                                ...prev,
+                                [c.id]: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">-- 검사 선택 --</option>
+                            {toOptions.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} ({p.position || p.title})
+                              </option>
+                            ))}
+                          </select>
+
+                          {/* 재배당 버튼 */}
+                          <button
+                            onClick={() => handleSingleReassign(c)}
+                            disabled={!selectedTo || reassignLoading}
+                            className="btn btn-gold"
+                            style={{
+                              padding: "4px 12px",
+                              fontSize: "0.74rem",
+                              fontWeight: 700,
+                              opacity: !selectedTo ? 0.4 : 1,
+                            }}
+                          >
+                            <ArrowRightLeft size={12} /> 재배당
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              <div style={{ color: "var(--text-muted)", paddingBottom: 8 }}>
-                →
-              </div>
-              <div>
-                <label className="input-label">새 담당 검사 (이관 도착)</label>
-                <select
-                  className="select-field"
-                  style={{ width: 200 }}
-                  value={reassignToId}
-                  onChange={(e) => setReassignToId(e.target.value)}
-                >
-                  <option value="">-- 선택 --</option>
-                  {deptMembers
-                    .filter(
-                      (p) => p.id !== reassignFromId && p.status === "ACTIVE",
-                    )
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.position || p.title})
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <button
-                onClick={handleDeptReassign}
-                disabled={!reassignFromId || !reassignToId || reassignLoading}
-                className="btn btn-gold"
-                style={{
-                  padding: "8px 18px",
-                  fontWeight: 700,
-                  opacity: reassignLoading ? 0.6 : 1,
-                }}
-              >
-                <ArrowRightLeft size={14} />{" "}
-                {reassignLoading ? "재배당 중..." : "전체 재배당"}
-              </button>
-            </div>
-          )}
+            );
+          })()}
 
           {/* 결과 메시지 */}
           {seniorMsg && (
