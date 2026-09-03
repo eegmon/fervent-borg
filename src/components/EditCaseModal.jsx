@@ -152,6 +152,7 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
       bookingStatus: primarySuspect.bookingStatus || formData.bookingStatus || '',
       suspects: validSuspects,
       privateViewerIds,
+      forceReassign: canReassign,
     });
 
     setSaving(false);
@@ -228,7 +229,15 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
                   className="select-field"
                   name="prosecutorName"
                   value={formData.prosecutorName || ''}
-                  onChange={handleChange}
+                  onChange={(e) => {
+                    const selectedName = e.target.value;
+                    const selectedP = prosecutorsList.find(p => p.name === selectedName);
+                    setFormData(prev => ({
+                      ...prev,
+                      prosecutorName: selectedName,
+                      prosecutorId: selectedP?.id ?? prev.prosecutorId,
+                    }));
+                  }}
                   disabled={!canReassign}
                   title={!canReassign ? '담당검사 변경은 검사장 이상 또는 사무국만 가능합니다.' : undefined}
                   style={!canReassign ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
