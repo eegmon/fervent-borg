@@ -120,7 +120,7 @@ export default function Header({
             >
               도스온라인 검찰청
             </div>
-            <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+            <div className="site-header-logo-sub" style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
               통합 사건처리 포털
             </div>
           </div>
@@ -177,7 +177,7 @@ export default function Header({
             }}
           >
             <FileText size={14} />
-            {"📋 서식 복사"}
+            <span className="site-header-btn-template-label">{"📋 서식 복사"}</span>
           </button>
 
           {/* New Case */}
@@ -198,7 +198,7 @@ export default function Header({
             }
           >
             <PlusCircle size={15} />
-            신규 사건 접수
+            <span className="site-header-btn-intake-label">신규 사건 접수</span>
           </button>
 
           {/* Real-time Web Notifications Center */}
@@ -302,6 +302,7 @@ export default function Header({
                   {currentUser.name}
                 </div>
                 <div
+                  className="site-header-user-position"
                   style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}
                 >
                   {currentUser.position || currentUser.title}
@@ -383,6 +384,7 @@ export default function Header({
           }}
         >
           <span
+            className="site-header-readonly-text"
             style={{
               color: currentUser.status === "ON_LEAVE" ? "#f59e0b" : "#f97316",
               fontWeight: 700,
@@ -452,7 +454,7 @@ export default function Header({
               }}
             >
               <Icon size={15} />
-              {tab.label}
+              <span className="site-header-tab-label">{tab.label}</span>
               {tab.id === "approvals" && pendingApprovalsCount > 0 && (
                 <span
                   style={{

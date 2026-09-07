@@ -946,6 +946,7 @@ export default function MyCasesLedger({
   onOpenIndictmentComposer,
   onUpdateProsecutorStatus,
   onBulkReassign,
+  onReloadCases,
   isReadOnly = false,
 }) {
   const [selectedProsecutorFilter, setSelectedProsecutorFilter] = useState(
@@ -1244,6 +1245,10 @@ export default function MyCasesLedger({
           ? `✅ ${successCount}건 재배당 완료 → ${toP?.name || reassignToId}`
           : "❌ 재배당에 실패했습니다.",
     });
+    // 재배당 성공 건이 있으면 부모 ledgerData 재조회
+    if (successCount > 0 && onReloadCases) {
+      onReloadCases();
+    }
   };
 
   const canSelectProsecutor = Boolean(
@@ -1787,13 +1792,17 @@ export default function MyCasesLedger({
                 toOptions.find((p) => p.id === toProsecutorId) ||
                 prosecutorsList.find((p) => p.id === toProsecutorId);
               setSeniorMsg(null);
-              const res = await updateCaseApi(caseItem.id, {
+              // onUpdateCase(App.jsx handleUpdateCase)를 통해 API 호출 + ledgerData state 갱신을 일괄 처리
+              const updatedCase = {
                 ...caseItem,
                 prosecutorId: toProsecutorId,
                 prosecutorName: toP?.name || toProsecutorId,
                 forceReassign: true,
-              });
-              if (res?.success) {
+              };
+              const ok = onUpdateCase
+                ? await onUpdateCase(updatedCase)
+                : (await updateCaseApi(caseItem.id, updatedCase))?.success;
+              if (ok) {
                 // 처리된 사건을 맵에서 제거
                 setReassignSingleMap((prev) => {
                   const next = { ...prev };
@@ -1807,7 +1816,7 @@ export default function MyCasesLedger({
               } else {
                 setSeniorMsg({
                   type: "error",
-                  text: `❌ 재배당 실패: ${res?.message || "서버 오류"}`,
+                  text: `❌ 재배당 실패: 서버 오류`,
                 });
               }
             };

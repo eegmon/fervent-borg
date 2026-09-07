@@ -7017,6 +7017,9 @@ export default function SecretariatAdmin({
           addLog={addLog}
         />
       )}
+      {activeSubTab === "import" && hasHighLevelAdminAccess && (
+        <ExcelImportTab onBulkImport={onBulkImport} />
+      )}
     </div>
   );
 }

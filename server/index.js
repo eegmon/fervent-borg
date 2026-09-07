@@ -369,7 +369,7 @@ function requireApprovalScope(req, res, next) {
   return requireRecordScope("approvals")(req, res, next);
 }
 
-async function requireCaseScope(req, res, next) {
+async function requireCaseScopeImpl(req, res, next) {
   // 검찰총장은 모든 사건 접근 가능
   if (isProsecutorGeneral(req.user)) {
     return next();
@@ -465,6 +465,9 @@ async function requireCaseScope(req, res, next) {
   }
   next();
 }
+
+/** requireCaseScopeImpl을 asyncWrap으로 감싸 DB 오류를 전역 에러 핸들러로 전파 */
+const requireCaseScope = asyncWrap(requireCaseScopeImpl);
 
 async function findCaseForEvidence(caseNo, user) {
   const result = await db.execute({
@@ -2400,6 +2403,26 @@ app.put(
         ? `강제 재배당: ${assignedName} (${assignedId})${changedSummary}`
         : `처분: ${c.disposition || ""}, 상태: ${c.bookingStatus || ""}${changedSummary}`,
     });
+    // ── SSE: 사건 수정 알림 (담당검사에게) ────────────────────────────────
+    // 강제 재배당이면 새 담당검사에게, 일반 수정이면 담당검사에게 CASE_UPDATED 발송
+    try {
+      const targetId = assignedId || null;
+      if (targetId && targetId !== req.user.id) {
+        await sendNotificationToUser({
+          userId: targetId,
+          type: "CASE_UPDATED",
+          title: "사건 원부 수정",
+          message: c.forceReassign
+            ? `[${c.sujeNo || c.hyeongjeNo || "-"}] 사건이 귀하에게 재배당되었습니다.`
+            : `[${c.sujeNo || c.hyeongjeNo || "-"}] 담당 사건 원부가 수정되었습니다.`,
+          linkTab: "mycases",
+          linkId: req.params.id,
+        });
+      }
+    } catch (e) {
+      console.warn("[SSE CASE_UPDATED send error]", e.message);
+    }
+
     res.json({ success: true, id: req.params.id });
   }),
 );
@@ -2620,6 +2643,28 @@ app.post(
         a.chargeName || "",
       ],
     });
+
+    // ── SSE: 항고 접수 알림 (담당검사에게) ───────────────────────────
+    try {
+      const prosecutorRow = await db.execute({
+        sql: "SELECT id FROM prosecutors WHERE name=? AND status != 'RETIRED'",
+        args: [assignedName],
+      });
+      const prosecutorId = prosecutorRow.rows[0]?.id;
+      if (prosecutorId) {
+        await sendNotificationToUser({
+          userId: prosecutorId,
+          type: "APPEAL_UPDATED",
+          title: "항고 접수",
+          message: `[${a.hyeongjeNo || a.sujeNo || "-"}] (피의자: ${a.suspectName || "-"}) 항고가 접수되었습니다.`,
+          linkTab: "appeals",
+          linkId: id,
+        });
+      }
+    } catch (e) {
+      console.warn("[SSE APPEAL_UPDATED (new) send error]", e.message);
+    }
+
     res.json({ success: true, appeal: { ...a, id } });
   }),
 );
@@ -2655,6 +2700,36 @@ app.patch(
         sql: `UPDATE appeals SET ${updates.map(([, column]) => `${column}=?`).join(", ")} WHERE id=?`,
         args: [...updates.map(([field]) => req.body[field]), req.params.id],
       });
+
+      // ── SSE: 항고 수정 알림 (담당검사에게) ─────────────────────────
+      try {
+        const appealRow = await db.execute({
+          sql: "SELECT prosecutor_name, hyeongje_no, suje_no, suspect_name FROM appeals WHERE id=? AND deleted_at=''",
+          args: [req.params.id],
+        });
+        if (appealRow.rows.length > 0) {
+          const aRow = toCamel(appealRow.rows[0]);
+          const targetName = req.body.prosecutorName || aRow.prosecutorName;
+          const prosecutorRow = await db.execute({
+            sql: "SELECT id FROM prosecutors WHERE name=? AND status != 'RETIRED'",
+            args: [targetName || ""],
+          });
+          const prosecutorId = prosecutorRow.rows[0]?.id;
+          if (prosecutorId && prosecutorId !== req.user.id) {
+            await sendNotificationToUser({
+              userId: prosecutorId,
+              type: "APPEAL_UPDATED",
+              title: "항고 사건 수정",
+              message: `[${aRow.hyeongjeNo || aRow.sujeNo || "-"}] (피의자: ${aRow.suspectName || "-"}) 항고 사건이 수정되었습니다.`,
+              linkTab: "appeals",
+              linkId: req.params.id,
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("[SSE APPEAL_UPDATED (patch) send error]", e.message);
+      }
+
       res.json({ success: true, appeal: { ...req.body, id: req.params.id } });
     } catch (err) {
       console.error("[PATCH /appeals]", err);
@@ -2819,6 +2894,31 @@ app.post("/api/warrants", requireAuth, async (req, res) => {
         w.notes || "",
       ],
     });
+
+    // ── SSE: 영장 청구 알림 (담당검사 본인 외 전체 글로벌 권한자 or 담당검사에게) ─
+    try {
+      if (req.user.name !== assignedName) {
+        // 재배당된 경우: 지정된 담당검사에게 알림
+        const prosecutorRow = await db.execute({
+          sql: "SELECT id FROM prosecutors WHERE name=? AND status != 'RETIRED'",
+          args: [assignedName],
+        });
+        const prosecutorId = prosecutorRow.rows[0]?.id;
+        if (prosecutorId) {
+          await sendNotificationToUser({
+            userId: prosecutorId,
+            type: "WARRANT_UPDATED",
+            title: "영장 청구 배당",
+            message: `[${w.caseNo || "-"}] ${w.warrantTypeName || "영장"}이 귀하에게 배당되었습니다. (피의자: ${w.suspectName || "-"})`,
+            linkTab: "warrants",
+            linkId: id,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[SSE WARRANT_UPDATED (new) send error]", e.message);
+    }
+
     res.json({
       success: true,
       warrant: { ...w, id, prosecutorName: assignedName },
@@ -2845,6 +2945,35 @@ app.patch(
         sql: "UPDATE warrants SET status=? WHERE id=? AND deleted_at=''",
         args: [req.body.status, req.params.id],
       });
+
+      // ── SSE: 영장 상태 변경 알림 (담당검사에게) ─────────────────────
+      try {
+        const warrantRow = await db.execute({
+          sql: "SELECT prosecutor_name, case_no, suspect_name, warrant_type_name FROM warrants WHERE id=? AND deleted_at=''",
+          args: [req.params.id],
+        });
+        if (warrantRow.rows.length > 0) {
+          const wRow = toCamel(warrantRow.rows[0]);
+          const prosecutorRow = await db.execute({
+            sql: "SELECT id FROM prosecutors WHERE name=? AND status != 'RETIRED'",
+            args: [wRow.prosecutorName || ""],
+          });
+          const prosecutorId = prosecutorRow.rows[0]?.id;
+          if (prosecutorId && prosecutorId !== req.user.id) {
+            await sendNotificationToUser({
+              userId: prosecutorId,
+              type: "WARRANT_UPDATED",
+              title: "영장 상태 변경",
+              message: `[${wRow.caseNo || "-"}] ${wRow.warrantTypeName || "영장"} (피의자: ${wRow.suspectName || "-"}) 상태가 "${req.body.status}"로 변경되었습니다.`,
+              linkTab: "warrants",
+              linkId: req.params.id,
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("[SSE WARRANT_UPDATED send error]", e.message);
+      }
+
       res.json({ success: true });
     } catch (err) {
       console.error("[PATCH /warrants]", err);
@@ -5870,9 +5999,43 @@ const NON_INDICT_KEYWORDS = [
   "죄가안됨",
 ];
 
+// 단일 처분 문자열이 불기소 계열인지 판단
 function isNonIndictDisposition(disposition) {
   if (!disposition) return false;
   return NON_INDICT_KEYWORDS.some((kw) => disposition.includes(kw));
+}
+
+/**
+ * 사건의 최종 처분이 "전원 불기소" 상태인지 판단.
+ *
+ * suspects_dispositions JSON이 있으면 각 피의자의 처분을 개별 확인:
+ *   - 모든 피의자가 불기소 계열 → true
+ *   - 한 명이라도 기소/수사중/공소장 등 → false
+ * suspects_dispositions가 없거나 빈 객체이면 disposition 문자열로 폴백.
+ */
+function isCaseFullyNonIndict(disposition, suspectsDispositionsJson) {
+  // suspects_dispositions 파싱 시도
+  let dispositionsMap = {};
+  try {
+    if (suspectsDispositionsJson && suspectsDispositionsJson !== "{}") {
+      const parsed = JSON.parse(suspectsDispositionsJson);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        dispositionsMap = parsed;
+      }
+    }
+  } catch {
+    // 파싱 실패 시 무시하고 폴백
+  }
+
+  const entries = Object.values(dispositionsMap);
+
+  if (entries.length > 0) {
+    // 모든 피의자 처분이 불기소 계열이어야 보존 대상
+    return entries.every((d) => isNonIndictDisposition(String(d || "")));
+  }
+
+  // suspects_dispositions 없음 → disposition 컬럼으로 폴백
+  return isNonIndictDisposition(disposition);
 }
 
 async function runAutoArchiveScheduler() {
@@ -5892,9 +6055,11 @@ async function runAutoArchiveScheduler() {
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffStr = cutoff.toISOString().replace("T", " ").substring(0, 19);
 
-    // 불기소 처분이며 아직 보존되지 않은 사건 조회
+    // 불기소 처분이며 아직 보존되지 않은 사건 조회 (suspects_dispositions 포함)
     const casesResult = await db.execute({
-      sql: `SELECT id, hyeongje_no, suje_no, disposition, created_at
+      sql: `SELECT id, hyeongje_no, suje_no, disposition,
+                   COALESCE(suspects_dispositions, '{}') AS suspects_dispositions,
+                   created_at
             FROM cases
             WHERE is_archived = 0
               AND deleted_at = ''
@@ -5905,7 +6070,8 @@ async function runAutoArchiveScheduler() {
     let archivedCount = 0;
     for (const row of casesResult.rows) {
       const c = toCamel(row);
-      if (!isNonIndictDisposition(c.disposition)) continue;
+      // suspects_dispositions를 포함한 전원 불기소 판단
+      if (!isCaseFullyNonIndict(c.disposition, c.suspectsDispositions)) continue;
 
       // 항고 접수 여부 확인 (hyeongje_no 또는 suje_no 기준)
       const appealCheck = await db.execute({
@@ -5938,7 +6104,7 @@ async function runAutoArchiveScheduler() {
         entityLabel: c.hyeongjeNo || c.sujeNo || c.id,
         actorId: "SYSTEM",
         actorName: "자동보존 스케줄러",
-        detail: `불기소 처분(${c.disposition}) 후 ${days}일 경과, 항고 없음 — 자동 보존 처리`,
+        detail: `불기소 처분 후 ${days}일 경과, 항고 없음 — 자동 보존 처리 (처분: ${c.disposition || "-"})`,
       });
       archivedCount++;
     }

@@ -464,12 +464,33 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   color: var(--text-main);
 }
 
-/* 담당 사건 화면은 휴대폰에서도 검색과 처리 버튼을 우선 노출한다. */
+/* ═══════════════════════════════════════════════════
+   반응형 — 태블릿 (≤ 900px)
+═══════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .modal-content {
+    max-width: 96vw !important;
+    width: 96vw !important;
+    padding: 18px !important;
+    border-radius: 12px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   반응형 — 모바일 (≤ 640px)
+   담당 사건 화면은 휴대폰에서도 검색과 처리 버튼을 우선 노출한다.
+═══════════════════════════════════════════════════ */
 @media (max-width: 640px) {
+  /* ── Header ─────────────────────────────────── */
   .site-header-topbar {
     padding: 10px 12px !important;
     flex-wrap: wrap;
-    gap: 10px !important;
+    gap: 8px !important;
+  }
+
+  /* 로고 부제목 숨김 */
+  .site-header-logo-sub {
+    display: none !important;
   }
 
   .site-header-actions {
@@ -489,24 +510,91 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     font-size: 0.74rem !important;
   }
 
+  /* "서식 복사" 버튼 레이블 숨기고 아이콘만 */
+  .site-header-btn-template-label {
+    display: none !important;
+  }
+
+  /* 신규 사건 접수 버튼 레이블 숨기고 아이콘만 */
+  .site-header-btn-intake-label {
+    display: none !important;
+  }
+
   .site-header-user {
     padding: 5px 8px !important;
   }
 
+  /* 사용자 직위/직책 텍스트 숨김 */
+  .site-header-user-position {
+    display: none !important;
+  }
+
+  /* 읽기전용 배너: 문구 줄이기 */
+  .site-header-readonly-text {
+    font-size: 0.72rem !important;
+  }
+
+  /* ── 탭 네비게이션 ──────────────────────────── */
   .site-header-tabs {
-    padding: 0 10px !important;
+    padding: 0 8px !important;
     gap: 2px !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .site-header-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .site-header-tab {
-    padding: 10px 12px !important;
-    font-size: 0.76rem !important;
+    padding: 10px 10px !important;
+    font-size: 0.74rem !important;
   }
 
+  /* 탭 아이콘만 보이고 텍스트는 숨김 (화면 너무 작을 때) */
+  @media (max-width: 480px) {
+    .site-header-tab-label {
+      display: none !important;
+    }
+
+    .site-header-tab {
+      padding: 10px 12px !important;
+    }
+  }
+
+  /* ── 메인 레이아웃 ──────────────────────────── */
   .main-content {
-    padding: 12px;
+    padding: 10px !important;
   }
 
+  /* ── 모달 ───────────────────────────────────── */
+  .modal-content {
+    max-width: 100vw !important;
+    width: 100vw !important;
+    max-height: 95vh !important;
+    border-radius: 16px 16px 0 0 !important;
+    padding: 16px !important;
+    margin: auto 0 0 !important;
+    /* 하단 시트 스타일 */
+    align-self: flex-end;
+  }
+
+  .modal-overlay {
+    align-items: flex-end !important;
+  }
+
+  /* ── glass-panel ────────────────────────────── */
+  .glass-panel {
+    border-radius: 10px !important;
+  }
+
+  /* ── ledger table ───────────────────────────── */
+  .ledger-table th,
+  .ledger-table td {
+    padding: 8px 10px !important;
+    font-size: 0.78rem !important;
+  }
+
+  /* ── My Cases ───────────────────────────────── */
   .my-cases-view {
     gap: 12px !important;
   }
@@ -535,6 +623,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   .my-cases-filter {
     padding: 10px !important;
     align-items: stretch !important;
+    flex-wrap: wrap !important;
   }
 
   .my-cases-search {
@@ -553,6 +642,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
   .my-case-heading {
     align-items: flex-start !important;
+    flex-wrap: wrap !important;
   }
 
   .my-case-heading > div:first-child {
@@ -573,6 +663,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
   .my-case-actions {
     width: 100%;
+    flex-wrap: wrap !important;
   }
 
   .my-case-actions .btn,
@@ -585,5 +676,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
   .my-case-card > div:last-child {
     align-items: stretch !important;
+    flex-wrap: wrap !important;
   }
 }

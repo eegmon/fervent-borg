@@ -4,8 +4,6 @@ import { fetchSuspectProfile } from '../services/api';
 import { getDisplayCaseNumber } from '../services/caseUtils';
 
 export default function SuspectHistoryModal({ isOpen, onClose, suspectName, suspectUuid, ledgerData, onOpenSuspectProfile }) {
-  if (!isOpen) return null;
-
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -22,6 +20,8 @@ export default function SuspectHistoryModal({ isOpen, onClose, suspectName, susp
       }).catch(() => setLoading(false));
     }
   }, [isOpen, suspectUuid]);
+
+  if (!isOpen) return null;
 
   // UUID 조회 결과 또는 ledgerData 폴백
   const history = profileData?.cases

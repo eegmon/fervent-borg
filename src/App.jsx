@@ -315,6 +315,8 @@ export default function App() {
         serverCaseNumberSettings,
         serverDepartments,
         serverCharges,
+        serverNotifications,
+        serverSchedules,
       ] = await Promise.all([
         fetchCases(),
         fetchApprovals(),
@@ -379,6 +381,27 @@ export default function App() {
     loadDbData();
   }, [currentUser]);
 
+  // JWT 만료 감지 — api.js가 dispatch하는 커스텀 이벤트 수신 후 React state로 로그아웃
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setCurrentUser(null);
+      setLedgerData([]);
+      setApprovalsData([]);
+      setReportsData([]);
+      setAppealsData([]);
+      setBookingsData([]);
+      setNotifications([]);
+      setSchedules([]);
+      setAuditLogs([]);
+      setAllCaseHistory([]);
+      setActiveTab("ledger");
+      setIsLoginModalOpen(true);
+      showToast("⏰ 세션이 만료되었습니다. 다시 로그인해주세요.", "error", 5000);
+    };
+    window.addEventListener("dose:session-expired", handleSessionExpired);
+    return () => window.removeEventListener("dose:session-expired", handleSessionExpired);
+  }, []);
+
   // 실시간 SSE 알림 스트림 구독
   useEffect(() => {
     if (!currentUser) return;
@@ -415,6 +438,19 @@ export default function App() {
           } else if (data.type === "SCHEDULE") {
             fetchSchedules().then((res) => {
               if (Array.isArray(res?.schedules)) setSchedules(res.schedules);
+            });
+          } else if (data.type === "CASE_UPDATED") {
+            // 사건 원부 수정 — 사건 목록 재조회
+            fetchCases().then((res) => {
+              if (Array.isArray(res)) setLedgerData(res);
+            });
+          } else if (data.type === "WARRANT_UPDATED") {
+            // 영장 생성/상태 변경 — 별도 warrants state가 없으므로 알림만 표시
+            // (WarrantLedger는 자체 로컬 state를 갖고 있어 리렌더 트리거 필요 없음)
+          } else if (data.type === "APPEAL_UPDATED") {
+            // 항고 접수/수정 — 항고 목록 재조회
+            fetchAppeals().then((res) => {
+              if (Array.isArray(res)) setAppealsData(res);
             });
           }
         } catch (err) {
@@ -2099,6 +2135,11 @@ export default function App() {
                 onUndesignateCase={handleUndesignateCase}
                 onUpdateProsecutorStatus={handleUpdateProsecutorStatus}
                 onBulkReassign={handleBulkReassignCases}
+                onReloadCases={() =>
+                  fetchCases().then((res) => {
+                    if (Array.isArray(res)) setLedgerData(res);
+                  })
+                }
               />
             )}
 
