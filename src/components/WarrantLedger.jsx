@@ -79,6 +79,7 @@ export default function WarrantLedger({
     .split("T")[0];
   const [newForm, setNewForm] = useState({
     warrantType: "SEARCH",
+    arrestType: "구전", // 구속영장 전용: "구전" | "구후"
     caseNo: "",
     suspectName: "",
     suspectUuid: "",
@@ -109,7 +110,7 @@ export default function WarrantLedger({
     const typeObj = WARRANT_TYPES.find((t) => t.id === newForm.warrantType);
     const prefix =
       newForm.warrantType === "ARREST"
-        ? "구제"
+        ? newForm.arrestType // "구전" 또는 "구후"
         : newForm.warrantType === "SEARCH"
           ? "압제"
           : newForm.warrantType === "LOG"
@@ -777,6 +778,66 @@ export default function WarrantLedger({
                   ))}
                 </select>
               </div>
+
+              {/* 구속영장 전용: 구전/구후 선택 */}
+              {newForm.warrantType === "ARREST" && (
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "0.78rem",
+                      fontWeight: 700,
+                      color: "var(--text-muted)",
+                      marginBottom: 8,
+                    }}
+                  >
+                    구속영장 유형 *
+                  </label>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    {[
+                      { value: "구전", label: "구전 (사전)", desc: "체포 전 청구" },
+                      { value: "구후", label: "구후 (사후)", desc: "체포 후 청구" },
+                    ].map((opt) => (
+                      <label
+                        key={opt.value}
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "10px 14px",
+                          borderRadius: 10,
+                          border: `2px solid ${newForm.arrestType === opt.value ? "var(--primary-amber)" : "var(--border-subtle)"}`,
+                          background: newForm.arrestType === opt.value
+                            ? "rgba(245,158,11,0.1)"
+                            : "var(--bg-elevated)",
+                          cursor: "pointer",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="arrestType"
+                          value={opt.value}
+                          checked={newForm.arrestType === opt.value}
+                          onChange={(e) =>
+                            setNewForm({ ...newForm, arrestType: e.target.value })
+                          }
+                          style={{ accentColor: "var(--primary-amber)" }}
+                        />
+                        <div>
+                          <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--text-main)" }}>
+                            {opt.label}
+                          </div>
+                          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                            {opt.desc}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div
                 style={{
