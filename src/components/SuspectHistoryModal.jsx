@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Clock, RefreshCw } from 'lucide-react';
 import { fetchSuspectProfile } from '../services/api';
-import { getDisplayCaseNumber } from '../services/caseUtils';
+import { getDisplayCaseNumber, parseDispositionEntries, dispositionColor } from '../services/caseUtils';
 
 export default function SuspectHistoryModal({ isOpen, onClose, suspectName, suspectUuid, ledgerData, onOpenSuspectProfile }) {
   const [profileData, setProfileData] = useState(null);
@@ -121,9 +121,25 @@ export default function SuspectHistoryModal({ isOpen, onClose, suspectName, susp
                   </div>
                   <div style={{ fontSize: '0.82rem', color: 'var(--text-main)', fontWeight: 600, marginBottom: 6 }}>{c.chargeName}</div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span className={`badge ${(c.disposition || '').includes('구속') ? 'badge-danger' : (c.disposition || '').includes('불기소') ? 'badge-success' : 'badge-warning'}`}>
-                      {c.disposition || '수사중'}
-                    </span>
+                    {parseDispositionEntries(c).map((entry, i) => (
+                      <span
+                        key={i}
+                        className="badge"
+                        style={{
+                          background: `${dispositionColor(entry.disposition)}20`,
+                          color: dispositionColor(entry.disposition),
+                          border: `1px solid ${dispositionColor(entry.disposition)}40`,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 3,
+                        }}
+                      >
+                        {entry.name && (
+                          <span style={{ fontWeight: 600, opacity: 0.75, fontSize: '0.7rem' }}>{entry.name}:</span>
+                        )}
+                        {entry.disposition}
+                      </span>
+                    ))}
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Clock size={11} />{c.bookingDate || '-'}
                     </span>

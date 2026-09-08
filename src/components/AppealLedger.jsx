@@ -1106,7 +1106,7 @@ function AppealFormModal({
             {form.hyeongjeNo && (
               <div style={{
                 padding: "6px 10px",
-                background: "var(--bg-tertiary)",
+                background: "var(--bg-elevated)",
                 border: "1px solid var(--primary-amber)",
                 borderRadius: 6,
                 fontSize: "0.78rem",
@@ -1148,7 +1148,7 @@ function AppealFormModal({
                   left: 0,
                   right: 0,
                   zIndex: 9999,
-                  background: "var(--bg-secondary)",
+                  background: "var(--bg-card)",
                   border: "1px solid var(--border-color)",
                   borderRadius: 6,
                   maxHeight: 220,
@@ -1181,8 +1181,8 @@ function AppealFormModal({
                           color: "var(--text-primary)",
                           fontSize: "0.78rem",
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-tertiary)"}
-                        onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-elevated)"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "var(--bg-card)"}
                       >
                         <div style={{ fontWeight: 600 }}>{c.sujeNo ? `수제 ${c.sujeNo} | ` : ""}{c.hyeongjeNo}호 | {c.suspectName}</div>
                         <div style={{ color: "var(--text-muted)", fontSize: "0.72rem", marginTop: 2 }}>

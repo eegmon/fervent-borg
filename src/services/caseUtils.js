@@ -95,3 +95,81 @@ export function isArchivedCase(caseItem) {
 export function isActiveCase(caseItem) {
   return !isArchivedCase(caseItem);
 }
+
+/**
+ * disposition 문자열을 피의자별 항목으로 분리한다.
+ *
+ * 케이스:
+ *   - suspectsDispositions 객체가 있으면 → { name, disposition }[] 반환
+ *   - 없으면 disposition 문자열을 " / " 로 split:
+ *       "홍길동: 구속기소 (결재완료) / 김철수: 혐의없음 - 증거불충분 (불기소)"
+ *       → [{ name: "홍길동", disposition: "구속기소 (결재완료)" }, ...]
+ *     "이름: " 패턴이 없으면 전체를 단일 항목으로 반환
+ *
+ * @param {object} caseItem  - suspects, suspectsDispositions, disposition 포함
+ * @returns {{ name: string|null, disposition: string }[]}
+ */
+export function parseDispositionEntries(caseItem) {
+  if (!caseItem) return [];
+
+  // suspects_dispositions 객체 우선 사용
+  const dispsMap = caseItem.suspectsDispositions;
+  const suspects = Array.isArray(caseItem.suspects) ? caseItem.suspects : [];
+
+  if (dispsMap && typeof dispsMap === "object" && Object.keys(dispsMap).length > 0) {
+    if (suspects.length > 0) {
+      return suspects.map((s) => {
+        const key = s.id || s.uuid || s.name;
+        return {
+          name: s.name || null,
+          disposition: dispsMap[key] || caseItem.disposition || "수사중",
+        };
+      });
+    }
+    // suspects 배열 없이 맵만 있는 경우
+    return Object.entries(dispsMap).map(([key, disp]) => ({
+      name: key,
+      disposition: disp,
+    }));
+  }
+
+  // disposition 문자열 파싱 (fallback)
+  const raw = (caseItem.disposition || "").trim();
+  if (!raw) return [{ name: null, disposition: "수사중" }];
+
+  const parts = raw.split(" / ").map((s) => s.trim()).filter(Boolean);
+  if (parts.length <= 1) {
+    // 단일 항목 — "이름: 처분" 패턴 분리 시도
+    const m = parts[0]?.match(/^(.+?):\s*(.+)$/);
+    if (m) return [{ name: m[1].trim(), disposition: m[2].trim() }];
+    return [{ name: null, disposition: parts[0] || raw }];
+  }
+
+  return parts.map((part) => {
+    const m = part.match(/^(.+?):\s*(.+)$/);
+    if (m) return { name: m[1].trim(), disposition: m[2].trim() };
+    return { name: null, disposition: part };
+  });
+}
+
+/**
+ * 처분 문자열에 따른 색상을 반환한다.
+ * STATUS_COLOR와 동일한 규칙, 컴포넌트 외부에서도 공유 가능.
+ *
+ * @param {string} disp
+ * @returns {string} hex color
+ */
+export function dispositionColor(disp) {
+  if (!disp) return "#94a3b8";
+  if (disp.includes("구속")) return "#f87171";
+  if (
+    disp.includes("불기소") ||
+    disp.includes("무혐의") ||
+    disp.includes("유예") ||
+    disp.includes("공소권없음") ||
+    disp.includes("기소중지")
+  )
+    return "#34d399";
+  if (disp.includes("기소")) return "#fb923c";
+  return "#93c5fd";
+}

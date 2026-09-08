@@ -583,7 +583,7 @@ export default function ApprovalSystem({
   const handleOpenEditDocModal = () => {
     if (!selectedDoc) return;
     setEditDocForm({
-      dispositionType: selectedDoc.dispositionType || "구속기소",
+      dispositionType: selectedDoc.dispositionType || "",
       summary: selectedDoc.summary || "",
       attachments:
         selectedDoc.attachments?.length > 0

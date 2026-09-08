@@ -15,7 +15,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import EditCaseModal from "./EditCaseModal";
-import { getDisplayCaseNumber, getMasterCaseNumber, matchesCaseNumber } from "../services/caseUtils";
+import { getDisplayCaseNumber, getMasterCaseNumber, matchesCaseNumber, parseDispositionEntries, dispositionColor } from "../services/caseUtils";
 
 const STATUS_COLOR = (s) => {
   if (!s) return "#94a3b8";
@@ -775,15 +775,26 @@ export default function MainLedger({
                       <AlertCircle size={10} />
                       {item.bookingStatus}
                     </span>
-                    <span
-                      style={{
-                        fontSize: "0.78rem",
-                        fontWeight: 700,
-                        color: STATUS_COLOR(item.disposition),
-                      }}
-                    >
-                      {item.disposition}
-                    </span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      {parseDispositionEntries(item).map((entry, i) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                          {entry.name && (
+                            <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 600 }}>
+                              {entry.name}:
+                            </span>
+                          )}
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              color: dispositionColor(entry.disposition),
+                            }}
+                          >
+                            {entry.disposition}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                     <div
                       style={{
                         fontSize: "0.68rem",

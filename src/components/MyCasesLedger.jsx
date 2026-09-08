@@ -3,6 +3,8 @@ import {
   getDisplayCaseNumber,
   getMasterCaseNumber,
   matchesCaseNumber,
+  parseDispositionEntries,
+  dispositionColor,
 } from "../services/caseUtils";
 import {
   UserCheck,
@@ -1373,7 +1375,6 @@ export default function MyCasesLedger({
       onUpdateCase({
         ...statusChangeCase,
         disposition: finalDisposition,
-        bookingStatus: finalDisposition,
         suspectsDispositions: suspectsDispositions,
       });
     setStatusChangeCase(null);
@@ -1422,7 +1423,6 @@ export default function MyCasesLedger({
       onUpdateCase({
         ...caseItem,
         disposition: dispositionType,
-        bookingStatus: dispositionType,
       });
     alert(
       `✅ [${dispositionType}] 결재 문서가 전자결재함에 상신되었습니다.\n담당자: ${approvalLine[0]?.name || currentUser.name}`,
@@ -2175,16 +2175,25 @@ export default function MyCasesLedger({
                           ✅ 결재 완료
                         </span>
                       )}
-                    <span
-                      className="badge"
-                      style={{
-                        background: `${statusColor}20`,
-                        color: statusColor,
-                        fontSize: "0.75rem",
-                      }}
-                    >
-                      {item.disposition || item.bookingStatus || "수사중"}
-                    </span>
+                    {parseDispositionEntries(item).map((entry, i) => (
+                      <span
+                        key={i}
+                        className="badge"
+                        style={{
+                          background: `${dispositionColor(entry.disposition)}20`,
+                          color: dispositionColor(entry.disposition),
+                          fontSize: "0.75rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                        }}
+                      >
+                        {entry.name && (
+                          <span style={{ fontWeight: 600, opacity: 0.75 }}>{entry.name}:</span>
+                        )}
+                        {entry.disposition}
+                      </span>
+                    ))}
                   </div>
                   <div
                     style={{
