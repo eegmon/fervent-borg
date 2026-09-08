@@ -2618,54 +2618,59 @@ app.post(
     });
     if (lenErr)
       return res.status(400).json({ success: false, message: lenErr });
-    const assignedName = hasGlobalDataAccess(req.user)
-      ? a.prosecutorName || req.user.name
-      : req.user.name;
-    // 클라이언트 제공 ID 무시 — 서버에서 항상 UUID 생성
-    const id = `APL-${Date.now()}-${randomUUID().slice(0, 8)}`;
-    await db.execute({
-      sql: `INSERT INTO appeals (id, appeal_no, hyeongje_no, suje_no, status,
-            prosecutor_name, suspect_name, suspect_uuid, disposition, disposition_date,
-            basis_url, charge_name)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      args: [
-        id,
-        a.appealNo || "",
-        a.hyeongjeNo || "",
-        a.sujeNo || "",
-        a.status || "",
-        assignedName,
-        a.suspectName || "",
-        a.suspectUuid || "",
-        a.disposition || "",
-        a.dispositionDate || "",
-        a.basisUrl || "",
-        a.chargeName || "",
-      ],
-    });
-
-    // ── SSE: 항고 접수 알림 (담당검사에게) ───────────────────────────
     try {
-      const prosecutorRow = await db.execute({
-        sql: "SELECT id FROM prosecutors WHERE name=? AND status != 'RETIRED'",
-        args: [assignedName],
+      const assignedName = hasGlobalDataAccess(req.user)
+        ? a.prosecutorName || req.user.name
+        : req.user.name;
+      // 클라이언트 제공 ID 무시 — 서버에서 항상 UUID 생성
+      const id = `APL-${Date.now()}-${randomUUID().slice(0, 8)}`;
+      await db.execute({
+        sql: `INSERT INTO appeals (id, appeal_no, hyeongje_no, suje_no, status,
+              prosecutor_name, suspect_name, suspect_uuid, disposition, disposition_date,
+              basis_url, charge_name)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        args: [
+          id,
+          a.appealNo || "",
+          a.hyeongjeNo || "",
+          a.sujeNo || "",
+          a.status || "",
+          assignedName,
+          a.suspectName || "",
+          a.suspectUuid || "",
+          a.disposition || "",
+          a.dispositionDate || "",
+          a.basisUrl || "",
+          a.chargeName || "",
+        ],
       });
-      const prosecutorId = prosecutorRow.rows[0]?.id;
-      if (prosecutorId) {
-        await sendNotificationToUser({
-          userId: prosecutorId,
-          type: "APPEAL_UPDATED",
-          title: "항고 접수",
-          message: `[${a.hyeongjeNo || a.sujeNo || "-"}] (피의자: ${a.suspectName || "-"}) 항고가 접수되었습니다.`,
-          linkTab: "appeals",
-          linkId: id,
-        });
-      }
-    } catch (e) {
-      console.warn("[SSE APPEAL_UPDATED (new) send error]", e.message);
-    }
 
-    res.json({ success: true, appeal: { ...a, id } });
+      // ── SSE: 항고 접수 알림 (담당검사에게) ───────────────────────────
+      try {
+        const prosecutorRow = await db.execute({
+          sql: "SELECT id FROM prosecutors WHERE name=? AND status != 'RETIRED'",
+          args: [assignedName],
+        });
+        const prosecutorId = prosecutorRow.rows[0]?.id;
+        if (prosecutorId) {
+          await sendNotificationToUser({
+            userId: prosecutorId,
+            type: "APPEAL_UPDATED",
+            title: "항고 접수",
+            message: `[${a.hyeongjeNo || a.sujeNo || "-"}] (피의자: ${a.suspectName || "-"}) 항고가 접수되었습니다.`,
+            linkTab: "appeals",
+            linkId: id,
+          });
+        }
+      } catch (e) {
+        console.warn("[SSE APPEAL_UPDATED (new) send error]", e.message);
+      }
+
+      res.json({ success: true, appeal: { ...a, id } });
+    } catch (err) {
+      console.error("[POST /appeals]", err);
+      res.status(500).json({ success: false, message: err.message || "서버 오류가 발생했습니다." });
+    }
   }),
 );
 

@@ -259,7 +259,8 @@ export async function initDb() {
       disposition      TEXT,
       disposition_date TEXT,
       basis_url        TEXT,
-      charge_name      TEXT
+      charge_name      TEXT,
+      deleted_at       TEXT DEFAULT ''
     )
   `);
 
