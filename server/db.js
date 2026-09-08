@@ -263,6 +263,19 @@ export async function initDb() {
       deleted_at       TEXT DEFAULT ''
     )
   `);
+  // 기존 appeals 테이블에 누락된 컬럼 마이그레이션
+  for (const column of [
+    "suje_no TEXT DEFAULT ''",
+    "charge_name TEXT DEFAULT ''",
+    "deleted_at TEXT DEFAULT ''",
+  ]) {
+    try {
+      await db.execute(`ALTER TABLE appeals ADD COLUMN ${column}`);
+    } catch (error) {
+      if (!String(error.message || error).includes("duplicate column"))
+        throw error;
+    }
+  }
 
   // ── bookings ───────────────────────────────────────────────────
   await db.execute(`
