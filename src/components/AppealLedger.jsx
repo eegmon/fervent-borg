@@ -81,6 +81,14 @@ export default function AppealLedger({
   // Filtered Appeals
   const filteredAppeals = appeals.filter((a) => {
     const s = searchTerm.toLowerCase();
+
+    // 원처분 사건 조회 (sujeNo 또는 hyeongjeNo로 매칭)
+    const originalCase = ledgerData.find(
+      (c) =>
+        (a.hyeongjeNo && c.hyeongjeNo === a.hyeongjeNo) ||
+        (a.sujeNo && (c.hyeongjeNo === a.sujeNo || c.sujeNo === a.sujeNo))
+    );
+
     const matchSearch =
       !s ||
       (a.jibulhangNo || "").toLowerCase().includes(s) ||
@@ -92,7 +100,17 @@ export default function AppealLedger({
       (a.prosecutorName || "").toLowerCase().includes(s) ||
       (a.suspectName || "").toLowerCase().includes(s) ||
       (a.chargeName || "").toLowerCase().includes(s) ||
-      (a.appealStatus || a.status || "").toLowerCase().includes(s);
+      (a.appealStatus || a.status || "").toLowerCase().includes(s) ||
+      // 원처분 사건 필드 검색
+      (originalCase && (
+        (originalCase.suspectName || "").toLowerCase().includes(s) ||
+        (originalCase.chargeName || "").toLowerCase().includes(s) ||
+        (originalCase.prosecutorName || "").toLowerCase().includes(s) ||
+        (originalCase.hyeongjeNo || "").toLowerCase().includes(s) ||
+        (originalCase.sujeNo || "").toLowerCase().includes(s) ||
+        (originalCase.bookingNo || "").toLowerCase().includes(s) ||
+        (originalCase.disposition || "").toLowerCase().includes(s)
+      ));
 
     const matchStatus =
       statusFilter === "ALL" ||
@@ -949,6 +967,37 @@ function AppealFormModal({
   isEdit,
 }) {
   const [mojangLoading, setMojangLoading] = useState(false);
+  const [caseSearchTerm, setCaseSearchTerm] = useState("");
+  const [showCaseDropdown, setShowCaseDropdown] = useState(false);
+
+  // 불기소 처분된 사건만 필터링
+  const unindictedCases = (ledgerData || []).filter((c) => {
+    const d = (c.disposition || "").toLowerCase();
+    return d.includes("불기소") || d.includes("혐의없음") || d.includes("각하") || d.includes("공소권없음") || d.includes("죄가안됨") || d.includes("기소유예");
+  });
+
+  // 검색어로 2차 필터링
+  const sortBySujeNo = (arr) =>
+    [...arr].sort((a, b) => {
+      const n = (v) => parseInt((v || "").replace(/\D/g, ""), 10) || 0;
+      return n(a.sujeNo) - n(b.sujeNo);
+    });
+
+  const filteredCases = sortBySujeNo(
+    caseSearchTerm.trim()
+      ? unindictedCases.filter((c) => {
+          const s = caseSearchTerm.toLowerCase();
+          return (
+            (c.hyeongjeNo || "").toLowerCase().includes(s) ||
+            (c.sujeNo || "").toLowerCase().includes(s) ||
+            (c.suspectName || "").toLowerCase().includes(s) ||
+            (c.chargeName || "").toLowerCase().includes(s) ||
+            (c.prosecutorName || "").toLowerCase().includes(s) ||
+            (c.disposition || "").toLowerCase().includes(s)
+          );
+        })
+      : unindictedCases
+  );
 
   const handleMojangSearch = async () => {
     if (!form.suspectName || !form.suspectName.trim()) {
@@ -1053,19 +1102,105 @@ function AppealFormModal({
             >
               💡 원 처분 사건 선택 시 자동 채우기
             </label>
-            <select
-              className="select-field"
-              value={form.hyeongjeNo}
-              onChange={(e) => onSelectCase(e.target.value)}
-            >
-              <option value="">사건 원부에서 사건 선택...</option>
-              {ledgerData.map((c) => (
-                <option key={c.id} value={c.hyeongjeNo}>
-                  {c.hyeongjeNo}호 | {c.suspectName} | {c.chargeName} (
-                  {c.disposition || "불기소"})
-                </option>
-              ))}
-            </select>
+            {/* 선택된 사건 표시 */}
+            {form.hyeongjeNo && (
+              <div style={{
+                padding: "6px 10px",
+                background: "var(--bg-tertiary)",
+                border: "1px solid var(--primary-amber)",
+                borderRadius: 6,
+                fontSize: "0.78rem",
+                color: "var(--primary-amber)",
+                marginBottom: 6,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}>
+                <span>✅ {form.sujeNo ? `수제 ${form.sujeNo} | ` : ""}{form.hyeongjeNo}호 | {form.suspectName} | {form.chargeName}</span>
+                <button
+                  type="button"
+                  onClick={() => { onSelectCase(""); setCaseSearchTerm(""); }}
+                  style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 0 }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            {/* 검색 입력 */}
+            <div style={{ position: "relative" }}>
+              <div style={{ position: "relative" }}>
+                <Search size={13} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="사건번호 · 피의자 · 죄명 · 검사 검색... (불기소 처분만 표시)"
+                  value={caseSearchTerm}
+                  onChange={(e) => { setCaseSearchTerm(e.target.value); setShowCaseDropdown(true); }}
+                  onFocus={() => setShowCaseDropdown(true)}
+                  style={{ paddingLeft: 28, fontSize: "0.8rem" }}
+                />
+              </div>
+              {/* 드롭다운 목록 */}
+              {showCaseDropdown && (
+                <div style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  zIndex: 9999,
+                  background: "var(--bg-secondary)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: 6,
+                  maxHeight: 220,
+                  overflowY: "auto",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+                }}>
+                  {filteredCases.length === 0 ? (
+                    <div style={{ padding: "10px 12px", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      {unindictedCases.length === 0 ? "불기소 처분된 사건이 없습니다." : "검색 결과가 없습니다."}
+                    </div>
+                  ) : (
+                    filteredCases.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          onSelectCase(c.hyeongjeNo);
+                          setCaseSearchTerm("");
+                          setShowCaseDropdown(false);
+                        }}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "8px 12px",
+                          background: "none",
+                          border: "none",
+                          borderBottom: "1px solid var(--border-color)",
+                          cursor: "pointer",
+                          color: "var(--text-primary)",
+                          fontSize: "0.78rem",
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-tertiary)"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+                      >
+                        <div style={{ fontWeight: 600 }}>{c.sujeNo ? `수제 ${c.sujeNo} | ` : ""}{c.hyeongjeNo}호 | {c.suspectName}</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: "0.72rem", marginTop: 2 }}>
+                          {c.chargeName} · {c.disposition} · {c.prosecutorName}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+            {/* 드롭다운 외부 클릭 시 닫기 */}
+            {showCaseDropdown && (
+              <div
+                style={{ position: "fixed", inset: 0, zIndex: 9998 }}
+                onClick={() => setShowCaseDropdown(false)}
+              />
+            )}
           </div>
         )}
 
