@@ -119,13 +119,14 @@ export default function AppealLedger({
   });
 
   // Select case from ledger in add modal -> Auto-fills matching fields
-  const handleSelectCase = (hyeongjeNo) => {
-    const selected = ledgerData.find((c) => c.hyeongjeNo === hyeongjeNo);
+  // caseId: c.id (고유 식별자) 기준으로 매칭 — 형제번호 없는 사건도 정확히 선택됨
+  const handleSelectCase = (caseId) => {
+    const selected = ledgerData.find((c) => c.id === caseId);
     if (selected) {
       setAddForm((prev) => ({
         ...prev,
-        sujeNo: selected.hyeongjeNo || "미지정",
-        hyeongjeNo: selected.hyeongjeNo,
+        sujeNo: selected.sujeNo || selected.hyeongjeNo || "미지정",
+        hyeongjeNo: selected.hyeongjeNo || "",
         beobwonNo: selected.court1No || "-",
         chargeName: selected.chargeName || "",
         prosecutorName: selected.prosecutorName || prev.prosecutorName,
@@ -138,7 +139,7 @@ export default function AppealLedger({
         indictmentDocUrl: selected.court1Doc || "",
       }));
     } else {
-      setAddForm((prev) => ({ ...prev, hyeongjeNo }));
+      setAddForm((prev) => ({ ...prev, hyeongjeNo: caseId }));
     }
   };
 
@@ -1103,7 +1104,7 @@ function AppealFormModal({
               💡 원 처분 사건 선택 시 자동 채우기
             </label>
             {/* 선택된 사건 표시 */}
-            {form.hyeongjeNo && (
+            {(form.hyeongjeNo || form.sujeNo) && (
               <div style={{
                 padding: "6px 10px",
                 background: "var(--bg-elevated)",
@@ -1165,7 +1166,7 @@ function AppealFormModal({
                         key={c.id}
                         type="button"
                         onClick={() => {
-                          onSelectCase(c.hyeongjeNo);
+                          onSelectCase(c.id);
                           setCaseSearchTerm("");
                           setShowCaseDropdown(false);
                         }}
