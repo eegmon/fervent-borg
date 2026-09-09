@@ -2314,10 +2314,24 @@ app.put(
               },
             ]
           : [];
-    const dispositionMapForUpdate =
+    let dispositionMapForUpdate =
       c.suspectsDispositions && typeof c.suspectsDispositions === "object"
-        ? c.suspectsDispositions
+        ? { ...c.suspectsDispositions }
         : {};
+
+    // c.disposition이 문자열로 명시 전달된 경우 피의자 맵과 동기화
+    if (typeof c.disposition === "string" && c.disposition.trim()) {
+      const dispText = c.disposition.trim();
+      if (suspectsForUpdate.length <= 1 || Object.keys(dispositionMapForUpdate).length === 0) {
+        suspectsForUpdate.forEach((s, idx) => {
+          const key = s.id || s.uuid || s.name || `suspect-${idx}`;
+          dispositionMapForUpdate[key] = dispText;
+          if (s.name) dispositionMapForUpdate[s.name] = dispText;
+          if (s.uuid) dispositionMapForUpdate[s.uuid] = dispText;
+        });
+      }
+    }
+
     const effectiveDisposition =
       suspectsForUpdate.length > 1
         ? buildCaseDispositionSummary(

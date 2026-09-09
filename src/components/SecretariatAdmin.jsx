@@ -3103,14 +3103,18 @@ export default function SecretariatAdmin({
       (currentUser.dualSecretariatWork &&
         currentUser.dualDept?.includes("사무국")));
 
+  const HIGH_LEVEL_ROLES = new Set([
+    "SUPER_ADMIN",
+    "PROSECUTOR_GENERAL",
+    "CHIEF_PROSECUTOR",
+    "DEPUTY_CHIEF",
+    "CHIEF_ADMINISTRATOR",
+  ]);
   const hasHighLevelAdminAccess =
     currentUser &&
     (currentUser.isSuperAdmin ||
-      currentUser.roleLevel === "SUPER_ADMIN" ||
-      currentUser.roleLevel === "PROSECUTOR_GENERAL" ||
-      currentUser.roleLevel === "CHIEF_PROSECUTOR" ||
-      currentUser.roleLevel === "DEPUTY_CHIEF" ||
-      currentUser.roleLevel === "CHIEF_ADMINISTRATOR");
+      HIGH_LEVEL_ROLES.has(currentUser.roleLevel) ||
+      HIGH_LEVEL_ROLES.has(currentUser.dualRoleLevel));
   const canManageSecretariatPersonnel =
     currentUser?.isSuperAdmin ||
     currentUser?.dept?.includes("사무국") ||

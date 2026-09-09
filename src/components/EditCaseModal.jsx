@@ -145,12 +145,25 @@ export default function EditCaseModal({ isOpen, onClose, caseItem, onSave, prose
       ? `${primarySuspect.name} 외 ${validSuspects.length - 1}명`
       : primarySuspect.name;
 
+    const currentDisposition = (formData.disposition || '').trim();
+    const updatedSuspectsDispositions = {};
+    if (currentDisposition) {
+      validSuspects.forEach((s, idx) => {
+        const key = s.id || s.uuid || s.name || `suspect-${idx}`;
+        updatedSuspectsDispositions[key] = currentDisposition;
+        if (s.id) updatedSuspectsDispositions[s.id] = currentDisposition;
+        if (s.uuid) updatedSuspectsDispositions[s.uuid] = currentDisposition;
+        if (s.name) updatedSuspectsDispositions[s.name] = currentDisposition;
+      });
+    }
+
     const success = await onSave({
       ...formData,
       suspectName: displaySuspectName,
       suspectUuid: primarySuspect.uuid || '',
       bookingStatus: primarySuspect.bookingStatus || formData.bookingStatus || '',
       suspects: validSuspects,
+      suspectsDispositions: updatedSuspectsDispositions,
       privateViewerIds,
       forceReassign: canReassign,
     });

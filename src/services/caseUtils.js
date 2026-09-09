@@ -119,10 +119,14 @@ export function parseDispositionEntries(caseItem) {
   if (dispsMap && typeof dispsMap === "object" && Object.keys(dispsMap).length > 0) {
     if (suspects.length > 0) {
       return suspects.map((s) => {
-        const key = s.id || s.uuid || s.name;
+        const found =
+          (s.id && dispsMap[s.id]) ||
+          (s.uuid && dispsMap[s.uuid]) ||
+          (s.name && dispsMap[s.name]) ||
+          dispsMap[s.id || s.uuid || s.name];
         return {
           name: s.name || null,
-          disposition: dispsMap[key] || caseItem.disposition || "수사중",
+          disposition: found || caseItem.disposition || "수사중",
         };
       });
     }
