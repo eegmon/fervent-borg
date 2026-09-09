@@ -1,5 +1,9 @@
 import React, { useState } from "react";
 import { AlertOctagon, ExternalLink, Eye, EyeOff } from "lucide-react";
+import {
+  getDisplayCaseNumber,
+  getMasterCaseNumber,
+} from "../services/caseUtils";
 
 function getBookingElapsedDays(booking) {
   const raw = Number(booking?.daysElapsed ?? 0);
@@ -19,7 +23,10 @@ function getBookingElapsedDays(booking) {
 
 function getBookingDisplayKey(booking) {
   return [
-    booking?.hyeongjeNo || "",
+    getMasterCaseNumber(booking) ||
+      booking?.hyeongjeNo ||
+      booking?.sujeNo ||
+      "",
     booking?.suspectName || "",
     booking?.suspectUuid || "",
     booking?.prosecutorName || "",
@@ -130,7 +137,7 @@ export default function BookingLedger({
           <table className="ledger-table">
             <thead>
               <tr>
-                <th>형제번호</th>
+                <th>사건번호</th>
                 <th>담당검사</th>
                 <th>피의자</th>
                 <th>UUID</th>
@@ -153,7 +160,10 @@ export default function BookingLedger({
                         color: "var(--primary-amber)",
                       }}
                     >
-                      {b.hyeongjeNo}
+                      {getDisplayCaseNumber(b) ||
+                        b.sujeNo ||
+                        b.hyeongjeNo ||
+                        "-"}
                     </td>
                     <td style={{ fontWeight: 700 }}>{b.prosecutorName}</td>
                     <td>
@@ -225,7 +235,9 @@ export default function BookingLedger({
                         onClick={() =>
                           onSelectEvidence(
                             b.basisUrl || "",
-                            b.hyeongjeNo,
+                            getMasterCaseNumber(b) ||
+                              b.sujeNo ||
+                              b.hyeongjeNo,
                             b.suspectName,
                           )
                         }

@@ -28,6 +28,10 @@ import {
   createApprovalTemplateApi,
   deleteApprovalTemplateApi,
 } from "../services/api";
+import {
+  getMasterCaseNumber,
+  getDisplayCaseNumber,
+} from "../services/caseUtils";
 
 const NAVER_CAFE_MENU_URL =
   "https://cafe.naver.com/f-e/cafes/29669442/menus/262";
@@ -495,7 +499,9 @@ export default function ApprovalSystem({
   });
   const [newDocData, setNewDocData] = useState({
     docType: "GIAN",
-    hyeongjeNo: ledgerData[0]?.hyeongjeNo || "",
+    caseId: ledgerData[0]?.id || "",
+    hyeongjeNo:
+      getMasterCaseNumber(ledgerData[0]) || ledgerData[0]?.hyeongjeNo || "",
     suspectName: ledgerData[0]?.suspectName || "",
     chargeName: ledgerData[0]?.chargeName || "",
     dispositionType: "기안 및 청구",
@@ -911,7 +917,10 @@ export default function ApprovalSystem({
       String(currentUser?.dept || "").includes("사무국");
     if (!isGlobalApproval && newDocData.hyeongjeNo) {
       const ownerCase = ledgerData.find(
-        (l) => l.hyeongjeNo === newDocData.hyeongjeNo,
+        (l) =>
+          (l.id && String(l.id) === String(newDocData.caseId)) ||
+          (l.sujeNo && l.sujeNo === newDocData.hyeongjeNo) ||
+          (l.hyeongjeNo && l.hyeongjeNo === newDocData.hyeongjeNo),
       );
       if (ownerCase && ownerCase.prosecutorId !== currentUser?.id) {
         alert("담당 사건의 결재만 상신할 수 있습니다.");
@@ -1326,14 +1335,22 @@ export default function ApprovalSystem({
                     </label>
                     <select
                       className="select-field"
-                      value={newDocData.hyeongjeNo}
+                      value={newDocData.caseId || newDocData.hyeongjeNo}
                       onChange={(e) => {
                         const m = ledgerData.find(
-                          (l) => l.hyeongjeNo === e.target.value,
+                          (l) =>
+                            String(l.id) === e.target.value ||
+                            getMasterCaseNumber(l) === e.target.value ||
+                            l.hyeongjeNo === e.target.value,
                         );
+                        const chosenNum =
+                          getMasterCaseNumber(m) ||
+                          m?.hyeongjeNo ||
+                          e.target.value;
                         setNewDocData({
                           ...newDocData,
-                          hyeongjeNo: e.target.value,
+                          caseId: m?.id || e.target.value,
+                          hyeongjeNo: chosenNum,
                           suspectName: m?.suspectName || newDocData.suspectName,
                           chargeName: m?.chargeName || newDocData.chargeName,
                         });
@@ -1355,8 +1372,12 @@ export default function ApprovalSystem({
                               (l) => l.prosecutorId === currentUser?.id,
                             );
                       })().map((l) => (
-                        <option key={l.id} value={l.hyeongjeNo}>
-                          {l.hyeongjeNo} ({l.suspectName})
+                        <option key={l.id} value={l.id}>
+                          {getDisplayCaseNumber(l) ||
+                            l.sujeNo ||
+                            l.hyeongjeNo ||
+                            l.id}{" "}
+                          ({l.suspectName})
                         </option>
                       ))}
                     </select>

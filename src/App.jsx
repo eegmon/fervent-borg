@@ -704,7 +704,12 @@ export default function App() {
         return true;
       if (item.isArchived) return true;
       const disp = (item.disposition || "").toLowerCase();
-      const status = (item.bookingStatus || "").toLowerCase();
+      const status = (
+        item.bookingStatus ||
+        item.status ||
+        item.appealStatus ||
+        ""
+      ).toLowerCase();
       return CLOSED_KEYWORDS.some(
         (k) => disp.includes(k) || status.includes(k),
       );
@@ -726,15 +731,15 @@ export default function App() {
     [approvalsData, isGlobalAdmin, currentUser, prosecutorDeptMap],
   );
   const scopedReportsData = useMemo(
-    () => scopeRecords(reportsData),
+    () => scopeRecords(reportsData, true),
     [reportsData, isGlobalAdmin, currentUser, prosecutorDeptMap],
   );
   const scopedAppealsData = useMemo(
-    () => scopeRecords(appealsData),
+    () => scopeRecords(appealsData, true),
     [appealsData, isGlobalAdmin, currentUser, prosecutorDeptMap],
   );
   const scopedBookingsData = useMemo(
-    () => scopeRecords(bookingsData),
+    () => scopeRecords(bookingsData, true),
     [bookingsData, isGlobalAdmin, currentUser, prosecutorDeptMap],
   );
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { FileText, ExternalLink, Search } from 'lucide-react';
+import { getDisplayCaseNumber, getMasterCaseNumber } from '../services/caseUtils';
 
 export default function ReportLedger({ reports, onSelectEvidence, onSelectSuspect }) {
   return (
@@ -21,7 +22,7 @@ export default function ReportLedger({ reports, onSelectEvidence, onSelectSuspec
             <thead>
               <tr>
                 <th>접수번호</th>
-                <th>형제번호</th>
+                <th>사건번호</th>
                 <th>신고 내용 / 죄명</th>
                 <th>담당검사</th>
                 <th>피의자</th>
@@ -35,7 +36,9 @@ export default function ReportLedger({ reports, onSelectEvidence, onSelectSuspec
               {reports.map(r => (
                 <tr key={r.id}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-amber)' }}>{r.reportNo}</td>
-                  <td style={{ fontFamily: 'monospace', color: '#93c5fd' }}>{r.hyeongjeNo}</td>
+                  <td style={{ fontFamily: 'monospace', color: '#93c5fd', fontWeight: 700 }}>
+                    {getDisplayCaseNumber(r) || r.sujeNo || r.hyeongjeNo || '-'}
+                  </td>
                   <td style={{ maxWidth: 200 }}><div style={{ whiteSpace: 'normal', lineHeight: 1.4 }}>{r.title}</div></td>
                   <td style={{ fontWeight: 700 }}>{r.prosecutorName}</td>
                   <td>
@@ -52,7 +55,7 @@ export default function ReportLedger({ reports, onSelectEvidence, onSelectSuspec
                   <td style={{ color: '#34d399', fontWeight: 700 }}>{r.confiscation}</td>
                   <td>
                     {r.basisUrl?.includes('http') && (
-                      <button onClick={() => onSelectEvidence(r.basisUrl, r.hyeongjeNo, r.suspectName)}
+                      <button onClick={() => onSelectEvidence(r.basisUrl, getMasterCaseNumber(r) || r.sujeNo || r.hyeongjeNo, r.suspectName)}
                         className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.72rem', color: 'var(--primary-amber)', border: '1px solid rgba(245,158,11,0.3)' }}>
                         <ExternalLink size={12} />카페
                       </button>

@@ -3259,8 +3259,12 @@ app.put(
           args: [JSON.stringify(updatedApprovals), docId],
         },
         {
-          sql: `UPDATE cases SET disposition=? WHERE hyeongje_no=? AND deleted_at=''`,
-          args: [`${doc.dispositionType} (결재완료)`, doc.hyeongjeNo],
+          sql: `UPDATE cases SET disposition=? WHERE (hyeongje_no=? OR suje_no=?) AND deleted_at=''`,
+          args: [
+            `${doc.dispositionType} (결재완료)`,
+            doc.hyeongjeNo,
+            doc.hyeongjeNo,
+          ],
         },
       ],
       "write",
@@ -4113,58 +4117,60 @@ app.delete(
     const { id } = req.params;
     try {
       const caseRes = await db.execute({
-        sql: "SELECT hyeongje_no, suspect_name FROM cases WHERE id = ?",
+        sql: "SELECT hyeongje_no, suje_no, suspect_name FROM cases WHERE id = ?",
         args: [id],
       });
-      const label = caseRes.rows.length > 0 ? caseRes.rows[0].hyeongje_no : id;
-      if (caseRes.rows.length > 0) {
-        const hyeongjeNo = caseRes.rows[0].hyeongje_no;
-        const deletedAt = new Date().toISOString();
-        await db.batch(
-          [
-            {
-              sql: "UPDATE reports SET deleted_at = ? WHERE hyeongje_no = ? AND deleted_at = ''",
-              args: [deletedAt, hyeongjeNo],
-            },
-            {
-              sql: "UPDATE bookings SET deleted_at = ? WHERE hyeongje_no = ? AND deleted_at = ''",
-              args: [deletedAt, hyeongjeNo],
-            },
-            {
-              sql: "UPDATE evidence SET deleted_at = ? WHERE case_no = ? AND deleted_at = ''",
-              args: [deletedAt, hyeongjeNo],
-            },
-            {
-              sql: "UPDATE appeals SET deleted_at = ? WHERE hyeongje_no = ? AND deleted_at = ''",
-              args: [deletedAt, hyeongjeNo],
-            },
-            {
-              sql: "UPDATE approvals SET deleted_at = ? WHERE hyeongje_no = ? AND deleted_at = ''",
-              args: [deletedAt, hyeongjeNo],
-            },
-            // case_memos 연쇄 삭제 (사건 ID 기준)
-            {
-              sql: "UPDATE case_memos SET deleted_at = ? WHERE case_id = ? AND deleted_at = ''",
-              args: [deletedAt, id],
-            },
-            // case_history 연쇄 삭제 (사건 ID 기준)
-            {
-              sql: "UPDATE case_history SET deleted_at = ? WHERE case_id = ? AND deleted_at = ''",
-              args: [deletedAt, id],
-            },
-            {
-              sql: "UPDATE cases SET deleted_at = ? WHERE id = ? AND deleted_at = ''",
-              args: [deletedAt, id],
-            },
-          ],
-          "write",
+      const caseRow = caseRes.rows[0];
+      const hyeongjeNo =
+        caseRow?.hyeongje_no && caseRow.hyeongje_no !== "-"
+          ? caseRow.hyeongje_no
+          : null;
+      const sujeNo =
+        caseRow?.suje_no && caseRow.suje_no !== "-" ? caseRow.suje_no : null;
+      const label = hyeongjeNo || sujeNo || id;
+      const deletedAt = new Date().toISOString();
+
+      const batchOps = [];
+      const identifiers = [hyeongjeNo, sujeNo].filter(Boolean);
+      for (const num of identifiers) {
+        batchOps.push(
+          {
+            sql: "UPDATE reports SET deleted_at = ? WHERE (hyeongje_no = ? OR (suje_no = ? AND suje_no != '')) AND deleted_at = ''",
+            args: [deletedAt, num, num],
+          },
+          {
+            sql: "UPDATE bookings SET deleted_at = ? WHERE (hyeongje_no = ? OR (suje_no = ? AND suje_no != '')) AND deleted_at = ''",
+            args: [deletedAt, num, num],
+          },
+          {
+            sql: "UPDATE evidence SET deleted_at = ? WHERE case_no = ? AND case_no != '-' AND deleted_at = ''",
+            args: [deletedAt, num],
+          },
+          {
+            sql: "UPDATE appeals SET deleted_at = ? WHERE (hyeongje_no = ? OR (suje_no = ? AND suje_no != '')) AND deleted_at = ''",
+            args: [deletedAt, num, num],
+          },
+          {
+            sql: "UPDATE approvals SET deleted_at = ? WHERE (hyeongje_no = ? OR (suje_no = ? AND suje_no != '')) AND deleted_at = ''",
+            args: [deletedAt, num, num],
+          },
         );
-      } else {
-        await db.execute({
-          sql: "UPDATE cases SET deleted_at = ? WHERE id = ? AND deleted_at = ''",
-          args: [new Date().toISOString(), id],
-        });
       }
+      batchOps.push(
+        {
+          sql: "UPDATE case_memos SET deleted_at = ? WHERE case_id = ? AND deleted_at = ''",
+          args: [deletedAt, id],
+        },
+        {
+          sql: "UPDATE case_history SET deleted_at = ? WHERE case_id = ? AND deleted_at = ''",
+          args: [deletedAt, id],
+        },
+        {
+          sql: "UPDATE cases SET deleted_at = ? WHERE id = ? AND deleted_at = ''",
+          args: [deletedAt, id],
+        },
+      );
+      await db.batch(batchOps, "write");
       await writeAuditLog({
         action: "DELETE",
         entityType: "case",
