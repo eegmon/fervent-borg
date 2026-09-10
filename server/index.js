@@ -77,6 +77,8 @@ const SECRETARIAT_ROLES = new Set([
   "CHIEF_PROSECUTOR",
   "DEPUTY_CHIEF",
   "CHIEF_ADMINISTRATOR",
+  "ADMINISTRATOR",
+  "ADMIN_PROBATIONARY",
 ]);
 const SELF_ROLE_CHANGE_ROLES = new Set([
   "PROSECUTOR_GENERAL",
@@ -290,19 +292,21 @@ function hasGlobalDataAccess(user) {
 }
 
 function hasSecretariatWorkAccess(user) {
+  if (!user) return false;
   return Boolean(
+    user.isSuperAdmin ||
     user.dept?.includes("사무국") ||
-    (user.dualSecretariatWork && user.dualDept?.includes("사무국")),
+    (user.dualSecretariatWork && user.dualDept?.includes("사무국")) ||
+    MANAGEMENT_ROLE_LEVELS.has(effectiveRoleLevel(user))
   );
 }
 
 function isManagementAccount(account) {
+  if (!account) return false;
   return Boolean(
-    account?.isSuperAdmin ||
-    String(account?.dept || "").includes("사무국") ||
-    ["CHIEF_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN_PROBATIONARY"].includes(
-      account?.roleLevel,
-    ),
+    account.isSuperAdmin ||
+    String(account.dept || "").includes("사무국") ||
+    MANAGEMENT_ROLE_LEVELS.has(account.roleLevel),
   );
 }
 
@@ -1477,10 +1481,14 @@ app.post(
       return res.status(400).json({ success: false, message: lenErr });
     const visibility = c.visibility === "PRIVATE" ? "PRIVATE" : "PUBLIC";
     const privateViewerIds = normalizePrivateViewerIds(c.privateViewerIds);
-    const assignedId = hasGlobalDataAccess(req.user)
+    const canAssignOthers =
+      hasGlobalDataAccess(req.user) ||
+      hasSecretariatWorkAccess(req.user) ||
+      isManagementAccount(req.user);
+    const assignedId = canAssignOthers
       ? c.prosecutorId || ""
       : req.user.id;
-    const assignedName = hasGlobalDataAccess(req.user)
+    const assignedName = canAssignOthers
       ? c.prosecutorName || ""
       : req.user.name;
     const suspects =
@@ -1598,10 +1606,14 @@ app.post(
     const c = req.body || {};
     const visibility = c.visibility === "PRIVATE" ? "PRIVATE" : "PUBLIC";
     const privateViewerIds = normalizePrivateViewerIds(c.privateViewerIds);
-    const assignedId = hasGlobalDataAccess(req.user)
+    const canAssignOthers =
+      hasGlobalDataAccess(req.user) ||
+      hasSecretariatWorkAccess(req.user) ||
+      isManagementAccount(req.user);
+    const assignedId = canAssignOthers
       ? String(c.prosecutorId || "")
       : req.user.id;
-    const assignedName = hasGlobalDataAccess(req.user)
+    const assignedName = canAssignOthers
       ? String(c.prosecutorName || "")
       : req.user.name;
     if (
@@ -2189,6 +2201,7 @@ app.put(
     const canEditOthers =
       hasGlobalDataAccess(req.user) ||
       hasSecretariatWorkAccess(req.user) ||
+      isManagementAccount(req.user) ||
       (c.forceReassign && isSeniorInDept);
     const assignedId = canEditOthers
       ? String(c.prosecutorId || "")
@@ -2532,7 +2545,11 @@ app.post(
     });
     if (lenErr)
       return res.status(400).json({ success: false, message: lenErr });
-    const assignedName = hasGlobalDataAccess(req.user)
+    const canAssignOthers =
+      hasGlobalDataAccess(req.user) ||
+      hasSecretariatWorkAccess(req.user) ||
+      isManagementAccount(req.user);
+    const assignedName = canAssignOthers
       ? r.prosecutorName || req.user.name
       : req.user.name;
     // 클라이언트 제공 ID 무시 — 서버에서 항상 UUID 생성
@@ -2633,7 +2650,11 @@ app.post(
     if (lenErr)
       return res.status(400).json({ success: false, message: lenErr });
     try {
-      const assignedName = hasGlobalDataAccess(req.user)
+      const canAssignOthers =
+        hasGlobalDataAccess(req.user) ||
+        hasSecretariatWorkAccess(req.user) ||
+        isManagementAccount(req.user);
+      const assignedName = canAssignOthers
         ? a.prosecutorName || req.user.name
         : req.user.name;
       // 클라이언트 제공 ID 무시 — 서버에서 항상 UUID 생성
@@ -2806,7 +2827,11 @@ app.post(
     });
     if (lenErr)
       return res.status(400).json({ success: false, message: lenErr });
-    const assignedName = hasGlobalDataAccess(req.user)
+    const canAssignOthers =
+      hasGlobalDataAccess(req.user) ||
+      hasSecretariatWorkAccess(req.user) ||
+      isManagementAccount(req.user);
+    const assignedName = canAssignOthers
       ? b.prosecutorName || req.user.name
       : req.user.name;
     const computedDaysElapsed = calculateDaysElapsedFromDate(
@@ -2887,7 +2912,11 @@ app.get(
 
 app.post("/api/warrants", requireAuth, async (req, res) => {
   const w = req.body || {};
-  const assignedName = hasGlobalDataAccess(req.user)
+  const canAssignOthers =
+    hasGlobalDataAccess(req.user) ||
+    hasSecretariatWorkAccess(req.user) ||
+    isManagementAccount(req.user);
+  const assignedName = canAssignOthers
     ? w.prosecutorName || req.user.name
     : req.user.name;
   // 클라이언트 제공 ID 무시 — 서버에서 항상 UUID 생성
@@ -3063,7 +3092,12 @@ app.post(
 
     // ── 사건 소유권 검증 ─────────────────────────────────────────────
     // 전역 권한(검찰총장·사무국)이 없는 일반 검사는 본인이 담당한 사건에만 결재를 상신할 수 있다.
-    if (!hasGlobalDataAccess(req.user) && doc.hyeongjeNo) {
+    const canAssignOthers =
+      hasGlobalDataAccess(req.user) ||
+      hasSecretariatWorkAccess(req.user) ||
+      isManagementAccount(req.user);
+
+    if (!canAssignOthers && doc.hyeongjeNo) {
       const caseCheck = await db.execute({
         sql: `SELECT prosecutor_id FROM cases
             WHERE (hyeongje_no = ? OR suje_no = ?) AND deleted_at = '' LIMIT 1`,
@@ -3078,10 +3112,10 @@ app.post(
       }
     }
 
-    const assignedId = hasGlobalDataAccess(req.user)
+    const assignedId = canAssignOthers
       ? doc.prosecutorId || req.user.id
       : req.user.id;
-    const assignedName = hasGlobalDataAccess(req.user)
+    const assignedName = canAssignOthers
       ? doc.prosecutorName || req.user.name
       : req.user.name;
     // 클라이언트 제공 ID 무시 — 서버에서 항상 UUID 생성

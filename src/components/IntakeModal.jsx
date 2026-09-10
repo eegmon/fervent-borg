@@ -112,10 +112,12 @@ export default function IntakeModal({
   const sortedP = [...prosecutorsList].sort(
     (a, b) => (a.activeCases || 0) - (b.activeCases || 0),
   );
+  // 담당검사 드롭다운 및 자동배정 풀 — 검찰사무관시보(ADMIN_PROBATIONARY)는 직급상 배정 불가
   const isAssignableProsecutor = (prosecutor) =>
     prosecutor.status !== "RETIRED" &&
     !prosecutor.dept?.includes("사무국") &&
-    prosecutor.roleLevel !== "CHIEF_ADMINISTRATOR";
+    prosecutor.roleLevel !== "CHIEF_ADMINISTRATOR" &&
+    prosecutor.roleLevel !== "ADMIN_PROBATIONARY";
   const set = (k, v) => setFormData((p) => ({ ...p, [k]: v }));
   const isPreBookingInvestigation = formData.bookingStatus === "입건 전 조사";
   const handleBookingStatusChange = (bookingStatus) => {

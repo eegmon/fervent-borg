@@ -558,6 +558,8 @@ export default function App() {
         effectiveRole === "CHIEF_PROSECUTOR" ||
         effectiveRole === "DEPUTY_CHIEF" ||
         effectiveRole === "CHIEF_ADMINISTRATOR" ||
+        effectiveRole === "ADMINISTRATOR" ||
+        effectiveRole === "ADMIN_PROBATIONARY" ||
         (currentUser.dept && currentUser.dept.includes("사무국"))),
     );
   }, [currentUser, effectiveRole]);
@@ -1366,6 +1368,10 @@ export default function App() {
     currentUser.isSuperAdmin ||
     currentUser.roleLevel === "SUPER_ADMIN" ||
     currentUser.roleLevel === "PROSECUTOR_GENERAL" ||
+    currentUser.roleLevel === "CHIEF_ADMINISTRATOR" ||
+    currentUser.roleLevel === "ADMINISTRATOR" ||
+    currentUser.roleLevel === "ADMIN_PROBATIONARY" ||
+    currentUser.dept?.includes("사무국") ||
     (currentUserDeptObj ? currentUserDeptObj.canIntake !== false : true);
 
   const handleTryOpenIntakeModal = () => {
