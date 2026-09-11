@@ -257,7 +257,14 @@ export default function AnalyticsDashboard({ ledgerData = [], prosecutorsList = 
       const isClosed = isCaseConcluded(c) || isCaseIndicted(c);
 
       if (!isClosed && !isArchived) entry.pending += 1;
-      if ((c.bookingStatus || '').includes('구속') || disp.includes('구속')) entry.detained += 1;
+      // 현재 구속 상태: 종결/기소완료되지 않은 사건 중 구속이 포함되고 불구속은 아닌 것
+      const isCurrentlyDetained =
+        !isClosed &&
+        !isArchived &&
+        ((c.bookingStatus || '').includes('구속') || disp.includes('구속')) &&
+        !(c.bookingStatus || '').includes('불구속') &&
+        !disp.includes('불구속');
+      if (isCurrentlyDetained) entry.detained += 1;
 
       // 이번 달 처분 건수 — disposition 또는 bookingDate가 이번 달인 경우
       const dateRef = c.updatedAt || c.bookingDate || '';
