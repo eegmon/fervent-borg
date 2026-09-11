@@ -3352,13 +3352,26 @@ const PROSECUTOR_PUBLIC_FIELDS = new Set([
   "dept",
   "roleLevel",
   "status",
+  "activeCases",
 ]);
 
 app.get(
   "/api/prosecutors",
   requireAuth,
   asyncWrap(async (req, res) => {
-    const result = await db.execute("SELECT * FROM prosecutors");
+    const [result, caseCountResult] = await Promise.all([
+      db.execute("SELECT * FROM prosecutors"),
+      // 보존(is_archived) 제외한 실시간 담당사건 수 집계
+      db.execute(
+        "SELECT prosecutor_id, COUNT(*) AS cnt FROM cases WHERE deleted_at = '' AND is_archived = 0 GROUP BY prosecutor_id"
+      ),
+    ]);
+
+    const activeCasesMap = {};
+    for (const row of caseCountResult.rows) {
+      if (row.prosecutor_id) activeCasesMap[row.prosecutor_id] = Number(row.cnt);
+    }
+
     const canViewManagementAccounts =
       req.user.isSuperAdmin ||
       SECRETARIAT_ROLES.has(effectiveRoleLevel(req.user));
@@ -3379,6 +3392,8 @@ app.get(
     res.json(
       visibleRows.map((row) => {
         const { password: _pw, ...safe } = toCamel(row);
+        // DB의 active_cases 대신 실시간 집계값으로 덮어씀
+        safe.activeCases = activeCasesMap[safe.id] ?? 0;
 
         if (isSuperAdmin || isSecretariatRole) {
           // 최고 권한: 모든 필드 반환 (비밀번호만 제거)

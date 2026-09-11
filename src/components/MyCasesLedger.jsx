@@ -1320,11 +1320,16 @@ export default function MyCasesLedger({
     return matchQ && matchStatus && !item.isArchived;
   });
 
-  const activeCount = myActiveCases.filter(
-    (c) =>
-      !(c.disposition || "").includes("불기소") &&
-      !(c.disposition || "").includes("종국"),
-  ).length;
+  const activeCount = myActiveCases.filter((c) => {
+    const disp = (c.disposition || "");
+    if (disp.includes("불기소")) return false;
+    if (disp.includes("종국")) return false;
+    // 기소/공판 진행 중인 사건 제외
+    if (disp.includes("기소") && !disp.includes("불기소") && !disp.includes("미기소")) return false;
+    if (disp.includes("구공판")) return false;
+    if (disp.includes("공판")) return false;
+    return true;
+  }).length;
   const indictmentCount = myActiveCases.filter(
     (c) =>
       (c.disposition || "").includes("기소") &&
