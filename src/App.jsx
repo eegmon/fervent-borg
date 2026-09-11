@@ -2606,6 +2606,7 @@ export default function App() {
           initialCase={indictmentCaseItem}
           ledgerData={scopedLedgerData}
           chargesData={chargesData}
+          prosecutorsList={operationalProsecutorsList}
           currentUser={currentUser}
           showToast={showToast}
           onCreateApprovalFromIndictment={({
@@ -2613,6 +2614,7 @@ export default function App() {
             caseItem,
             docTitle,
             dispositionType,
+            approvalLine,
           }) => {
             const newDoc = {
               docNo: `공소-${new Date().getFullYear()}-${String(docNoCounter).padStart(4, "0")}`,
@@ -2630,7 +2632,7 @@ export default function App() {
               summary: "공소 제기 및 공소장 결재 상신",
               status: "대기",
               hwpHtml: templateHtml,
-              approvals: [
+              approvals: approvalLine || [
                 {
                   role: "주임검사",
                   name: currentUser.name,
@@ -2642,13 +2644,23 @@ export default function App() {
                 },
                 {
                   role: "부장검사",
-                  name: "부장검사",
+                  name:
+                    operationalProsecutorsList.find((p) =>
+                      ["SENIOR_PROSECUTOR", "DEPUTY_CHIEF"].includes(
+                        p.roleLevel,
+                      ),
+                    )?.name || "",
                   status: "결재대기",
                   date: "-",
                 },
                 {
                   role: "지검장",
-                  name: "지검장",
+                  name:
+                    operationalProsecutorsList.find((p) =>
+                      ["CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(
+                        p.roleLevel,
+                      ),
+                    )?.name || "",
                   status: "결재대기",
                   date: "-",
                 },

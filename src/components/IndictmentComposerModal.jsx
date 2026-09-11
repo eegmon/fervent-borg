@@ -14,9 +14,11 @@ import {
   ShieldAlert,
   Send,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { fetchEvidence } from "../services/api";
 import { HWP_TEMPLATES } from "../data/hwpTemplates";
+import ChargeSearchInput from "./ChargeSearchInput";
 
 export default function IndictmentComposerModal({
   isOpen,
@@ -24,6 +26,7 @@ export default function IndictmentComposerModal({
   initialCase = null,
   ledgerData = [],
   chargesData = [],
+  prosecutorsList = [],
   currentUser,
   showToast,
   onCreateApprovalFromIndictment,
@@ -43,6 +46,7 @@ export default function IndictmentComposerModal({
 
   const [copied, setCopied] = useState(false);
   const [activeStep, setActiveStep] = useState("FORM"); // FORM | PREVIEW
+  const [aiLoading, setAiLoading] = useState(false); // 'draft' | 'refine' | false
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const year = todayStr.slice(0, 4);
@@ -215,13 +219,6 @@ export default function IndictmentComposerModal({
       return `<div>서식을 불러올 수 없습니다.</div>`;
     }
 
-    const firstDef = defendants[0] || {};
-    const defName = firstDef.name || "(성명 미상)";
-    const defUuid = firstDef.uuid || "";
-    const defJob = firstDef.job || "무직";
-    const defAddr = firstDef.address || "주거 부정";
-    const defDetention = firstDef.detentionStatus || "불구속";
-
     let html = form14.html;
 
     // 1. 사건번호 및 일자
@@ -233,18 +230,47 @@ export default function IndictmentComposerModal({
       `검사 ${prosecutorName}은(는)`,
     );
 
-    // 2. 피고인 인적사항
+    // 2. 피고인 인적사항 — 다수 피고인 전체 반영
+    // 서식 원본의 피고인 단일 블록(○○○(UUID) ~ 구속 여부 줄)을 모든 피고인 블록으로 교체한다.
+    const buildDefendantBlock = (d, idx) => {
+      const name = d.name || "(성명 미상)";
+      const uuid = d.uuid ? ` (${d.uuid})` : "";
+      const job = d.job || "무직";
+      const addr = d.address || "주거 부정";
+      const detention =
+        d.detentionStatus === "구속"
+          ? `<strong style="color:#b91c1c;">[구속]</strong>`
+          : "[불구속]";
+      const prefix =
+        defendants.length > 1
+          ? `<div style="font-size:10pt;font-family:'한컴바탕';font-weight:bold;margin-top:${idx > 0 ? "10px" : "0"};border-top:${idx > 0 ? "1px dashed #94a3b8" : "none"};padding-top:${idx > 0 ? "8px" : "0"};">피고인 ${idx + 1}</div>`
+          : "";
+      return (
+        prefix +
+        `<div style="font-size:11pt;font-family:'한컴바탕';line-height:190%;">` +
+        `<strong>${name}</strong>${uuid}<br/>` +
+        `직업: ${job}<br/>` +
+        `주거: ${addr}<br/>` +
+        `구속 여부: ${detention}` +
+        `</div>`
+      );
+    };
+
+    const allDefsHtml = defendants
+      .map((d, idx) => buildDefendantBlock(d, idx))
+      .join("");
+
+    // 서식 내 피고인 원본 플레이스홀더를 전체 피고인 블록으로 치환
     html = html.replace(
       /○○○\(UUID\)/g,
-      `<strong>${defName}</strong>${defUuid ? ` (${defUuid})` : ""}`,
+      `<div style="font-size:11pt;font-family:'한컴바탕';">${allDefsHtml}</div>`,
     );
-    html = html.replace(/직업&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; , 연락처 discord@/g, `직업: ${defJob}`);
-    html = html.replace(/주거/g, `주거: ${defAddr}`);
+    // 원본 서식의 직업/주거/구속 여부 잔여 라인 제거 (이미 buildDefendantBlock에 포함됨)
+    html = html.replace(/직업&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; , 연락처 discord@/g, "");
+    html = html.replace(/주거/g, "");
     html = html.replace(
       /2025\. 00\. 00\. 구속 \(2025\. 00\. 00\. 체포\)/g,
-      defDetention === "구속"
-        ? `<strong style="color:#b91c1c;">[구속]</strong>`
-        : `[불구속]`,
+      "",
     );
 
     // 3. 죄명 & 적용법조 (테이블 내 빈 <td> 영역 치환)
@@ -380,6 +406,59 @@ ${indictmentHtml}
     showToast?.("💾 HWP 호환 공소장 파일이 다운로드되었습니다.", "success");
   };
 
+  // ── AI 공소사실 초안 생성 ────────────────────────────────────────
+  const callAiApi = async (mode) => {
+    setAiLoading(mode);
+    try {
+      const selectedCase =
+        ledgerData.find((c) => String(c.id) === String(selectedCaseId)) ||
+        initialCase;
+
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/ai/indictment-draft`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            mode,
+            defendants,
+            charges: chargesList,
+            incidentDate:
+              selectedCase?.incidentDate || selectedCase?.bookingDate || "",
+            caseNo: docNo,
+            evidenceList: evidenceList.filter((e) =>
+              selectedEvidenceIds.has(e.id),
+            ),
+            currentText: mode === "refine" ? crimeFacts : "",
+          }),
+        },
+      );
+
+      const data = await res.json();
+      if (data.success) {
+        setCrimeFacts(data.result);
+        showToast?.(
+          mode === "draft"
+            ? "✨ AI 공소사실 초안이 생성되었습니다. 내용을 검토 후 수정하세요."
+            : "✅ AI 교정이 완료되었습니다.",
+          "success",
+        );
+      } else {
+        showToast?.(`AI 오류: ${data.message}`, "error");
+      }
+    } catch (e) {
+      showToast?.(`AI 연결 오류: ${e.message}`, "error");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAiDraft = () => callAiApi("draft");
+  const handleAiRefine = () => callAiApi("refine");
+
   // 전자결재 연동
   const handleSendToApprovals = () => {
     if (!onCreateApprovalFromIndictment) {
@@ -387,12 +466,52 @@ ${indictmentHtml}
       return;
     }
 
-    const selectedCase = ledgerData.find((c) => String(c.id) === String(selectedCaseId)) || initialCase;
+    // prosecutorsList에서 결재선 실제 인물 조회
+    const supervisor = prosecutorsList.find((p) =>
+      ["SENIOR_PROSECUTOR", "DEPUTY_CHIEF"].includes(p.roleLevel),
+    );
+    const chief = prosecutorsList.find((p) =>
+      ["CHIEF_PROSECUTOR", "PROSECUTOR_GENERAL"].includes(p.roleLevel),
+    );
+
+    const now = new Date().toISOString().replace("T", " ").substring(0, 16);
+
+    const approvalLine = [
+      {
+        role: "주임검사",
+        name: prosecutorName || currentUser?.name || "",
+        status: "상신완료",
+        date: now,
+      },
+      {
+        role: "부장검사",
+        name: supervisor?.name || "",
+        status: supervisor ? "결재대기" : "결재대기",
+        date: "-",
+      },
+      {
+        role: "지검장",
+        name: chief?.name || "",
+        status: "결재대기",
+        date: "-",
+      },
+    ];
+
+    const defNamesStr = defendants
+      .map((d) => d.name)
+      .filter(Boolean)
+      .join(", ") || "미상";
+
+    const selectedCase =
+      ledgerData.find((c) => String(c.id) === String(selectedCaseId)) ||
+      initialCase;
+
     onCreateApprovalFromIndictment({
       templateHtml: indictmentHtml,
       caseItem: selectedCase,
-      docTitle: `[공소장 기안] ${docNo} 피고인 ${defendants[0]?.name || "미상"} (${chargesList.map((c) => c.name).join(", ")})`,
+      docTitle: `[공소장 기안] ${docNo} 피고인 ${defNamesStr} (${chargesList.map((c) => c.name).join(", ")})`,
       dispositionType: "구공판(기소)",
+      approvalLine,
     });
     onClose();
     showToast?.("🚀 공소장 결재 기안문이 전자결재함에 등록되었습니다.", "success");
@@ -653,23 +772,28 @@ ${indictmentHtml}
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {chargesList.map((ch) => (
                   <div key={ch.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <input
-                      className="input-field"
-                      placeholder="죄명 (예: 사기)"
-                      style={{ width: "38%", fontSize: "0.76rem" }}
-                      value={ch.name}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const match = chargesData.find((c) => c.name === val);
-                        setChargesList((prev) =>
-                          prev.map((item) =>
-                            item.id === ch.id
-                              ? { ...item, name: val, lawArticle: match?.lawArticle || item.lawArticle }
-                              : item,
-                          ),
-                        );
-                      }}
-                    />
+                    <div style={{ width: "42%" }}>
+                      <ChargeSearchInput
+                        value={ch.name}
+                        chargesData={chargesData}
+                        placeholder="죄명 검색 또는 입력"
+                        onChange={(val) => {
+                          const match = chargesData.find((c) => c.name === val);
+                          setChargesList((prev) =>
+                            prev.map((item) =>
+                              item.id === ch.id
+                                ? {
+                                    ...item,
+                                    name: val,
+                                    lawArticle:
+                                      match?.lawArticle || item.lawArticle,
+                                  }
+                                : item,
+                            ),
+                          );
+                        }}
+                      />
+                    </div>
                     <input
                       className="input-field"
                       placeholder="적용법조 (예: 형법 제347조제1항)"
@@ -704,11 +828,57 @@ ${indictmentHtml}
                 <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--text-main)" }}>
                   4. 공소사실 (범죄사실 본문)
                 </span>
+                <div style={{ display: "flex", gap: 5 }}>
+                  <button
+                    type="button"
+                    onClick={handleAiDraft}
+                    disabled={!!aiLoading}
+                    className="btn btn-outline"
+                    style={{
+                      fontSize: "0.7rem",
+                      padding: "2px 9px",
+                      gap: 4,
+                      color: "#c4b5fd",
+                      borderColor: "rgba(196,181,253,0.4)",
+                      opacity: aiLoading ? 0.6 : 1,
+                    }}
+                    title="사건 정보를 바탕으로 AI가 공소사실 초안을 작성합니다"
+                  >
+                    {aiLoading === "draft" ? (
+                      <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} />
+                    ) : (
+                      <Sparkles size={11} />
+                    )}
+                    {aiLoading === "draft" ? "생성 중..." : "AI 초안"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAiRefine}
+                    disabled={!!aiLoading || !crimeFacts.trim()}
+                    className="btn btn-outline"
+                    style={{
+                      fontSize: "0.7rem",
+                      padding: "2px 9px",
+                      gap: 4,
+                      color: "#86efac",
+                      borderColor: "rgba(134,239,172,0.4)",
+                      opacity: aiLoading || !crimeFacts.trim() ? 0.5 : 1,
+                    }}
+                    title="작성된 공소사실을 AI가 법률 문체로 교정합니다"
+                  >
+                    {aiLoading === "refine" ? (
+                      <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} />
+                    ) : (
+                      <Wand2 size={11} />
+                    )}
+                    {aiLoading === "refine" ? "교정 중..." : "AI 교정"}
+                  </button>
+                </div>
               </div>
               <textarea
                 className="input-field"
                 style={{ width: "100%", minHeight: 120, fontSize: "0.78rem", lineHeight: 1.6 }}
-                placeholder="일시, 장소, 범행 방법, 결과 등을 상세히 기술하세요."
+                placeholder="일시, 장소, 범행 방법, 결과 등을 상세히 기술하세요. 또는 위 'AI 초안' 버튼을 눌러 자동 생성하세요."
                 value={crimeFacts}
                 onChange={(e) => setCrimeFacts(e.target.value)}
               />
