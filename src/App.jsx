@@ -38,6 +38,7 @@ import IndictmentComposerModal from "./components/IndictmentComposerModal";
 
 import AuditLogViewer from "./components/AuditLogViewer";
 import Toast from "./components/Toast";
+import QuickSearchModal from "./components/QuickSearchModal";
 
 function formatIntakeNotice(data) {
   const chargeName = (data.chargeName || "-")
@@ -154,6 +155,16 @@ export default function App() {
   }, [theme]);
   const toggleTheme = () =>
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+useEffect(() => {
+  const handler = (e) => {
+    if (e.ctrlKey && e.key === "k") {
+      e.preventDefault();
+      setIsQuickSearchOpen(true);
+    }
+  };
+  window.addEventListener("keydown", handler);
+  return () => window.removeEventListener("keydown", handler);
+}, []);
 
   // Auth Session State (Commercial Security Gate - Defaults to null with sessionStorage persistence)
   const [currentUser, setCurrentUser] = useState(() => {
@@ -220,7 +231,7 @@ export default function App() {
   const [isIndictmentModalOpen, setIsIndictmentModalOpen] = useState(false);
   const [indictmentCaseItem, setIndictmentCaseItem] = useState(null);
   const [summonsModalInfo, setSummonsModalInfo] = useState(null);
-
+  const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
   const unreadNotificationsCount = useMemo(() => {
     return (notifications || []).filter((n) => !n.isRead).length;
   }, [notifications]);
@@ -2430,6 +2441,23 @@ export default function App() {
         appealsData={appealsData}
         approvalsData={approvalsData}
       />
+<QuickSearchModal
+    isOpen={isQuickSearchOpen}
+    onClose={() => setIsQuickSearchOpen(false)}
+    ledgerData={ledgerData}
+    approvalsData={approvalsData}
+    warrantsData={[]}
+    currentUser={currentUser}
+    activeTab={activeTab}
+    setActiveTab={setActiveTab}
+    onOpenIntakeModal={handleTryOpenIntakeModal}
+    onOpenDeadlineModal={() => setIsDeadlineModalOpen(true)}
+    onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
+    onOpenTimelineModal={(c) => setTimelineCaseItem(c)}
+    onToggleTheme={toggleTheme}
+    theme={theme}
+    isReadOnly={false}
+  />
 
       {/* 사건접수 배당 알림 복사 팝업 모달 */}
       {intakeNoticeData && (

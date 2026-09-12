@@ -231,28 +231,32 @@ export default function IndictmentComposerModal({
     );
 
     // 2. 피고인 인적사항 — 다수 피고인 전체 반영
-    // 서식 원본의 피고인 단일 블록(○○○(UUID) ~ 구속 여부 줄)을 모든 피고인 블록으로 교체한다.
+    // buildDefendantBlock: 각 피고인의 인적사항을 한 줄씩 HTML로 반환
     const buildDefendantBlock = (d, idx) => {
       const name = d.name || "(성명 미상)";
       const uuid = d.uuid ? ` (${d.uuid})` : "";
       const job = d.job || "무직";
       const addr = d.address || "주거 부정";
-      const detention =
+      const detentionLabel =
         d.detentionStatus === "구속"
-          ? `<strong style="color:#b91c1c;">[구속]</strong>`
+          ? '<strong style="color:#b91c1c;">[구속]</strong>'
           : "[불구속]";
-      const prefix =
-        defendants.length > 1
-          ? `<div style="font-size:10pt;font-family:'한컴바탕';font-weight:bold;margin-top:${idx > 0 ? "10px" : "0"};border-top:${idx > 0 ? "1px dashed #94a3b8" : "none"};padding-top:${idx > 0 ? "8px" : "0"};">피고인 ${idx + 1}</div>`
+
+      const separator =
+        defendants.length > 1 && idx > 0
+          ? `<p style="margin:6px 0 2px;border-top:1px dashed #94a3b8;padding-top:6px;font-size:10pt;font-family:'한컴바탕';font-weight:bold;">피고인 ${idx + 1}</p>`
+          : defendants.length > 1
+          ? `<p style="margin:0 0 2px;font-size:10pt;font-family:'한컴바탕';font-weight:bold;">피고인 ${idx + 1}</p>`
           : "";
+
       return (
-        prefix +
-        `<div style="font-size:11pt;font-family:'한컴바탕';line-height:190%;">` +
-        `<strong>${name}</strong>${uuid}<br/>` +
-        `직업: ${job}<br/>` +
-        `주거: ${addr}<br/>` +
-        `구속 여부: ${detention}` +
-        `</div>`
+        separator +
+        `<p style="margin:1px 0;font-size:11pt;font-family:'한컴바탕';">` +
+        `<strong>${name}</strong>${uuid}` +
+        `</p>` +
+        `<p style="margin:1px 0;font-size:10.5pt;font-family:'한컴바탕';">직업: ${job}</p>` +
+        `<p style="margin:1px 0;font-size:10.5pt;font-family:'한컴바탕';">주거지: ${addr}</p>` +
+        `<p style="margin:1px 0;font-size:10.5pt;font-family:'한컴바탕';">구속 여부: ${detentionLabel}</p>`
       );
     };
 
@@ -260,14 +264,16 @@ export default function IndictmentComposerModal({
       .map((d, idx) => buildDefendantBlock(d, idx))
       .join("");
 
-    // 서식 내 피고인 원본 플레이스홀더를 전체 피고인 블록으로 치환
+    // 서식 내 피고인 원본 플레이스홀더 → 전체 피고인 블록으로 치환
     html = html.replace(
       /○○○\(UUID\)/g,
-      `<div style="font-size:11pt;font-family:'한컴바탕';">${allDefsHtml}</div>`,
+      `<span style="display:inline-block;vertical-align:top;">${allDefsHtml}</span>`,
     );
-    // 원본 서식의 직업/주거/구속 여부 잔여 라인 제거 (이미 buildDefendantBlock에 포함됨)
-    html = html.replace(/직업&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; , 연락처 discord@/g, "");
-    html = html.replace(/주거/g, "");
+
+    // 원본 서식의 잔여 라인 제거
+    // ※ /주거/g 전역 치환은 서식 본문을 훼손하므로 사용하지 않는다.
+    html = html.replace(/직업&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; , 연락처 discord@[^\s<]*/g, "");
+    html = html.replace(/주거&nbsp;[^\s<]*/g, "");          // "주거 " 뒤에 오는 원본 주소 값만 제거
     html = html.replace(
       /2025\. 00\. 00\. 구속 \(2025\. 00\. 00\. 체포\)/g,
       "",
@@ -1014,6 +1020,7 @@ ${indictmentHtml}
                 padding: 28,
                 display: "flex",
                 justifyContent: "center",
+                alignItems: "flex-start",
               }}
             >
               <div
@@ -1022,7 +1029,7 @@ ${indictmentHtml}
                   maxWidth: 800,
                   boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
                   borderRadius: 4,
-                  overflow: "hidden",
+                  overflow: "visible",
                 }}
                 dangerouslySetInnerHTML={{ __html: indictmentHtml }}
               />
