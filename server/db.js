@@ -318,19 +318,31 @@ export async function initDb() {
       hyeongje_no     TEXT,
       suje_no         TEXT DEFAULT '',
       title           TEXT,
+      report_title    TEXT DEFAULT '',
       prosecutor_name TEXT,
       suspect_name    TEXT,
       suspect_uuid    TEXT,
+      charge_name     TEXT DEFAULT '',
       status          TEXT,
       created_at      TEXT,
       basis_url       TEXT,
       period          TEXT,
       confiscation    TEXT,
+      incident_date   TEXT DEFAULT '',
+      report_content  TEXT DEFAULT '',
+      booking_basis   TEXT DEFAULT '',
+      evidence_attachments TEXT DEFAULT '[]',
       deleted_at      TEXT DEFAULT ''
     )
   `);
   for (const column of [
     "suje_no TEXT DEFAULT ''",
+    "report_title TEXT DEFAULT ''",
+    "charge_name TEXT DEFAULT ''",
+    "incident_date TEXT DEFAULT ''",
+    "report_content TEXT DEFAULT ''",
+    "booking_basis TEXT DEFAULT ''",
+    "evidence_attachments TEXT DEFAULT '[]'",
     "deleted_at TEXT DEFAULT ''",
   ]) {
     try {

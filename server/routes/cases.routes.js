@@ -431,6 +431,7 @@ router.post(
     if (
       visibility === "PRIVATE" &&
       !isProsecutorGeneral(req.user) &&
+      !hasSecretariatWorkAccess(req.user) &&
       req.user.id !== assignedId
     ) {
       return res.status(403).json({
