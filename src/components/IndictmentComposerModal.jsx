@@ -5,20 +5,24 @@ import {
   Check,
   Printer,
   Download,
-  FileText,
   Wand2,
   Plus,
   Trash2,
-  ChevronRight,
   Scale,
-  ShieldAlert,
   Send,
   Sparkles,
   Loader2,
 } from "lucide-react";
-import { fetchEvidence } from "../services/api";
+import { fetchEvidence, getToken } from "../services/api";
 import { HWP_TEMPLATES } from "../data/hwpTemplates";
 import ChargeSearchInput from "./ChargeSearchInput";
+
+const getDetentionStatus = (status) => {
+  const value = String(status || "");
+  if (value.includes("구속") && !value.includes("불구속")) return "구속";
+  if (value.includes("불구속")) return "불구속";
+  return "";
+};
 
 export default function IndictmentComposerModal({
   isOpen,
@@ -41,11 +45,14 @@ export default function IndictmentComposerModal({
   const [selectedEvidenceIds, setSelectedEvidenceIds] = useState(new Set());
   const [customEvidenceText, setCustomEvidenceText] = useState("");
   const [confiscationText, setConfiscationText] = useState("");
-  const [prosecutorName, setProsecutorName] = useState(currentUser?.name || "담당검사");
-  const [prosecutorRank, setProsecutorRank] = useState(currentUser?.rank || "검사");
+  const [prosecutorName, setProsecutorName] = useState(
+    currentUser?.name || "담당검사",
+  );
+  const [prosecutorRank, setProsecutorRank] = useState(
+    currentUser?.rank || "검사",
+  );
 
   const [copied, setCopied] = useState(false);
-  const [activeStep, setActiveStep] = useState("FORM"); // FORM | PREVIEW
   const [aiLoading, setAiLoading] = useState(false); // 'draft' | 'refine' | false
 
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -62,7 +69,9 @@ export default function IndictmentComposerModal({
     if (caseItem) {
       const caseNo = caseItem.sujeNo || caseItem.hyeongjeNo || "";
       setDocNo(caseNo);
-      setProsecutorName(caseItem.prosecutorName || currentUser?.name || "담당검사");
+      setProsecutorName(
+        caseItem.prosecutorName || currentUser?.name || "담당검사",
+      );
 
       // 피고인 목록 초기화
       let defs = [];
@@ -71,11 +80,18 @@ export default function IndictmentComposerModal({
           id: s.id || `def-${idx}`,
           name: s.name || caseItem.suspectName || "",
           uuid: s.uuid || caseItem.suspectUuid || "",
-          address: "주거 부정",
-          job: "무직",
-          detentionStatus: (caseItem.bookingStatus || "").includes("구속") && !(caseItem.bookingStatus || "").includes("불구속")
-            ? "구속"
-            : "불구속",
+          address:
+            s.address ||
+            s.residence ||
+            s.residentialAddress ||
+            caseItem.address ||
+            caseItem.residence ||
+            "",
+          job:
+            s.job || s.occupation || caseItem.job || caseItem.occupation || "",
+          detentionStatus: getDetentionStatus(
+            s.detentionStatus || s.bookingStatus || caseItem.bookingStatus,
+          ),
         }));
       } else {
         defs = [
@@ -83,18 +99,18 @@ export default function IndictmentComposerModal({
             id: "def-0",
             name: caseItem.suspectName || "",
             uuid: caseItem.suspectUuid || "",
-            address: "주거 부정",
-            job: "무직",
-            detentionStatus: (caseItem.bookingStatus || "").includes("구속") && !(caseItem.bookingStatus || "").includes("불구속")
-              ? "구속"
-              : "불구속",
+            address: caseItem.address || caseItem.residence || "",
+            job: caseItem.job || caseItem.occupation || "",
+            detentionStatus: getDetentionStatus(caseItem.bookingStatus),
           },
         ];
       }
       setDefendants(defs);
 
       // 죄명 및 적용법조 초기화
-      const foundCharge = chargesData.find((ch) => ch.name === caseItem.chargeName);
+      const foundCharge = chargesData.find(
+        (ch) => ch.name === caseItem.chargeName,
+      );
       setChargesList([
         {
           id: "ch-0",
@@ -127,7 +143,14 @@ export default function IndictmentComposerModal({
           .catch(() => {});
       }
     }
-  }, [selectedCaseId, initialCase, chargesData]);
+  }, [
+    selectedCaseId,
+    initialCase,
+    ledgerData,
+    chargesData,
+    currentUser?.name,
+    todayStr,
+  ]);
 
   // 피고인 추가/삭제
   const handleAddDefendant = () => {
@@ -137,9 +160,9 @@ export default function IndictmentComposerModal({
         id: `def-${Date.now()}`,
         name: "",
         uuid: "",
-        address: "주거 부정",
-        job: "무직",
-        detentionStatus: "불구속",
+        address: "",
+        job: "",
+        detentionStatus: "",
       },
     ]);
   };
@@ -225,75 +248,45 @@ export default function IndictmentComposerModal({
     html = html.replace(/2025년 형제0000호/g, docNo || `${year}년 형제0000호`);
     html = html.replace(/2025\. 00\. 00\./g, `${year}. ${month}. ${day}.`);
     html = html.replace(/도스온라인 법원/g, courtName);
-    html = html.replace(
-      /검사 ○○○은\(는\)/g,
-      `검사 ${prosecutorName}은(는)`,
-    );
+    html = html.replace(/검사 ○○○은\(는\)/g, `검사 ${prosecutorName}은(는)`);
 
-    // 2. 피고인 인적사항 — 다수 피고인 전체 반영
-    // buildDefendantBlock: 각 피고인의 인적사항을 한 줄씩 HTML로 반환
-    const buildDefendantBlock = (d, idx) => {
-      const name = d.name || "(성명 미상)";
-      const uuid = d.uuid ? ` (${d.uuid})` : "";
-      const job = d.job || "무직";
-      const addr = d.address || "주거 부정";
-      const detentionLabel =
-        d.detentionStatus === "구속"
-          ? '<strong style="color:#b91c1c;">[구속]</strong>'
-          : "[불구속]";
-
-      const separator =
-        defendants.length > 1 && idx > 0
-          ? `<p style="margin:6px 0 2px;border-top:1px dashed #94a3b8;padding-top:6px;font-size:10pt;font-family:'한컴바탕';font-weight:bold;">피고인 ${idx + 1}</p>`
-          : defendants.length > 1
-          ? `<p style="margin:0 0 2px;font-size:10pt;font-family:'한컴바탕';font-weight:bold;">피고인 ${idx + 1}</p>`
-          : "";
-
-      return (
-        separator +
-        `<p style="margin:1px 0;font-size:11pt;font-family:'한컴바탕';">` +
-        `<strong>${name}</strong>${uuid}` +
-        `</p>` +
-        `<p style="margin:1px 0;font-size:10.5pt;font-family:'한컴바탕';">직업: ${job}</p>` +
-        `<p style="margin:1px 0;font-size:10.5pt;font-family:'한컴바탕';">주거지: ${addr}</p>` +
-        `<p style="margin:1px 0;font-size:10.5pt;font-family:'한컴바탕';">구속 여부: ${detentionLabel}</p>`
-      );
-    };
-
-    const allDefsHtml = defendants
-      .map((d, idx) => buildDefendantBlock(d, idx))
-      .join("");
+    // 2. 피고인 인적사항 — 서식의 원본 행에 첫 피고인 정보를 반영
+    const primaryDefendant = defendants[0] || {};
+    const defendantName = primaryDefendant.name || "(성명 미상)";
+    const defendantUuid = primaryDefendant.uuid
+      ? ` (${primaryDefendant.uuid})`
+      : "";
+    const defendantJob = primaryDefendant.job || "미입력";
+    const defendantAddress = primaryDefendant.address || "미입력";
+    const detentionText = primaryDefendant.detentionStatus || "미입력";
 
     // 서식 내 피고인 원본 플레이스홀더 → 전체 피고인 블록으로 치환
     html = html.replace(
       /○○○\(UUID\)/g,
-      `<span style="display:inline-block;vertical-align:top;">${allDefsHtml}</span>`,
+      `<strong>${defendantName}</strong>${defendantUuid}`,
     );
 
-    // 원본 서식의 잔여 라인 제거
-    // ※ /주거/g 전역 치환은 서식 본문을 훼손하므로 사용하지 않는다.
-    html = html.replace(/직업&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; , 연락처 discord@[^\s<]*/g, "");
-    html = html.replace(/주거&nbsp;[^\s<]*/g, "");          // "주거 " 뒤에 오는 원본 주소 값만 제거
     html = html.replace(
-      /2025\. 00\. 00\. 구속 \(2025\. 00\. 00\. 체포\)/g,
-      "",
+      /직업&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; , 연락처 discord@/i,
+      `직업&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${defendantJob}`,
     );
+    html = html.replace(
+      /(>주거)(<\/span>)/i,
+      `$1&nbsp;&nbsp;${defendantAddress}$2`,
+    );
+
+    const replaceRowValue = (labelPattern, value) => {
+      const rowPattern = new RegExp(
+        `(<tr>\\s*<td[^>]*>[\\s\\S]*?${labelPattern}[\\s\\S]*?<\\/td>\\s*<td[^>]*>)[\\s\\S]*?(<\\/td>\\s*<\\/tr>)`,
+        "i",
+      );
+      html = html.replace(rowPattern, `$1${value}$2`);
+    };
 
     // 3. 죄명 & 적용법조 (테이블 내 빈 <td> 영역 치환)
-    const tdPattern = /(<td[^>]*>\s*<p class=HStyle0>\s*<span[^>]*>&nbsp;<\/span><\/p>\s*<\/td>)/gi;
-    let tdMatches = 0;
-    html = html.replace(tdPattern, (match) => {
-      tdMatches++;
-      if (tdMatches === 1) {
-        // 죄명
-        return `<td colspan="3" valign="middle" style="padding:4pt 8pt;"><p class=HStyle0><span style="font-size:11pt;font-family:'한컴바탕';font-weight:bold;">${chargeNamesStr || "형법 위반"}</span></p></td>`;
-      }
-      if (tdMatches === 2) {
-        // 적용법조
-        return `<td colspan="3" valign="middle" style="padding:4pt 8pt;"><p class=HStyle0><span style="font-size:10.5pt;font-family:'한컴바탕';">${lawArticlesStr || "형법 및 해당 법령 조항"}</span></p></td>`;
-      }
-      return match;
-    });
+    replaceRowValue("죄(?:&nbsp;|\\s)+명", chargeNamesStr || "");
+    replaceRowValue("적용법조", lawArticlesStr || "");
+    replaceRowValue("구속여부", detentionText);
 
     // 4. Ⅱ. 공소사실 영역
     const crimeFactsContent = crimeFacts
@@ -318,10 +311,7 @@ export default function IndictmentComposerModal({
     );
 
     // 6. 검사 서명란
-    html = html.replace(
-      /○&nbsp; ○&nbsp; ○/g,
-      `${prosecutorName}`,
-    );
+    html = html.replace(/○&nbsp; ○&nbsp; ○/g, `${prosecutorName}`);
 
     return `
       <style>${form14.style}</style>
@@ -341,9 +331,9 @@ export default function IndictmentComposerModal({
     year,
     month,
     day,
-    prosecutorRank,
     prosecutorName,
     courtName,
+    form14,
   ]);
 
   // isOpen 가드: 모든 훅(useState, useEffect, useMemo) 이후 배치 (React 훅 규칙 준수)
@@ -358,7 +348,10 @@ export default function IndictmentComposerModal({
       ]);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-      showToast?.("📋 공소장 서식 복사 완료! 카페 스마트에디터에 Ctrl+V로 붙여넣기 하세요.", "success");
+      showToast?.(
+        "📋 공소장 서식 복사 완료! 카페 스마트에디터에 Ctrl+V로 붙여넣기 하세요.",
+        "success",
+      );
     } catch (e) {
       showToast?.("복사 실패: " + e.message, "error");
     }
@@ -402,7 +395,9 @@ export default function IndictmentComposerModal({
 ${indictmentHtml}
 </body>
 </html>`;
-    const blob = new Blob([fullDoc], { type: "application/haansofthwp;charset=utf-8" });
+    const blob = new Blob([fullDoc], {
+      type: "application/haansofthwp;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -421,12 +416,12 @@ ${indictmentHtml}
         initialCase;
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/ai/indictment-draft`,
+        `${import.meta.env.VITE_API_BASE_URL || "/api"}/ai/indictment-draft`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${getToken()}`,
           },
           body: JSON.stringify({
             mode,
@@ -503,10 +498,11 @@ ${indictmentHtml}
       },
     ];
 
-    const defNamesStr = defendants
-      .map((d) => d.name)
-      .filter(Boolean)
-      .join(", ") || "미상";
+    const defNamesStr =
+      defendants
+        .map((d) => d.name)
+        .filter(Boolean)
+        .join(", ") || "미상";
 
     const selectedCase =
       ledgerData.find((c) => String(c.id) === String(selectedCaseId)) ||
@@ -520,7 +516,10 @@ ${indictmentHtml}
       approvalLine,
     });
     onClose();
-    showToast?.("🚀 공소장 결재 기안문이 전자결재함에 등록되었습니다.", "success");
+    showToast?.(
+      "🚀 공소장 결재 기안문이 전자결재함에 등록되었습니다.",
+      "success",
+    );
   };
 
   return (
@@ -558,17 +557,25 @@ ${indictmentHtml}
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            background: "linear-gradient(135deg, rgba(30,58,138,0.25), rgba(245,158,11,0.1))",
+            background:
+              "linear-gradient(135deg, rgba(30,58,138,0.25), rgba(245,158,11,0.1))",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Scale size={22} color="var(--primary-amber)" />
             <div>
-              <div style={{ fontWeight: 800, fontSize: "1.08rem", color: "var(--text-main)" }}>
+              <div
+                style={{
+                  fontWeight: 800,
+                  fontSize: "1.08rem",
+                  color: "var(--text-main)",
+                }}
+              >
                 HWP 공소장 자동작성기 (Indictment Composer)
               </div>
               <div style={{ fontSize: "0.74rem", color: "var(--text-muted)" }}>
-                대한민국 검찰 표준 공소장 서식 · 사건/피고인/죄명/증거 연동 빌더 · 카페 복사 & HWP 다운로드
+                대한민국 검찰 표준 공소장 서식 · 사건/피고인/죄명/증거 연동 빌더
+                · 카페 복사 & HWP 다운로드
               </div>
             </div>
           </div>
@@ -603,16 +610,43 @@ ${indictmentHtml}
             }}
           >
             {/* 1. 사건 선택 & 기본정보 */}
-            <div style={{ background: "rgba(0,0,0,0.2)", padding: 12, borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <div
+              style={{
+                background: "rgba(0,0,0,0.2)",
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginBottom: 8,
+                }}
+              >
                 <Wand2 size={15} color="var(--primary-amber)" />
-                <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--text-main)" }}>
+                <span
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 800,
+                    color: "var(--text-main)",
+                  }}
+                >
                   1. 사건 연동 및 법원 지정
                 </span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <div>
-                  <label style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "block", marginBottom: 3 }}>
+                  <label
+                    style={{
+                      fontSize: "0.72rem",
+                      color: "var(--text-muted)",
+                      display: "block",
+                      marginBottom: 3,
+                    }}
+                  >
                     대상 사건 선택
                   </label>
                   <select
@@ -624,14 +658,28 @@ ${indictmentHtml}
                     <option value="">사건 선택...</option>
                     {ledgerData.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.sujeNo || c.hyeongjeNo} · {c.suspectName} · {c.chargeName}
+                        {c.sujeNo || c.hyeongjeNo} · {c.suspectName} ·{" "}
+                        {c.chargeName}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                  }}
+                >
                   <div>
-                    <label style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "block", marginBottom: 3 }}>
+                    <label
+                      style={{
+                        fontSize: "0.72rem",
+                        color: "var(--text-muted)",
+                        display: "block",
+                        marginBottom: 3,
+                      }}
+                    >
                       사건번호 (공소번호)
                     </label>
                     <input
@@ -642,7 +690,14 @@ ${indictmentHtml}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "block", marginBottom: 3 }}>
+                    <label
+                      style={{
+                        fontSize: "0.72rem",
+                        color: "var(--text-muted)",
+                        display: "block",
+                        marginBottom: 3,
+                      }}
+                    >
                       관할 법원
                     </label>
                     <input
@@ -657,9 +712,29 @@ ${indictmentHtml}
             </div>
 
             {/* 2. 피고인 목록 */}
-            <div style={{ background: "rgba(0,0,0,0.2)", padding: 12, borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--text-main)" }}>
+            <div
+              style={{
+                background: "rgba(0,0,0,0.2)",
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 800,
+                    color: "var(--text-main)",
+                  }}
+                >
                   2. 피고인 인적사항 ({defendants.length}명)
                 </span>
                 <button
@@ -686,21 +761,45 @@ ${indictmentHtml}
                       gap: 6,
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: "0.76rem", fontWeight: 700, color: "var(--primary-amber)" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "0.76rem",
+                          fontWeight: 700,
+                          color: "var(--primary-amber)",
+                        }}
+                      >
                         피고인 {idx + 1}
                       </span>
                       {defendants.length > 1 && (
                         <button
                           type="button"
                           onClick={() => handleRemoveDefendant(d.id)}
-                          style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", padding: 2 }}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "#f87171",
+                            cursor: "pointer",
+                            padding: 2,
+                          }}
                         >
                           <Trash2 size={13} />
                         </button>
                       )}
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 6,
+                      }}
+                    >
                       <input
                         className="input-field"
                         placeholder="성명"
@@ -709,7 +808,9 @@ ${indictmentHtml}
                         onChange={(e) => {
                           const val = e.target.value;
                           setDefendants((prev) =>
-                            prev.map((item) => (item.id === d.id ? { ...item, name: val } : item)),
+                            prev.map((item) =>
+                              item.id === d.id ? { ...item, name: val } : item,
+                            ),
                           );
                         }}
                       />
@@ -720,15 +821,26 @@ ${indictmentHtml}
                         onChange={(e) => {
                           const val = e.target.value;
                           setDefendants((prev) =>
-                            prev.map((item) => (item.id === d.id ? { ...item, detentionStatus: val } : item)),
+                            prev.map((item) =>
+                              item.id === d.id
+                                ? { ...item, detentionStatus: val }
+                                : item,
+                            ),
                           );
                         }}
                       >
+                        <option value="">구속 여부 선택</option>
                         <option value="불구속">불구속</option>
                         <option value="구속">구속</option>
                       </select>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 6,
+                      }}
+                    >
                       <input
                         className="input-field"
                         placeholder="주소 (예: 주거부정)"
@@ -737,7 +849,11 @@ ${indictmentHtml}
                         onChange={(e) => {
                           const val = e.target.value;
                           setDefendants((prev) =>
-                            prev.map((item) => (item.id === d.id ? { ...item, address: val } : item)),
+                            prev.map((item) =>
+                              item.id === d.id
+                                ? { ...item, address: val }
+                                : item,
+                            ),
                           );
                         }}
                       />
@@ -749,7 +865,9 @@ ${indictmentHtml}
                         onChange={(e) => {
                           const val = e.target.value;
                           setDefendants((prev) =>
-                            prev.map((item) => (item.id === d.id ? { ...item, job: val } : item)),
+                            prev.map((item) =>
+                              item.id === d.id ? { ...item, job: val } : item,
+                            ),
                           );
                         }}
                       />
@@ -760,9 +878,29 @@ ${indictmentHtml}
             </div>
 
             {/* 3. 죄명 및 적용법조 */}
-            <div style={{ background: "rgba(0,0,0,0.2)", padding: 12, borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--text-main)" }}>
+            <div
+              style={{
+                background: "rgba(0,0,0,0.2)",
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 800,
+                    color: "var(--text-main)",
+                  }}
+                >
                   3. 죄명 및 적용법조 ({chargesList.length}건)
                 </span>
                 <button
@@ -777,7 +915,10 @@ ${indictmentHtml}
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {chargesList.map((ch) => (
-                  <div key={ch.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <div
+                    key={ch.id}
+                    style={{ display: "flex", gap: 6, alignItems: "center" }}
+                  >
                     <div style={{ width: "42%" }}>
                       <ChargeSearchInput
                         value={ch.name}
@@ -809,7 +950,9 @@ ${indictmentHtml}
                         const val = e.target.value;
                         setChargesList((prev) =>
                           prev.map((item) =>
-                            item.id === ch.id ? { ...item, lawArticle: val } : item,
+                            item.id === ch.id
+                              ? { ...item, lawArticle: val }
+                              : item,
                           ),
                         );
                       }}
@@ -818,7 +961,13 @@ ${indictmentHtml}
                       <button
                         type="button"
                         onClick={() => handleRemoveCharge(ch.id)}
-                        style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", padding: 2 }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#f87171",
+                          cursor: "pointer",
+                          padding: 2,
+                        }}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -829,9 +978,29 @@ ${indictmentHtml}
             </div>
 
             {/* 4. 공소사실(범죄사실) */}
-            <div style={{ background: "rgba(0,0,0,0.2)", padding: 12, borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--text-main)" }}>
+            <div
+              style={{
+                background: "rgba(0,0,0,0.2)",
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "0.82rem",
+                    fontWeight: 800,
+                    color: "var(--text-main)",
+                  }}
+                >
                   4. 공소사실 (범죄사실 본문)
                 </span>
                 <div style={{ display: "flex", gap: 5 }}>
@@ -851,7 +1020,10 @@ ${indictmentHtml}
                     title="사건 정보를 바탕으로 AI가 공소사실 초안을 작성합니다"
                   >
                     {aiLoading === "draft" ? (
-                      <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} />
+                      <Loader2
+                        size={11}
+                        style={{ animation: "spin 1s linear infinite" }}
+                      />
                     ) : (
                       <Sparkles size={11} />
                     )}
@@ -873,7 +1045,10 @@ ${indictmentHtml}
                     title="작성된 공소사실을 AI가 법률 문체로 교정합니다"
                   >
                     {aiLoading === "refine" ? (
-                      <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} />
+                      <Loader2
+                        size={11}
+                        style={{ animation: "spin 1s linear infinite" }}
+                      />
                     ) : (
                       <Wand2 size={11} />
                     )}
@@ -883,7 +1058,12 @@ ${indictmentHtml}
               </div>
               <textarea
                 className="input-field"
-                style={{ width: "100%", minHeight: 120, fontSize: "0.78rem", lineHeight: 1.6 }}
+                style={{
+                  width: "100%",
+                  minHeight: 120,
+                  fontSize: "0.78rem",
+                  lineHeight: 1.6,
+                }}
                 placeholder="일시, 장소, 범행 방법, 결과 등을 상세히 기술하세요. 또는 위 'AI 초안' 버튼을 눌러 자동 생성하세요."
                 value={crimeFacts}
                 onChange={(e) => setCrimeFacts(e.target.value)}
@@ -891,15 +1071,49 @@ ${indictmentHtml}
             </div>
 
             {/* 5. 증거의 요지 */}
-            <div style={{ background: "rgba(0,0,0,0.2)", padding: 12, borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
-              <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--text-main)", display: "block", marginBottom: 6 }}>
+            <div
+              style={{
+                background: "rgba(0,0,0,0.2)",
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "0.82rem",
+                  fontWeight: 800,
+                  color: "var(--text-main)",
+                  display: "block",
+                  marginBottom: 6,
+                }}
+              >
                 5. 증거의 요지 (체크 시 자동 첨부)
               </span>
 
               {evidenceList.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 100, overflowY: "auto", marginBottom: 6 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                    maxHeight: 100,
+                    overflowY: "auto",
+                    marginBottom: 6,
+                  }}
+                >
                   {evidenceList.map((e) => (
-                    <label key={e.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.74rem", color: "var(--text-main)", cursor: "pointer" }}>
+                    <label
+                      key={e.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: "0.74rem",
+                        color: "var(--text-main)",
+                        cursor: "pointer",
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={selectedEvidenceIds.has(e.id)}
@@ -910,7 +1124,13 @@ ${indictmentHtml}
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: 6 }}>
+                <div
+                  style={{
+                    fontSize: "0.72rem",
+                    color: "var(--text-muted)",
+                    marginBottom: 6,
+                  }}
+                >
                   사건에 등록된 증거물이 없습니다. 아래에 직접 입력하세요.
                 </div>
               )}
@@ -925,9 +1145,22 @@ ${indictmentHtml}
             </div>
 
             {/* 담당 검사 서명 정보 */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 8,
+              }}
+            >
               <div>
-                <label style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "block", marginBottom: 2 }}>
+                <label
+                  style={{
+                    fontSize: "0.72rem",
+                    color: "var(--text-muted)",
+                    display: "block",
+                    marginBottom: 2,
+                  }}
+                >
                   담당검사 직급
                 </label>
                 <input
@@ -938,7 +1171,14 @@ ${indictmentHtml}
                 />
               </div>
               <div>
-                <label style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "block", marginBottom: 2 }}>
+                <label
+                  style={{
+                    fontSize: "0.72rem",
+                    color: "var(--text-muted)",
+                    display: "block",
+                    marginBottom: 2,
+                  }}
+                >
                   담당검사 성명
                 </label>
                 <input
@@ -952,7 +1192,15 @@ ${indictmentHtml}
           </div>
 
           {/* 우측: 실시간 HWP 공소장 미리보기 & 액션 툴바 */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#334155" }}>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              background: "#334155",
+            }}
+          >
             {/* 툴바 */}
             <div
               style={{
@@ -967,7 +1215,13 @@ ${indictmentHtml}
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--primary-amber)" }}>
+                <span
+                  style={{
+                    fontSize: "0.78rem",
+                    fontWeight: 800,
+                    color: "var(--primary-amber)",
+                  }}
+                >
                   표준 규격 HWP 공소장 미리보기
                 </span>
               </div>
