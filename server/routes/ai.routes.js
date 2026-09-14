@@ -110,12 +110,24 @@ ${currentText}
     };
 
     let geminiRes;
+    const maxAttempts = 3;
     try {
-      geminiRes = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(geminiBody),
-      });
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        geminiRes = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(geminiBody),
+        });
+
+        const shouldRetry = [429, 503].includes(geminiRes.status);
+        if (!shouldRetry || attempt === maxAttempts) break;
+
+        const retryDelayMs = 1000 * 2 ** (attempt - 1);
+        console.warn(
+          `[AI /indictment-draft] Gemini ${geminiRes.status}, ${retryDelayMs}ms 후 재시도 (${attempt}/${maxAttempts - 1})`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      }
     } catch (fetchErr) {
       console.error("[AI /indictment-draft] Gemini fetch 실패:", fetchErr);
       return res
