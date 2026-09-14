@@ -844,6 +844,8 @@ export default function SecretariatAdmin({
       currentUser.roleLevel === "CHIEF_PROSECUTOR" ||
       currentUser.roleLevel === "DEPUTY_CHIEF" ||
       currentUser.roleLevel === "CHIEF_ADMINISTRATOR" ||
+      currentUser.roleLevel === "ADMINISTRATOR" ||
+      currentUser.roleLevel === "ADMIN_PROBATIONARY" ||
       (currentUser.dept && currentUser.dept.includes("사무국")) ||
       (currentUser.dualSecretariatWork &&
         currentUser.dualDept?.includes("사무국")));
@@ -954,7 +956,10 @@ export default function SecretariatAdmin({
   }
 
   const visibleSubTabs = SUB_TABS.filter((t) => {
-    if ((t.id === "delete" || t.id === "import") && !hasHighLevelAdminAccess) {
+    if (t.id === "import" && !hasHighLevelAdminAccess) {
+      return false;
+    }
+    if (t.id === "delete" && !hasSecretariatAccess) {
       return false;
     }
     if (selectedCategory !== "ALL" && t.category !== selectedCategory) {
@@ -2080,7 +2085,7 @@ export default function SecretariatAdmin({
       )}
 
       {/* ─── 기록 삭제 탭 ─────────────────────────────────────── */}
-      {activeSubTab === "delete" && hasHighLevelAdminAccess && (
+      {activeSubTab === "delete" && hasSecretariatAccess && (
         <DeleteManagementPanel
           ledgerData={ledgerData}
           appealsData={appealsData}
