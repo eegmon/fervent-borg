@@ -54,6 +54,7 @@ export default function IndictmentComposerModal({
 
   const [copied, setCopied] = useState(false);
   const [aiLoading, setAiLoading] = useState(false); // 'draft' | 'refine' | false
+  const [aiError, setAiError] = useState("");
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const year = todayStr.slice(0, 4);
@@ -410,6 +411,7 @@ ${indictmentHtml}
   // ── AI 공소사실 초안 생성 ────────────────────────────────────────
   const callAiApi = async (mode) => {
     setAiLoading(mode);
+    setAiError("");
     try {
       const selectedCase =
         ledgerData.find((c) => String(c.id) === String(selectedCaseId)) ||
@@ -448,10 +450,14 @@ ${indictmentHtml}
           "success",
         );
       } else {
-        showToast?.(`AI 오류: ${data.message}`, "error");
+        const message = `AI 오류: ${data.message || "AI 요청에 실패했습니다."}`;
+        setAiError(message);
+        showToast?.(message, "error");
       }
     } catch (e) {
-      showToast?.(`AI 연결 오류: ${e.message}`, "error");
+      const message = `AI 연결 오류: ${e.message}`;
+      setAiError(message);
+      showToast?.(message, "error");
     } finally {
       setAiLoading(false);
     }
@@ -1056,6 +1062,23 @@ ${indictmentHtml}
                   </button>
                 </div>
               </div>
+              {aiError && (
+                <div
+                  role="alert"
+                  style={{
+                    marginBottom: 6,
+                    padding: "7px 10px",
+                    borderRadius: 6,
+                    color: "#fecaca",
+                    background: "rgba(127,29,29,0.35)",
+                    border: "1px solid rgba(248,113,113,0.45)",
+                    fontSize: "0.72rem",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {aiError}
+                </div>
+              )}
               <textarea
                 className="input-field"
                 style={{
