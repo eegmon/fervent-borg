@@ -433,7 +433,7 @@ ${indictmentHtml}
             evidenceList: evidenceList.filter((e) =>
               selectedEvidenceIds.has(e.id),
             ),
-            currentText: mode === "refine" ? crimeFacts : "",
+            currentText: crimeFacts,
           }),
         },
       );
