@@ -431,6 +431,7 @@ router.post(
     if (
       visibility === "PRIVATE" &&
       !isProsecutorGeneral(req.user) &&
+      !hasSecretariatWorkAccess(req.user) &&
       req.user.id !== assignedId
     ) {
       return res.status(403).json({
@@ -1129,6 +1130,51 @@ router.put(
 
     res.json({ success: true, id: req.params.id });
   }),
+);
+
+// ── 8. 사건 삭제 (DELETE /api/cases/:id) ─────────────────────────────
+router.delete(
+  "/cases/:id",
+  requireAuth,
+  requireSecretariat,
+  async (req, res) => {
+    try {
+      const existing = await db.execute({
+        sql: "SELECT suje_no, hyeongje_no, suspect_name FROM cases WHERE id = ? AND deleted_at = ''",
+        args: [req.params.id],
+      });
+      if (existing.rows.length === 0) {
+        return res
+          .status(404)
+          .json({ success: false, message: "삭제할 사건을 찾을 수 없습니다." });
+      }
+
+      const deletedAt = new Date().toISOString();
+      await db.execute({
+        sql: "UPDATE cases SET deleted_at = ? WHERE id = ? AND deleted_at = ''",
+        args: [deletedAt, req.params.id],
+      });
+
+      const row = existing.rows[0];
+      const label = row.suje_no || row.hyeongje_no || req.params.id;
+      await writeAuditLog({
+        action: "DELETE",
+        entityType: "case",
+        entityId: req.params.id,
+        entityLabel: label,
+        actorId: req.user.id,
+        actorName: req.user.name,
+        detail: `사건 원부 삭제: ${label} (피의자: ${row.suspect_name || "-"})`,
+      });
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[DELETE /api/cases/:id]", err);
+      res
+        .status(500)
+        .json({ success: false, message: "사건 삭제 중 오류가 발생했습니다." });
+    }
+  },
 );
 
 // ── 8. 사건 보존 / 보존 해제 (PATCH /api/cases/:id/archive) ─────────

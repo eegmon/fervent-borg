@@ -318,19 +318,31 @@ export async function initDb() {
       hyeongje_no     TEXT,
       suje_no         TEXT DEFAULT '',
       title           TEXT,
+      report_title    TEXT DEFAULT '',
       prosecutor_name TEXT,
       suspect_name    TEXT,
       suspect_uuid    TEXT,
+      charge_name     TEXT DEFAULT '',
       status          TEXT,
       created_at      TEXT,
       basis_url       TEXT,
       period          TEXT,
       confiscation    TEXT,
+      incident_date   TEXT DEFAULT '',
+      report_content  TEXT DEFAULT '',
+      booking_basis   TEXT DEFAULT '',
+      evidence_attachments TEXT DEFAULT '[]',
       deleted_at      TEXT DEFAULT ''
     )
   `);
   for (const column of [
     "suje_no TEXT DEFAULT ''",
+    "report_title TEXT DEFAULT ''",
+    "charge_name TEXT DEFAULT ''",
+    "incident_date TEXT DEFAULT ''",
+    "report_content TEXT DEFAULT ''",
+    "booking_basis TEXT DEFAULT ''",
+    "evidence_attachments TEXT DEFAULT '[]'",
     "deleted_at TEXT DEFAULT ''",
   ]) {
     try {
@@ -415,17 +427,41 @@ export async function initDb() {
     CREATE TABLE IF NOT EXISTS bookings (
       id                  TEXT PRIMARY KEY,
       hyeongje_no         TEXT,
+      suje_no             TEXT DEFAULT '',
       prosecutor_name     TEXT,
       suspect_name        TEXT,
       suspect_uuid        TEXT,
+      charge_name         TEXT DEFAULT '',
       disposition_status  TEXT,
       booking_date        TEXT,
+      booking_basis       TEXT DEFAULT '',
+      disposition_details TEXT DEFAULT '',
       basis_url           TEXT,
       days_elapsed        INTEGER DEFAULT 0,
       indictment_decision TEXT,
+      created_at          TEXT DEFAULT '',
+      non_indictment_reason TEXT DEFAULT '',
+      execution_doc_url   TEXT DEFAULT '',
       deleted_at          TEXT DEFAULT ''
     )
   `);
+  for (const column of [
+    "suje_no TEXT DEFAULT ''",
+    "charge_name TEXT DEFAULT ''",
+    "booking_basis TEXT DEFAULT ''",
+    "disposition_details TEXT DEFAULT ''",
+    "created_at TEXT DEFAULT ''",
+    "non_indictment_reason TEXT DEFAULT ''",
+    "execution_doc_url TEXT DEFAULT ''",
+    "deleted_at TEXT DEFAULT ''",
+  ]) {
+    try {
+      await db.execute(`ALTER TABLE bookings ADD COLUMN ${column}`);
+    } catch (error) {
+      if (!String(error.message || error).includes("duplicate column"))
+        throw error;
+    }
+  }
 
   // ── approvals ──────────────────────────────────────────────────
   await db.execute(`
