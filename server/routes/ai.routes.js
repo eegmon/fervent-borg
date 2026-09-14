@@ -39,7 +39,10 @@ router.post(
       )
       .join(", ");
     const chargeNames =
-      charges.map((c) => c.name).filter(Boolean).join(", ") || "해당 범죄";
+      charges
+        .map((c) => c.name)
+        .filter(Boolean)
+        .join(", ") || "해당 범죄";
     const lawArticles = charges
       .map((c) => c.lawArticle)
       .filter(Boolean)
@@ -92,7 +95,7 @@ ${currentText}
       });
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`;
     const geminiBody = {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
@@ -122,9 +125,16 @@ ${currentText}
         geminiRes.status,
         errText,
       );
+      let upstreamMessage = "AI 서버에서 요청을 처리하지 못했습니다.";
+      try {
+        const parsedError = JSON.parse(errText);
+        upstreamMessage = parsedError.error?.message || upstreamMessage;
+      } catch {
+        if (errText) upstreamMessage = errText;
+      }
       return res.status(502).json({
         success: false,
-        message: `AI 오류 (${geminiRes.status}): API 키를 확인해주세요.`,
+        message: `AI 오류 (${geminiRes.status}): ${upstreamMessage}`,
       });
     }
 
