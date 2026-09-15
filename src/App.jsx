@@ -571,6 +571,8 @@ useEffect(() => {
         effectiveRole === "CHIEF_ADMINISTRATOR" ||
         effectiveRole === "ADMINISTRATOR" ||
         effectiveRole === "ADMIN_PROBATIONARY" ||
+        (currentUser.dualSecretariatWork &&
+          currentUser.dualDept?.includes("사무국")) ||
         (currentUser.dept && currentUser.dept.includes("사무국"))),
     );
   }, [currentUser, effectiveRole]);
