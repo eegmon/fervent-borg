@@ -1383,6 +1383,8 @@ useEffect(() => {
     currentUser.roleLevel === "ADMINISTRATOR" ||
     currentUser.roleLevel === "ADMIN_PROBATIONARY" ||
     currentUser.dept?.includes("사무국") ||
+    (currentUser.dualSecretariatWork &&
+      currentUser.dualDept?.includes("사무국")) ||
     (currentUserDeptObj ? currentUserDeptObj.canIntake !== false : true);
 
   const handleTryOpenIntakeModal = () => {
