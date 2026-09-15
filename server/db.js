@@ -233,6 +233,14 @@ export async function initDb() {
     "incident_date TEXT DEFAULT ''",
     "suspects_json TEXT DEFAULT '[]'",
     "suspects_dispositions TEXT DEFAULT '{}'",
+    "execution_status TEXT DEFAULT ''",
+    "execution_date TEXT DEFAULT ''",
+    "execution_notes TEXT DEFAULT ''",
+    "execution_updated_by TEXT DEFAULT ''",
+    "execution_updated_at TEXT DEFAULT ''",
+    "is_expunged INTEGER DEFAULT 0",
+    "expunged_at TEXT DEFAULT ''",
+    "expunged_reason TEXT DEFAULT ''",
     "deleted_at TEXT DEFAULT ''",
   ]) {
     try {

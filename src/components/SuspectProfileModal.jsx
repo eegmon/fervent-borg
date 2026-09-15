@@ -419,7 +419,7 @@ function CasesTab({ cases = [] }) {
       >
         <thead>
           <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-            {["사건번호", "죄명", "담당검사", "입건상태", "처분"].map((h) => (
+            {["사건번호", "죄명", "담당검사", "입건상태", "처분", "법원재판/형집행"].map((h) => (
               <th
                 key={h}
                 style={{
@@ -436,54 +436,95 @@ function CasesTab({ cases = [] }) {
           </tr>
         </thead>
         <tbody>
-          {cases.map((c, i) => (
-            <tr
-              key={c.id || i}
-              style={{
-                borderBottom: "1px solid var(--border-subtle)",
-                background:
-                  i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
-              }}
-            >
-              <td
+          {cases.map((c, i) => {
+            const verdict = c.court3Result || c.court2Result || c.court1Result;
+            const doc = c.court3Doc || c.court2Doc || c.court1Doc;
+            const isExpunged = c.isExpunged === 1 || c.isExpunged === "1";
+
+            return (
+              <tr
+                key={c.id || i}
                 style={{
-                  padding: "8px 10px",
-                  fontFamily: "monospace",
-                  color: "var(--primary-amber)",
-                  whiteSpace: "nowrap",
+                  borderBottom: "1px solid var(--border-subtle)",
+                  background:
+                    i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
                 }}
               >
-                {getDisplayCaseNumber(c) || "-"}
-              </td>
-              <td
-                style={{
-                  padding: "8px 10px",
-                  color: "var(--text-main)",
-                  maxWidth: 160,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {c.chargeName || "-"}
-              </td>
-              <td
-                style={{
-                  padding: "8px 10px",
-                  color: "var(--text-muted)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {c.prosecutorName || "-"}
-              </td>
-              <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
-                <StatusBadge text={c.bookingStatus} />
-              </td>
-              <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
-                <DispositionBadge text={c.disposition} />
-              </td>
-            </tr>
-          ))}
+                <td
+                  style={{
+                    padding: "8px 10px",
+                    fontFamily: "monospace",
+                    color: "var(--primary-amber)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {getDisplayCaseNumber(c) || "-"}
+                </td>
+                <td
+                  style={{
+                    padding: "8px 10px",
+                    color: "var(--text-main)",
+                    maxWidth: 160,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {c.chargeName || "-"}
+                </td>
+                <td
+                  style={{
+                    padding: "8px 10px",
+                    color: "var(--text-muted)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {c.prosecutorName || "-"}
+                </td>
+                <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                  <StatusBadge text={c.bookingStatus} />
+                </td>
+                <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                  <DispositionBadge text={c.disposition} />
+                </td>
+                <td style={{ padding: "8px 10px", whiteSpace: "nowrap", fontSize: "0.72rem" }}>
+                  {verdict || c.executionStatus ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                      {verdict && (
+                        <div style={{ color: "#818cf8", fontWeight: 600 }}>
+                          {verdict}
+                          {doc && (
+                            <a
+                              href={doc}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ marginLeft: "4px", color: "#60a5fa", textDecoration: "underline" }}
+                            >
+                              [판결문]
+                            </a>
+                          )}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        {c.executionStatus && (
+                          <span style={{ color: "#34d399", fontWeight: 600 }}>
+                            {c.executionStatus}
+                          </span>
+                        )}
+                        {isExpunged && (
+                          <span style={{ background: "rgba(168,85,247,0.15)", color: "#c084fc", padding: "1px 4px", borderRadius: "4px", fontSize: "0.65rem", fontWeight: 700 }}>
+                            실효됨
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <span style={{ color: "var(--text-muted)" }}>-</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
