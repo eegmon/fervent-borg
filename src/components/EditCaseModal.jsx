@@ -1001,6 +1001,15 @@ export default function EditCaseModal({
                   value={formData.court1Result || ""}
                   onChange={handleChange}
                   placeholder="징역 1년 6월"
+                  style={{ marginBottom: 6 }}
+                />
+                <label className="input-label">1심 판결문 링크</label>
+                <input
+                  className="input-field"
+                  name="court1Doc"
+                  value={formData.court1Doc || ""}
+                  onChange={handleChange}
+                  placeholder="https://... (판결문 URL)"
                 />
               </div>
               <div
@@ -1037,6 +1046,15 @@ export default function EditCaseModal({
                   value={formData.court2Result || ""}
                   onChange={handleChange}
                   placeholder="항소기각"
+                  style={{ marginBottom: 6 }}
+                />
+                <label className="input-label">2심 판결문 링크</label>
+                <input
+                  className="input-field"
+                  name="court2Doc"
+                  value={formData.court2Doc || ""}
+                  onChange={handleChange}
+                  placeholder="https://... (판결문 URL)"
                 />
               </div>
               <div
@@ -1073,6 +1091,82 @@ export default function EditCaseModal({
                   value={formData.court3Result || ""}
                   onChange={handleChange}
                   placeholder="상고기각 (확정)"
+                  style={{ marginBottom: 6 }}
+                />
+                <label className="input-label">3심 판결문 링크</label>
+                <input
+                  className="input-field"
+                  name="court3Doc"
+                  value={formData.court3Doc || ""}
+                  onChange={handleChange}
+                  placeholder="https://... (판결문 URL)"
+                />
+              </div>
+            </div>
+
+            {/* 형집행 정보 입력 영역 */}
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 8,
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.78rem",
+                  fontWeight: 800,
+                  color: "var(--text-main)",
+                  marginBottom: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span>🔒 형집행 현황</span>
+                <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: "normal" }}>
+                  (법원 및 교정기관 연계 정보)
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label className="input-label">집행 상태</label>
+                  <select
+                    className="input-field"
+                    name="executionStatus"
+                    value={formData.executionStatus || ""}
+                    onChange={handleChange}
+                  >
+                    <option value="">집행 상태 미지정</option>
+                    <option value="집행 전">집행 전</option>
+                    <option value="집행 중">집행 중</option>
+                    <option value="집행 완료">집행 완료</option>
+                    <option value="집행 유예">집행 유예</option>
+                    <option value="집행 면제">집행 면제</option>
+                    <option value="가석방">가석방</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="input-label">집행 일자</label>
+                  <input
+                    type="date"
+                    className="input-field"
+                    name="executionDate"
+                    value={formData.executionDate ? formData.executionDate.slice(0, 10) : ""}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <label className="input-label">형집행 비고사항</label>
+                <input
+                  className="input-field"
+                  name="executionNotes"
+                  value={formData.executionNotes || ""}
+                  onChange={handleChange}
+                  placeholder="예: 서울남부교도소 수형 중 / 벌금 완납 확인"
                 />
               </div>
             </div>

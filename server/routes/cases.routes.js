@@ -1048,7 +1048,8 @@ router.put(
             charge_name=?, notes=?, content=?, confiscation=?,
             supervisor_designated=?, supervisor_id=?, supervisor_name=?,
             visibility=?, private_viewer_ids=?,
-            suspects_json=?, suspects_dispositions=?
+            suspects_json=?, suspects_dispositions=?,
+            execution_status=?, execution_date=?, execution_notes=?
           WHERE id=?`,
       args: [
         sujeNo,
@@ -1090,6 +1091,9 @@ router.put(
         JSON.stringify(newPrivateViewerIds),
         JSON.stringify(suspectsForUpdate),
         JSON.stringify(dispositionMapForUpdate),
+        c.executionStatus !== undefined ? c.executionStatus : (old?.executionStatus || ""),
+        c.executionDate !== undefined ? c.executionDate : (old?.executionDate || ""),
+        c.executionNotes !== undefined ? c.executionNotes : (old?.executionNotes || ""),
         req.params.id,
       ],
     });
