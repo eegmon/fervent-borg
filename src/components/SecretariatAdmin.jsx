@@ -1334,7 +1334,7 @@ export default function SecretariatAdmin({
                   const isSelected =
                     selectedDeptId === d.id || selectedDeptId === d.name;
                   const members = prosecutorsList.filter(
-                    (p) => p.dept === d.name,
+                    (p) => p.dept === d.name || p.dualDept === d.name,
                   );
                   const headUser = prosecutorsList.find(
                     (p) => p.id === d.headId || p.dept === d.name,
@@ -1488,7 +1488,7 @@ export default function SecretariatAdmin({
                   ) || departmentsData[0];
                 const deptName = currentDeptObj?.name || selectedDeptId;
                 const members = prosecutorsList.filter(
-                  (p) => p.dept === deptName,
+                  (p) => p.dept === deptName || p.dualDept === deptName,
                 );
                 const deptCases = ledgerData.filter(
                   (c) =>
@@ -1501,7 +1501,7 @@ export default function SecretariatAdmin({
                     ),
                 );
                 const nonMembers = prosecutorsList.filter(
-                  (p) => p.dept !== deptName,
+                  (p) => p.dept !== deptName && p.dualDept !== deptName,
                 );
 
                 return (
@@ -1960,6 +1960,22 @@ export default function SecretariatAdmin({
                                       >
                                         {p.position || `${deptName} 검사`}
                                       </span>
+                                      {p.dualDept === deptName && (
+                                        <span
+                                          style={{
+                                            display: "inline-block",
+                                            marginLeft: 6,
+                                            padding: "2px 6px",
+                                            borderRadius: 4,
+                                            background: "rgba(167,139,250,0.14)",
+                                            color: "#a78bfa",
+                                            fontSize: "0.65rem",
+                                            fontWeight: 800,
+                                          }}
+                                        >
+                                          겸직
+                                        </span>
+                                      )}
                                     </td>
                                     <td>
                                       <span
