@@ -20,6 +20,7 @@ import {
   X,
   Scale,
 } from "lucide-react";
+import { getMasterCaseNumber, matchesCaseNumber, matchesCaseSuspect } from "../services/caseUtils";
 
 export default function QuickSearchModal({
   isOpen,
@@ -270,30 +271,32 @@ export default function QuickSearchModal({
     // 1. Search Cases
     const matchedCases = (ledgerData || [])
       .filter((c) => {
-        const caseNo = (c.hyeongjeNo || "") + " " + (c.sujeNo || "") + " " + (c.naesaNo || "");
-        const suspect = c.suspectName || "";
-        const charge = c.charge || "";
-        const prosecutor = c.prosecutorName || "";
-        const victim = c.victimName || "";
-        const disposition = c.disposition || "";
+        const naesaNo = c.naesaNo || "";
+        const charge = (c.charge || c.chargeName || "").toLowerCase();
+        const prosecutor = (c.prosecutorName || "").toLowerCase();
+        const victim = (c.victimName || "").toLowerCase();
+        const disposition = (c.disposition || "").toLowerCase();
         return (
-          caseNo.toLowerCase().includes(q) ||
-          suspect.toLowerCase().includes(q) ||
-          charge.toLowerCase().includes(q) ||
-          prosecutor.toLowerCase().includes(q) ||
-          victim.toLowerCase().includes(q) ||
-          disposition.toLowerCase().includes(q)
+          matchesCaseNumber(c, q) ||
+          matchesCaseSuspect(c, q) ||
+          naesaNo.toLowerCase().includes(q) ||
+          charge.includes(q) ||
+          prosecutor.includes(q) ||
+          victim.includes(q) ||
+          disposition.includes(q)
         );
       })
       .slice(0, 8)
       .map((c) => {
-        const displayNo = c.hyeongjeNo || c.sujeNo || c.naesaNo || ("사건 #" + c.id);
+        const masterNo = getMasterCaseNumber(c);
+        const displayNo = masterNo || c.hyeongjeNo || c.naesaNo || ("사건 #" + c.id);
+        const extraNo = c.hyeongjeNo && c.sujeNo && c.hyeongjeNo !== c.sujeNo ? ` [형제: ${c.hyeongjeNo}]` : "";
         return {
           id: "case-" + c.id,
           type: "CASE",
           category: "사건",
-          title: displayNo + " · " + (c.suspectName || "피의자 미상"),
-          subtitle: "죄명: " + (c.charge || "미지정") + " | 담당: " + (c.prosecutorName || "미배당") + " | 처분: " + (c.disposition || "수사중"),
+          title: displayNo + extraNo + " · " + (c.suspectName || "피의자 미상"),
+          subtitle: "죄명: " + (c.charge || c.chargeName || "미지정") + " | 담당: " + (c.prosecutorName || "미배당") + " | 처분: " + (c.disposition || "수사중"),
           badge: c.disposition || c.bookingStatus || "수사중",
           badgeColor: c.disposition ? "#10b981" : "#3b82f6",
           icon: Scale,

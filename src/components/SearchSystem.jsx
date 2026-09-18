@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, ExternalLink, AlertCircle, RefreshCw, Clock } from 'lucide-react';
 import { isCaseConcluded, isCaseIndicted, isCaseInvestigating } from '../data/prosecutionData';
-import { isArchivedCase, matchesCaseNumber } from '../services/caseUtils';
+import { isArchivedCase, matchesCaseNumber, matchesCaseSuspect } from '../services/caseUtils';
 
 const STATUS_COLOR = (s) => {
   if (!s) return '#94a3b8';
@@ -23,20 +23,19 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
     return ledgerData.filter(item => {
       if (!item) return false;
 
-      const sName = (item.suspectName || '').toLowerCase();
       const pName = (item.prosecutorName || '').toLowerCase();
       const cName = (item.chargeName || '').toLowerCase();
-      const sUuid = (item.suspectUuid || '').toLowerCase();
       const disp = (item.disposition || item.bookingStatus || '').toLowerCase();
       const c1No = (item.court1No || '').toLowerCase();
       const notes = (item.notes || '').toLowerCase();
+      const matchSuspect = matchesCaseSuspect(item, q);
 
       let matchQuery = true;
       if (q) {
         if (searchType === 'case') {
           matchQuery = matchesCaseNumber(item, q) || c1No.includes(q);
         } else if (searchType === 'suspect') {
-          matchQuery = sName.includes(q) || sUuid.includes(q);
+          matchQuery = matchSuspect;
         } else if (searchType === 'prosecutor') {
           matchQuery = pName.includes(q);
         } else if (searchType === 'charge') {
@@ -44,10 +43,9 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
         } else {
           matchQuery =
             matchesCaseNumber(item, q) ||
-            sName.includes(q) ||
+            matchSuspect ||
             pName.includes(q) ||
             cName.includes(q) ||
-            sUuid.includes(q) ||
             disp.includes(q) ||
             c1No.includes(q) ||
             notes.includes(q);
@@ -227,24 +225,59 @@ export default function SearchSystem({ ledgerData = [], onSelectEvidence, onSele
 
                   <div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>피의자 닉네임 / UUID</div>
-                    <button
-                      onClick={() => onSelectSuspect && onSelectSuspect({ name: item.suspectName, uuid: item.suspectUuid || null })}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
-                    >
-                      <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.85rem', textDecoration: 'underline dotted' }}>
-                        {item.suspectName || '-'}
+                    {item.suspects && item.suspects.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {item.suspects.map((s, sIdx) => (
+                          <div key={sIdx} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => onSelectSuspect && onSelectSuspect({ name: s.name, uuid: s.uuid || null })}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
+                            >
+                              <span style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.85rem', textDecoration: 'underline dotted' }}>
+                                {s.name}
+                              </span>
+                            </button>
+                            {s.role && (
+                              <span className="badge badge-gold" style={{ fontSize: '0.62rem', padding: '1px 4px' }}>
+                                {s.role}
+                              </span>
+                            )}
+                            {s.uuid && (
+                              <button
+                                onClick={() => onOpenSuspectProfile && onOpenSuspectProfile(s.uuid)}
+                                title="통합 프로필 열기"
+                                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                              >
+                                <span style={{ fontSize: '0.68rem', color: 'rgba(245,158,11,0.6)', fontFamily: 'monospace', textDecoration: 'underline dotted' }}>
+                                  ({s.uuid})
+                                </span>
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    </button>
-                    {item.suspectUuid && (
-                      <button
-                        onClick={() => onOpenSuspectProfile && onOpenSuspectProfile(item.suspectUuid)}
-                        title="통합 프로필 열기"
-                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
-                      >
-                        <div style={{ fontSize: '0.68rem', color: 'rgba(245,158,11,0.6)', fontFamily: 'monospace', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'underline dotted' }}>
-                          {item.suspectUuid}
-                        </div>
-                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => onSelectSuspect && onSelectSuspect({ name: item.suspectName, uuid: item.suspectUuid || null })}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
+                        >
+                          <div style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.85rem', textDecoration: 'underline dotted' }}>
+                            {item.suspectName || '-'}
+                          </div>
+                        </button>
+                        {item.suspectUuid && (
+                          <button
+                            onClick={() => onOpenSuspectProfile && onOpenSuspectProfile(item.suspectUuid)}
+                            title="통합 프로필 열기"
+                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                          >
+                            <div style={{ fontSize: '0.68rem', color: 'rgba(245,158,11,0.6)', fontFamily: 'monospace', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'underline dotted' }}>
+                              {item.suspectUuid}
+                            </div>
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
 

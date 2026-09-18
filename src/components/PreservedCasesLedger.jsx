@@ -10,6 +10,7 @@ import { isCaseConcluded } from "../data/prosecutionData";
 import {
   isArchivedCase,
   matchesCaseNumber,
+  matchesCaseSuspect,
   getDisplayCaseNumber,
 } from "../services/caseUtils";
 
@@ -66,10 +67,9 @@ export default function PreservedCasesLedger({
       const matchQ =
         !q ||
         matchesCaseNumber(c, q) ||
-        (c.suspectName || "").toLowerCase().includes(q) ||
+        matchesCaseSuspect(c, q) ||
         (c.prosecutorName || "").toLowerCase().includes(q) ||
-        (c.chargeName || "").toLowerCase().includes(q) ||
-        (c.suspectUuid || "").toLowerCase().includes(q);
+        (c.chargeName || "").toLowerCase().includes(q);
 
       let matchStatus = true;
       if (statusFilter === "CONCLUDED") matchStatus = isCaseConcluded(c);

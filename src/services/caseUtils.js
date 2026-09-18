@@ -75,6 +75,40 @@ export function matchesCaseNumber(caseItem, query) {
 }
 
 /**
+ * 검색어가 피의자(단일 피의자 및 다수피의자 목록)의 이름 또는 UUID에 포함되는지 확인한다.
+ *
+ * @param {object} caseItem
+ * @param {string} query  소문자 트림된 검색어
+ * @returns {boolean}
+ */
+export function matchesCaseSuspect(caseItem, query) {
+  if (!query) return true;
+  if (!caseItem) return false;
+  const q = query.toLowerCase().trim();
+
+  // 기본 단일 피의자 필드 확인
+  if ((caseItem.suspectName || "").toLowerCase().includes(q)) return true;
+  if ((caseItem.suspectUuid || "").toLowerCase().includes(q)) return true;
+
+  // 다수피의자 목록(suspects) 확인
+  if (Array.isArray(caseItem.suspects)) {
+    for (const s of caseItem.suspects) {
+      if (!s) continue;
+      if (typeof s === "string" && s.toLowerCase().includes(q)) return true;
+      if (s.name && String(s.name).toLowerCase().includes(q)) return true;
+      if (s.uuid && String(s.uuid).toLowerCase().includes(q)) return true;
+    }
+  }
+
+  // suspectsJson 문자열 형태 fallback 확인
+  if (typeof caseItem.suspectsJson === "string" && caseItem.suspectsJson.toLowerCase().includes(q)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * 보존 사건 여부 반환.
  * isArchived가 truthy(1 또는 true)이면 보존 사건.
  *

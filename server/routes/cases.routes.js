@@ -1347,12 +1347,13 @@ router.get("/suspects/:uuid/profile", requireAuth, async (req, res) => {
       .json({ success: false, message: "유효한 UUID를 입력해주세요." });
   }
   try {
+    const likeUuid = `%${uuid}%`;
     const [casesRes, bookingsRes, appealsRes, warrantsRes] = await Promise.all([
       db.execute({
         sql: hasGlobalDataAccess(req.user)
-          ? "SELECT * FROM cases WHERE suspect_uuid = ? AND deleted_at = '' ORDER BY rowid DESC"
+          ? "SELECT * FROM cases WHERE (suspect_uuid = ? OR suspects_json LIKE ?) AND deleted_at = '' ORDER BY rowid DESC"
           : `SELECT c.* FROM cases c JOIN prosecutors p ON c.prosecutor_id = p.id
-             WHERE c.suspect_uuid = ? AND c.deleted_at = ''
+             WHERE (c.suspect_uuid = ? OR c.suspects_json LIKE ?) AND c.deleted_at = ''
                AND (c.visibility = 'PUBLIC' OR c.prosecutor_id = ? OR c.created_by = ?
                  OR (c.visibility = 'PUBLIC' AND (
                    c.disposition LIKE '%불기소%' OR c.disposition LIKE '%종국%' OR
@@ -1366,8 +1367,8 @@ router.get("/suspects/:uuid/profile", requireAuth, async (req, res) => {
                  )))
              ORDER BY c.rowid DESC`,
         args: hasGlobalDataAccess(req.user)
-          ? [uuid]
-          : [uuid, req.user.id, req.user.id],
+          ? [uuid, likeUuid]
+          : [uuid, likeUuid, req.user.id, req.user.id],
       }),
       db.execute({
         sql: hasGlobalDataAccess(req.user)
@@ -1417,7 +1418,26 @@ router.get("/suspects/:uuid/profile", requireAuth, async (req, res) => {
       }),
     ]);
 
-    const cases = casesRes.rows.map(toCamel);
+    const cases = casesRes.rows.map((row) => {
+      const c = toCamel(row);
+      c.suspects = Array.isArray(c.suspectsJson)
+        ? c.suspectsJson
+        : parseJsonArray(c.suspectsJson || c.suspects);
+      c.suspectsDispositions = parseJsonObject(
+        c.suspectsDispositions || c.suspects_dispositions,
+      );
+      if (c.suspects.length === 0 && c.suspectName) {
+        c.suspects = [
+          {
+            id: c.suspectUuid || c.suspectName,
+            name: c.suspectName,
+            uuid: c.suspectUuid || "",
+            role: "주범",
+          },
+        ];
+      }
+      return c;
+    });
     const bookings = bookingsRes.rows.map(toCamel);
     const appeals = appealsRes.rows.map(toCamel);
     const warrants = warrantsRes.rows.map(toCamel);
@@ -1428,11 +1448,31 @@ router.get("/suspects/:uuid/profile", requireAuth, async (req, res) => {
       dispositionStats[d] = (dispositionStats[d] || 0) + 1;
     });
 
-    const suspectName =
-      cases[0]?.suspectName ||
-      bookings[0]?.suspectName ||
-      appeals[0]?.suspectName ||
-      "알 수 없음";
+    // 해당 UUID와 일치하는 피의자 이름 추출
+    let suspectName = "";
+    for (const c of cases) {
+      if (Array.isArray(c.suspects)) {
+        const found = c.suspects.find(
+          (s) => s?.uuid && String(s.uuid).toLowerCase() === uuid.toLowerCase(),
+        );
+        if (found?.name) {
+          suspectName = found.name;
+          break;
+        }
+      }
+      if (c.suspectUuid && String(c.suspectUuid).toLowerCase() === uuid.toLowerCase()) {
+        suspectName = c.suspectName;
+        break;
+      }
+    }
+
+    if (!suspectName) {
+      suspectName =
+        cases[0]?.suspectName ||
+        bookings[0]?.suspectName ||
+        appeals[0]?.suspectName ||
+        "알 수 없음";
+    }
 
     res.json({
       uuid,

@@ -3,6 +3,7 @@ import {
   getDisplayCaseNumber,
   getMasterCaseNumber,
   matchesCaseNumber,
+  matchesCaseSuspect,
   parseDispositionEntries,
   dispositionColor,
 } from "../services/caseUtils";
@@ -1307,9 +1308,8 @@ export default function MyCasesLedger({
     const matchQ =
       !q ||
       matchesCaseNumber(item, q) ||
-      (item.suspectName || "").toLowerCase().includes(q) ||
-      (item.chargeName || "").toLowerCase().includes(q) ||
-      (item.suspectUuid || "").toLowerCase().includes(q);
+      matchesCaseSuspect(item, q) ||
+      (item.chargeName || "").toLowerCase().includes(q);
     const matchStatus =
       statusFilter === "ALL" ||
       (item.disposition || item.bookingStatus || "")

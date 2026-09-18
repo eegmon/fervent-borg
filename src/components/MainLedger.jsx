@@ -15,7 +15,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import EditCaseModal from "./EditCaseModal";
-import { getDisplayCaseNumber, getMasterCaseNumber, matchesCaseNumber, parseDispositionEntries, dispositionColor } from "../services/caseUtils";
+import { getDisplayCaseNumber, getMasterCaseNumber, matchesCaseNumber, matchesCaseSuspect, parseDispositionEntries, dispositionColor } from "../services/caseUtils";
 
 const STATUS_COLOR = (s) => {
   if (!s) return "#94a3b8";
@@ -243,17 +243,14 @@ export default function MainLedger({
 
       if (!q) return true;
 
-      const sName = (item.suspectName || "").toLowerCase();
       const pNameLower = pName.toLowerCase();
       const cName = (item.chargeName || "").toLowerCase();
-      const sUuid = (item.suspectUuid || "").toLowerCase();
 
       return (
         matchesCaseNumber(item, q) ||
-        sName.includes(q) ||
+        matchesCaseSuspect(item, q) ||
         pNameLower.includes(q) ||
-        cName.includes(q) ||
-        sUuid.includes(q)
+        cName.includes(q)
       );
     });
   }, [ledgerData, searchTerm, statusFilter, prosecutorFilter, deptFilter, archiveFilter, isChiefOrAbove, prosecutorDeptMap]);

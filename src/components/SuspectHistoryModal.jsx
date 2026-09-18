@@ -26,11 +26,39 @@ export default function SuspectHistoryModal({ isOpen, onClose, suspectName, susp
   // UUID 조회 결과 또는 ledgerData 폴백
   const history = profileData?.cases
     ? profileData.cases
-    : (ledgerData || []).filter(
-        (c) => c.suspectName && c.suspectName.toLowerCase() === (suspectName || "").toLowerCase()
-      );
+    : (ledgerData || []).filter((c) => {
+        if (!suspectName && !suspectUuid) return false;
+        const sNameLower = (suspectName || "").toLowerCase().trim();
+        const sUuidLower = (suspectUuid || "").toLowerCase().trim();
 
-  const displayUuid = suspectUuid || history[0]?.suspectUuid || null;
+        // 1. 단일 피의자 필드 확인
+        if (sUuidLower && (c.suspectUuid || "").toLowerCase() === sUuidLower) return true;
+        if (sNameLower && (c.suspectName || "").toLowerCase() === sNameLower) return true;
+
+        // 2. 다수피의자 목록(suspects) 확인
+        if (Array.isArray(c.suspects)) {
+          return c.suspects.some((s) => {
+            if (!s) return false;
+            if (sUuidLower && (s.uuid || "").toLowerCase() === sUuidLower) return true;
+            if (sNameLower && (s.name || "").toLowerCase() === sNameLower) return true;
+            return false;
+          });
+        }
+
+        // 3. 다수피의자 이름 문자열에 포함되어 있는지 확인 ("홍길동 외 2명" 등)
+        if (sNameLower && (c.suspectName || "").toLowerCase().includes(sNameLower)) return true;
+
+        return false;
+      });
+
+  const matchedSuspectInHistory = history[0]?.suspects?.find(
+    (s) => (suspectName && s.name === suspectName) || (suspectUuid && s.uuid === suspectUuid)
+  );
+  const displayUuid =
+    suspectUuid ||
+    matchedSuspectInHistory?.uuid ||
+    history[0]?.suspectUuid ||
+    null;
 
   return (
     <div className="modal-overlay">
