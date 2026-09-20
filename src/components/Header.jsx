@@ -33,7 +33,7 @@ const TABS = [
   { id: "approvals", label: "전자 결재함", icon: FileCheck },
   { id: "secretariat", label: "검찰사무국", icon: Building2 },
   { id: "appeals", label: "항고 관리", icon: ShieldAlert },
-  { id: "bookings", label: "입건 현황", icon: AlertOctagon },
+  { id: "execution", label: "형집행 관리", icon: Scale },
   { id: "search", label: "사건 조회", icon: Search },
   { id: "analytics", label: "통계 현황", icon: BarChart3 },
   { id: "auditlog", label: "감사 로그", icon: ClipboardList, adminOnly: true },

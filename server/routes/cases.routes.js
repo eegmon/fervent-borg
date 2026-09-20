@@ -1049,7 +1049,8 @@ router.put(
             supervisor_designated=?, supervisor_id=?, supervisor_name=?,
             visibility=?, private_viewer_ids=?,
             suspects_json=?, suspects_dispositions=?,
-            execution_status=?, execution_date=?, execution_notes=?
+            execution_status=?, execution_date=?, execution_notes=?,
+            sentence_type=?
           WHERE id=?`,
       args: [
         sujeNo,
@@ -1094,6 +1095,7 @@ router.put(
         c.executionStatus !== undefined ? c.executionStatus : (old?.executionStatus || ""),
         c.executionDate !== undefined ? c.executionDate : (old?.executionDate || ""),
         c.executionNotes !== undefined ? c.executionNotes : (old?.executionNotes || ""),
+        c.sentenceType !== undefined ? c.sentenceType : (old?.sentenceType || ""),
         req.params.id,
       ],
     });

@@ -68,6 +68,7 @@ import ActingOrderPanel from "./secretariat/ActingOrderPanel";
 import AutoArchiveSettingsPanel from "./secretariat/AutoArchiveSettingsPanel";
 import ArchiveStoragePanel from "./secretariat/ArchiveStoragePanel";
 import ExcelImportTab from "./secretariat/ExcelImportTab";
+import BookingLedger from "./BookingLedger";
 
 const CATEGORIES = [
   { id: "ALL", label: "전체 메뉴" },
@@ -139,6 +140,12 @@ const SUB_TABS = [
     id: "archivestore",
     label: "🗄️ 보존기록 서고",
     icon: Archive,
+    category: "CASES",
+  },
+  {
+    id: "bookings",
+    label: "📋 입건 현황",
+    icon: ClipboardList,
     category: "CASES",
   },
 ];
@@ -299,6 +306,9 @@ export default function SecretariatAdmin({
   onUpdateCharges,
   auditLogs: initialAuditLogs = [],
   isReadOnly = false,
+  bookings = [],
+  onSelectEvidence,
+  onSelectSuspect,
 }) {
   const [activeSubTab, setActiveSubTab] = useState("registrations");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
@@ -4789,6 +4799,17 @@ export default function SecretariatAdmin({
       )}
       {activeSubTab === "import" && hasHighLevelAdminAccess && (
         <ExcelImportTab onBulkImport={onBulkImport} />
+      )}
+
+      {/* 입건 현황 */}
+      {activeSubTab === "bookings" && (
+        <div style={{ marginTop: 24 }}>
+          <BookingLedger
+            bookings={bookings}
+            onSelectEvidence={onSelectEvidence}
+            onSelectSuspect={onSelectSuspect}
+          />
+        </div>
       )}
 
       {/* ── 부서원 특정 사건 선택 재배당 모달 ── */}

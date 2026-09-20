@@ -238,6 +238,7 @@ export async function initDb() {
     "execution_notes TEXT DEFAULT ''",
     "execution_updated_by TEXT DEFAULT ''",
     "execution_updated_at TEXT DEFAULT ''",
+    "sentence_type TEXT DEFAULT ''",
     "is_expunged INTEGER DEFAULT 0",
     "expunged_at TEXT DEFAULT ''",
     "expunged_reason TEXT DEFAULT ''",

@@ -17,6 +17,7 @@ import WarrantLedger from "./components/WarrantLedger";
 import ApprovalSystem from "./components/ApprovalSystem";
 import AppealLedger from "./components/AppealLedger";
 import BookingLedger from "./components/BookingLedger";
+import ExecutionLedger from "./components/ExecutionLedger";
 import SearchSystem from "./components/SearchSystem";
 import PreservedCasesLedger from "./components/PreservedCasesLedger";
 import AnalyticsDashboard from "./components/AnalyticsDashboard";
@@ -2294,6 +2295,11 @@ useEffect(() => {
                 chargesData={chargesData}
                 onUpdateCharges={setChargesData}
                 auditLogs={auditLogs}
+                bookings={scopedBookingsData}
+                onSelectEvidence={(url, caseNo, suspectName) =>
+                  setEvidenceModalInfo({ url, caseNo, suspectName })
+                }
+                onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
               />
             )}
 
@@ -2313,14 +2319,11 @@ useEffect(() => {
               />
             )}
 
-            {activeTab === "bookings" && (
-              <BookingLedger
-                bookings={scopedBookingsData}
-                onSelectEvidence={(url, caseNo, suspectName) =>
-                  setEvidenceModalInfo({ url, caseNo, suspectName })
-                }
+            {activeTab === "execution" && (
+              <ExecutionLedger
+                cases={scopedLedgerData}
+                onSave={handleUpdateCase}
                 onSelectSuspect={(suspect) => setSuspectHistoryName(suspect)}
-                onOpenSuspectProfile={(uuid) => setSuspectProfileUuid(uuid)}
               />
             )}
 
