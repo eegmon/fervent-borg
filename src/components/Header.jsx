@@ -28,7 +28,6 @@ const TABS = [
   { id: "mycases", label: "내 담당 사건", icon: UserCheck },
   { id: "schedule", label: "수사 캘린더", icon: Calendar },
   { id: "ledger", label: "사건 원부", icon: FileSpreadsheet },
-  { id: "preserved", label: "보존사건", icon: Archive },
   { id: "warrants", label: "영장 관리", icon: ShieldAlert },
   { id: "approvals", label: "전자 결재함", icon: FileCheck },
   { id: "secretariat", label: "검찰사무국", icon: Building2 },
@@ -36,7 +35,6 @@ const TABS = [
   { id: "execution", label: "형집행 관리", icon: Scale },
   { id: "search", label: "사건 조회", icon: Search },
   { id: "analytics", label: "통계 현황", icon: BarChart3 },
-  { id: "auditlog", label: "감사 로그", icon: ClipboardList, adminOnly: true },
 ];
 
 export default function Header({

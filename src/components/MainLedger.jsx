@@ -214,7 +214,7 @@ export default function MainLedger({
   // 필터 결과 — 검색/필터 조건이 바뀔 때만 재계산
   const filtered = useMemo(() => {
     const q = (searchTerm || "").toLowerCase().trim();
-    const effectiveArchiveFilter = isChiefOrAbove ? archiveFilter : "ACTIVE";
+    const effectiveArchiveFilter = archiveFilter;
 
     return (ledgerData || []).filter((item) => {
       const matchStatus =
@@ -253,7 +253,7 @@ export default function MainLedger({
         cName.includes(q)
       );
     });
-  }, [ledgerData, searchTerm, statusFilter, prosecutorFilter, deptFilter, archiveFilter, isChiefOrAbove, prosecutorDeptMap]);
+  }, [ledgerData, searchTerm, statusFilter, prosecutorFilter, deptFilter, archiveFilter, prosecutorDeptMap]);
 
   // 정렬
   const sorted = useMemo(() => {
@@ -365,13 +365,13 @@ export default function MainLedger({
               id: "ARCHIVED",
               label: `📦 보존기록 서고 (${stats.archived}건)`,
               color: "#f59e0b",
-              show: isChiefOrAbove,
+              show: true,
             },
             {
               id: "ALL",
               label: `📋 전체 원부 (${stats.total}건)`,
               color: "#94a3b8",
-              show: isChiefOrAbove,
+              show: true,
             },
           ].filter((t) => t.show).map((t) => (
             <button

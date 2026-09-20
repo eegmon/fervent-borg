@@ -2360,12 +2360,6 @@ useEffect(() => {
               />
             )}
 
-            {activeTab === "auditlog" && canViewLoginRecords && (
-              <AuditLogViewer
-                auditLogs={auditLogs}
-                caseHistory={allCaseHistory}
-              />
-            )}
           </>
         )}
       </main>

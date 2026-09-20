@@ -19,6 +19,33 @@ const SENTENCE_TYPE_OPTIONS = [
   { value: "detention", label: "구류/과료" },
 ];
 
+// 집행 불필요 판결 키워드 — 이 키워드가 포함된 최종 판결은 형종 입력 불필요
+const NO_EXECUTION_KEYWORDS = ["무죄", "공소기각", "면소", "형면제", "선고유예"];
+
+/**
+ * 최종 확정 판결 결과 반환 (3심 → 2심 → 1심 순으로 우선)
+ */
+function getFinalCourtResult(c) {
+  return c.court3Result || c.court2Result || c.court1Result || "";
+}
+
+/**
+ * 집행 불필요 사건 여부
+ */
+function isNoExecutionCase(c) {
+  const result = getFinalCourtResult(c);
+  return NO_EXECUTION_KEYWORDS.some((kw) => result.includes(kw));
+}
+
+function getCourtResultBadgeStyle(result) {
+  if (!result) return { background: "rgba(156,163,175,0.12)", color: "#9ca3af", border: "1px solid rgba(156,163,175,0.25)" };
+  if (NO_EXECUTION_KEYWORDS.some((kw) => result.includes(kw)))
+    return { background: "rgba(156,163,175,0.15)", color: "#9ca3af", border: "1px solid rgba(156,163,175,0.3)" };
+  if (result.includes("유죄") || result.includes("징역") || result.includes("금고") || result.includes("벌금") || result.includes("구류"))
+    return { background: "rgba(239,68,68,0.13)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" };
+  return { background: "rgba(96,165,250,0.13)", color: "#60a5fa", border: "1px solid rgba(96,165,250,0.3)" };
+}
+
 // 형종별 기간(일 단위) — D-day 계산용
 const SENTENCE_DURATION_DAYS = {
   imprisonment: 30,       // 징역/금고 장기: 30일 기본 (실제 선고일수로 계산하나 미입력 시 30일)
@@ -117,13 +144,8 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
       (c) =>
         !c.isArchived &&
         (!c.deletedAt || c.deletedAt === "") &&
-        // 처분이 유죄판결(징역·벌금 등)인 사건만 표시
-        // disposition에 "유죄" 또는 "판결" 포함하거나 sentenceType이 있는 경우
-        (c.sentenceType ||
-          String(c.disposition || "").includes("유죄") ||
-          String(c.disposition || "").includes("판결") ||
-          String(c.disposition || "").includes("집행") ||
-          String(c.bookingStatus || "").includes("판결")),
+        // 법원 사건번호가 하나라도 있는 사건
+        (c.court1No || c.court2No || c.court3No),
     );
 
     // 탭 필터
@@ -278,6 +300,7 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                 <th>사건번호</th>
                 <th>담당검사</th>
                 <th>피의자</th>
+                <th>판결 결과</th>
                 <th>형종</th>
                 <th>집행 상태</th>
                 <th>집행(완료)일</th>
@@ -290,7 +313,7 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     style={{
                       textAlign: "center",
                       color: "var(--text-muted)",
@@ -305,6 +328,8 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                 filtered.map((c) => {
                   const isEditing = editingId === c.id;
                   const caseNo = getDisplayCaseNumber(c) || c.sujeNo || c.hyeongjeNo || "-";
+                  const finalResult = getFinalCourtResult(c);
+                  const noExec = isNoExecutionCase(c);
                   const dday = getDdayInfo(isEditing ? { ...c, ...editDraft } : c);
 
                   let ddayDisplay = "-";
@@ -327,7 +352,13 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                   return (
                     <tr
                       key={c.id}
-                      style={isEditing ? { background: "rgba(251,191,36,0.05)" } : undefined}
+                      style={
+                        isEditing
+                          ? { background: "rgba(251,191,36,0.05)" }
+                          : noExec
+                            ? { opacity: 0.5 }
+                            : undefined
+                      }
                     >
                       {/* 사건번호 */}
                       <td style={{ fontFamily: "monospace", color: "#fbbf24", fontSize: "0.8rem" }}>
@@ -339,13 +370,22 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
 
                       {/* 피의자 */}
                       <td>
-                        {c.suspectName ? (
+                        {Array.isArray(c.suspects) && c.suspects.length > 0 ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                            {c.suspects.map((s, sIdx) => (
+                              <button
+                                key={sIdx}
+                                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left", color: "var(--text-main)", fontWeight: 500, fontSize: "0.82rem" }}
+                                onClick={() => onSelectSuspect?.({ name: s.name, uuid: s.uuid || null })}
+                              >
+                                {s.name}
+                              </button>
+                            ))}
+                          </div>
+                        ) : c.suspectName ? (
                           <button
-                            className="btn-link"
-                            style={{ color: "var(--text-main)", fontWeight: 500, background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                            onClick={() =>
-                              onSelectSuspect?.({ name: c.suspectName, uuid: c.suspectUuid })
-                            }
+                            style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--text-main)", fontWeight: 500, fontSize: "0.82rem" }}
+                            onClick={() => onSelectSuspect?.({ name: c.suspectName, uuid: c.suspectUuid })}
                           >
                             {c.suspectName}
                           </button>
@@ -354,9 +394,33 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                         )}
                       </td>
 
+                      {/* 판결 결과 */}
+                      <td>
+                        {finalResult ? (
+                          <span
+                            style={{
+                              ...getCourtResultBadgeStyle(finalResult),
+                              borderRadius: 4,
+                              padding: "2px 7px",
+                              fontSize: "0.72rem",
+                              fontWeight: 600,
+                              whiteSpace: "normal",
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {finalResult}
+                            {(c.court3Result && c.court2No) ? " (3심)" :
+                             (c.court2Result && c.court2No) ? " (2심)" :
+                             c.court1No ? " (1심)" : ""}
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>-</span>
+                        )}
+                      </td>
+
                       {/* 형종 */}
                       <td>
-                        {isEditing ? (
+                        {isEditing && !noExec ? (
                           <select
                             value={editDraft.sentenceType}
                             onChange={(e) =>
@@ -377,6 +441,8 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                               </option>
                             ))}
                           </select>
+                        ) : noExec ? (
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>집행 없음</span>
                         ) : (
                           <span
                             style={{
@@ -394,7 +460,7 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
 
                       {/* 집행 상태 */}
                       <td>
-                        {isEditing ? (
+                        {isEditing && !noExec ? (
                           <select
                             value={editDraft.executionStatus}
                             onChange={(e) =>
@@ -415,6 +481,8 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                               </option>
                             ))}
                           </select>
+                        ) : noExec ? (
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>-</span>
                         ) : (
                           <span
                             style={{
@@ -432,7 +500,7 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
 
                       {/* 집행(완료)일 */}
                       <td style={{ fontFamily: "monospace", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                        {isEditing ? (
+                        {isEditing && !noExec ? (
                           <input
                             type="date"
                             value={editDraft.executionDate}
@@ -449,7 +517,7 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                             }}
                           />
                         ) : (
-                          c.executionDate || "-"
+                          noExec ? "-" : (c.executionDate || "-")
                         )}
                       </td>
 
@@ -459,10 +527,10 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                           fontFamily: "monospace",
                           fontWeight: 700,
                           fontSize: "0.82rem",
-                          color: ddayColor,
+                          color: noExec ? "var(--text-muted)" : ddayColor,
                         }}
                       >
-                        {ddayDisplay}
+                        {noExec ? "-" : ddayDisplay}
                       </td>
 
                       {/* 비고 */}
@@ -522,6 +590,8 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                               <X size={12} />
                             </button>
                           </div>
+                        ) : noExec ? (
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>-</span>
                         ) : (
                           <button
                             className="btn btn-outline"
