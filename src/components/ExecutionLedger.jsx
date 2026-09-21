@@ -129,6 +129,7 @@ const FILTER_TABS = [
   { id: "in_progress", label: "집행 중" },
   { id: "completed", label: "집행 완료" },
   { id: "fine", label: "벌금" },
+  { id: "archived", label: "보존사건" },
 ];
 
 export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect }) {
@@ -142,17 +143,21 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
   const filtered = useMemo(() => {
     let list = (cases || []).filter(
       (c) =>
-        !c.isArchived &&
         (!c.deletedAt || c.deletedAt === "") &&
         // 법원 사건번호가 하나라도 있는 사건
         (c.court1No || c.court2No || c.court3No),
     );
 
     // 탭 필터
-    if (filterTab === "pending") list = list.filter((c) => c.executionStatus === "pending");
-    else if (filterTab === "in_progress") list = list.filter((c) => c.executionStatus === "in_progress");
-    else if (filterTab === "completed") list = list.filter((c) => c.executionStatus === "completed");
-    else if (filterTab === "fine") list = list.filter((c) => c.sentenceType === "fine");
+    if (filterTab === "archived") list = list.filter((c) => c.isArchived);
+    else {
+      // 보존사건 탭이 아닌 경우 활성 사건만 표시
+      list = list.filter((c) => !c.isArchived);
+      if (filterTab === "pending") list = list.filter((c) => c.executionStatus === "pending");
+      else if (filterTab === "in_progress") list = list.filter((c) => c.executionStatus === "in_progress");
+      else if (filterTab === "completed") list = list.filter((c) => c.executionStatus === "completed");
+      else if (filterTab === "fine") list = list.filter((c) => c.sentenceType === "fine");
+    }
 
     // 검색
     if (searchQuery.trim()) {
@@ -330,6 +335,7 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                   const caseNo = getDisplayCaseNumber(c) || c.sujeNo || c.hyeongjeNo || "-";
                   const finalResult = getFinalCourtResult(c);
                   const noExec = isNoExecutionCase(c);
+                  const isArchived = Boolean(c.isArchived);
                   const dday = getDdayInfo(isEditing ? { ...c, ...editDraft } : c);
 
                   let ddayDisplay = "-";
@@ -355,14 +361,32 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                       style={
                         isEditing
                           ? { background: "rgba(251,191,36,0.05)" }
-                          : noExec
-                            ? { opacity: 0.5 }
-                            : undefined
+                          : isArchived
+                            ? { background: "rgba(99,102,241,0.04)" }
+                            : noExec
+                              ? { opacity: 0.5 }
+                              : undefined
                       }
                     >
                       {/* 사건번호 */}
                       <td style={{ fontFamily: "monospace", color: "#fbbf24", fontSize: "0.8rem" }}>
-                        {caseNo}
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                          {caseNo}
+                          {isArchived && (
+                            <span style={{
+                              background: "rgba(99,102,241,0.15)",
+                              color: "#818cf8",
+                              border: "1px solid rgba(99,102,241,0.3)",
+                              borderRadius: 4,
+                              padding: "1px 5px",
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              fontFamily: "sans-serif",
+                            }}>
+                              보존
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* 담당검사 */}
@@ -413,9 +437,7 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                              (c.court2Result && c.court2No) ? " (2심)" :
                              c.court1No ? " (1심)" : ""}
                           </span>
-                        ) : (
-                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>-</span>
-                        )}
+                        ) : null}
                       </td>
 
                       {/* 형종 */}
@@ -427,16 +449,20 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
                               setEditDraft((d) => ({ ...d, sentenceType: e.target.value }))
                             }
                             style={{
-                              background: "var(--input-bg)",
+                              background: "var(--input-bg, #1e1e2e)",
                               border: "1px solid var(--border-subtle)",
                               borderRadius: 4,
-                              color: "var(--text-main)",
+                              color: "var(--text-main, #e2e8f0)",
                               fontSize: "0.78rem",
                               padding: "2px 6px",
                             }}
                           >
                             {SENTENCE_TYPE_OPTIONS.map((o) => (
-                              <option key={o.value} value={o.value}>
+                              <option
+                                key={o.value}
+                                value={o.value}
+                                style={{ background: "var(--input-bg, #1e1e2e)", color: "var(--text-main, #e2e8f0)" }}
+                              >
                                 {o.label}
                               </option>
                             ))}

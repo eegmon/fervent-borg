@@ -55,6 +55,7 @@ const DISPOSITION_OPTIONS = [
   "구속영장 청구 중",
   "구속 기소",
   "불구속 기소",
+  "공소취소",
   "기소유예 (불기소)",
   "혐의없음 - 범죄인정안됨 (불기소)",
   "혐의없음 - 증거불충분 (불기소)",
@@ -2260,33 +2261,65 @@ export default function MyCasesLedger({
                       </span>
                     ) : (
                       <>
-                        <button
-                          onClick={() =>
-                            onSelectSuspect &&
-                            onSelectSuspect({
-                              name: item.suspectName,
-                              uuid: item.suspectUuid || null,
-                            })
-                          }
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            padding: 0,
-                            textAlign: "left",
-                          }}
-                        >
-                          <strong
+                        {Array.isArray(item.suspects) && item.suspects.length > 1 ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            {item.suspects.map((s, sIdx) => (
+                              <button
+                                key={sIdx}
+                                onClick={() =>
+                                  onSelectSuspect &&
+                                  onSelectSuspect({ name: s.name, uuid: s.uuid || null })
+                                }
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  padding: 0,
+                                  textAlign: "left",
+                                }}
+                              >
+                                <strong
+                                  style={{
+                                    fontSize: "0.9rem",
+                                    color: "var(--text-main)",
+                                    textDecoration: "underline dotted",
+                                  }}
+                                >
+                                  {s.name}
+                                </strong>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() =>
+                              onSelectSuspect &&
+                              onSelectSuspect({
+                                name: item.suspectName,
+                                uuid: item.suspectUuid || null,
+                              })
+                            }
                             style={{
-                              fontSize: "0.9rem",
-                              color: "var(--text-main)",
-                              textDecoration: "underline dotted",
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              padding: 0,
+                              textAlign: "left",
                             }}
                           >
-                            {item.suspectName}
-                          </strong>
-                        </button>
-                        {item.suspectUuid &&
+                            <strong
+                              style={{
+                                fontSize: "0.9rem",
+                                color: "var(--text-main)",
+                                textDecoration: "underline dotted",
+                              }}
+                            >
+                              {item.suspectName}
+                            </strong>
+                          </button>
+                        )}
+                        {(!Array.isArray(item.suspects) || item.suspects.length <= 1) &&
+                          item.suspectUuid &&
                           item.suspectUuid !== "-" &&
                           item.suspectUuid !== "00" && (
                             <div

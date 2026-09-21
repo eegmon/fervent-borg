@@ -236,7 +236,7 @@ export function scopedQuery(table, user, orderBy = "rowid DESC") {
     const CLOSED_KEYWORDS = [
       "불기소", "종국", "기소유예", "혐의없음", "무혐의", "죄가안됨",
       "공소권없음", "각하", "기소중지", "참고인중지", "타관송치",
-      "처분완료", "구속기소", "불구속기소", "약식기소", "구공판",
+      "처분완료", "공소취소", "구속기소", "불구속기소", "약식기소", "구공판",
     ];
     const closedCondition = CLOSED_KEYWORDS.map(
       () => `(c.disposition LIKE ? OR c.booking_status LIKE ?)`,
@@ -369,7 +369,7 @@ async function requireCaseScopeImpl(req, res, next) {
                 c.disposition LIKE '%무혐의%' OR c.disposition LIKE '%죄가안됨%' OR
                 c.disposition LIKE '%공소권없음%' OR c.disposition LIKE '%각하%' OR
                 c.disposition LIKE '%기소중지%' OR c.disposition LIKE '%타관송치%' OR
-                c.disposition LIKE '%처분완료%' OR c.disposition LIKE '%구속기소%' OR
+                c.disposition LIKE '%처분완료%' OR c.disposition LIKE '%공소취소%' OR c.disposition LIKE '%구속기소%' OR
                 c.disposition LIKE '%불구속기소%' OR c.disposition LIKE '%약식기소%' OR
                 c.disposition LIKE '%구공판%'
               )))`,

@@ -1363,9 +1363,9 @@ router.get("/suspects/:uuid/profile", requireAuth, async (req, res) => {
                    c.disposition LIKE '%무혐의%' OR c.disposition LIKE '%죄가안됨%' OR
                    c.disposition LIKE '%공소권없음%' OR c.disposition LIKE '%각하%' OR
                    c.disposition LIKE '%기소중지%' OR c.disposition LIKE '%타관송치%' OR
-                   c.disposition LIKE '%처분완료%' OR c.disposition LIKE '%구속기소%' OR
-                   c.disposition LIKE '%불구속기소%' OR c.disposition LIKE '%약식기소%' OR
-                   c.disposition LIKE '%구공판%'
+                   c.disposition LIKE '%처분완료%' OR c.disposition LIKE '%공소취소%' OR
+                   c.disposition LIKE '%구속기소%' OR c.disposition LIKE '%불구속기소%' OR
+                   c.disposition LIKE '%약식기소%' OR c.disposition LIKE '%구공판%'
                  )))
              ORDER BY c.rowid DESC`,
         args: hasGlobalDataAccess(req.user)
@@ -1391,6 +1391,7 @@ router.get("/suspects/:uuid/profile", requireAuth, async (req, res) => {
                  OR b.disposition_status LIKE '%기소중지%'
                  OR b.disposition_status LIKE '%타관송치%'
                  OR b.disposition_status LIKE '%처분완료%'
+                 OR b.disposition_status LIKE '%공소취소%'
                  OR b.disposition_status LIKE '%구속기소%'
                  OR b.disposition_status LIKE '%불구속기소%'
                  OR b.disposition_status LIKE '%약식기소%'
