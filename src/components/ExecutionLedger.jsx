@@ -142,10 +142,16 @@ export default function ExecutionLedger({ cases = [], onSave, onSelectSuspect })
   // ── 필터링 ─────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let list = (cases || []).filter(
-      (c) =>
-        (!c.deletedAt || c.deletedAt === "") &&
-        // 법원 사건번호가 하나라도 있는 사건
-        (c.court1No || c.court2No || c.court3No),
+      (c) => {
+        const isValid = (v) => v && String(v).trim() !== "" && String(v).trim() !== "-";
+        return (
+          (!c.deletedAt || c.deletedAt === "") &&
+          // 검찰 사건번호(수제/형제)가 하나라도 있어야 표시
+          (isValid(c.sujeNo) || isValid(c.hyeongjeNo)) &&
+          // 법원 사건번호가 하나라도 있는 사건 ('-' 문자열 제외)
+          (isValid(c.court1No) || isValid(c.court2No) || isValid(c.court3No))
+        );
+      },
     );
 
     // 탭 필터
