@@ -12,6 +12,8 @@ import {
   Send,
   Sparkles,
   Loader2,
+  Save,
+  RotateCcw,
 } from "lucide-react";
 import { fetchEvidence, getToken } from "../services/api";
 import { HWP_TEMPLATES } from "../data/hwpTemplates";
@@ -55,13 +57,20 @@ export default function IndictmentComposerModal({
   const [copied, setCopied] = useState(false);
   const [aiLoading, setAiLoading] = useState(false); // 'draft' | 'refine' | false
   const [aiError, setAiError] = useState("");
+  const [lastSavedAt, setLastSavedAt] = useState("");
+  const [hasSavedDraft, setHasSavedDraft] = useState(false);
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const year = todayStr.slice(0, 4);
   const month = todayStr.slice(5, 7);
   const day = todayStr.slice(8, 10);
 
-  // 사건 선택 시 데이터 자동 로드 및 바인딩
+  const getStorageKey = (cId, cNo) => {
+    const keyId = cId || cNo || "current";
+    return `dose_indictment_draft_${keyId}`;
+  };
+
+  // 사건 선택 시 데이터 자동 로드 및 바인딩 (저장된 초안이 있으면 복원)
   useEffect(() => {
     const caseItem =
       ledgerData.find((c) => String(c.id) === String(selectedCaseId)) ||
@@ -69,67 +78,116 @@ export default function IndictmentComposerModal({
 
     if (caseItem) {
       const caseNo = caseItem.sujeNo || caseItem.hyeongjeNo || "";
-      setDocNo(caseNo);
-      setProsecutorName(
-        caseItem.prosecutorName || currentUser?.name || "담당검사",
-      );
+      const storageKey = getStorageKey(caseItem.id, caseNo);
+      let loadedFromDraft = false;
 
-      // 피고인 목록 초기화
-      let defs = [];
-      if (Array.isArray(caseItem.suspects) && caseItem.suspects.length > 0) {
-        defs = caseItem.suspects.map((s, idx) => ({
-          id: s.id || `def-${idx}`,
-          name: s.name || caseItem.suspectName || "",
-          uuid: s.uuid || caseItem.suspectUuid || "",
-          address:
-            s.address ||
-            s.residence ||
-            s.residentialAddress ||
-            caseItem.address ||
-            caseItem.residence ||
-            "",
-          job:
-            s.job || s.occupation || caseItem.job || caseItem.occupation || "",
-          detentionStatus: getDetentionStatus(
-            s.detentionStatus || s.bookingStatus || caseItem.bookingStatus,
-          ),
-        }));
-      } else {
-        defs = [
-          {
-            id: "def-0",
-            name: caseItem.suspectName || "",
-            uuid: caseItem.suspectUuid || "",
-            address: caseItem.address || caseItem.residence || "",
-            job: caseItem.job || caseItem.occupation || "",
-            detentionStatus: getDetentionStatus(caseItem.bookingStatus),
-          },
-        ];
+      // 1. 기존에 저장된 공소장 초안 확인
+      try {
+        const savedJson = localStorage.getItem(storageKey);
+        if (savedJson) {
+          const draft = JSON.parse(savedJson);
+          if (draft && typeof draft === "object") {
+            setCourtName(draft.courtName || "도스온라인 지방법원 형사부 귀중");
+            setDocNo(draft.docNo || caseNo);
+            if (Array.isArray(draft.defendants) && draft.defendants.length > 0) {
+              setDefendants(draft.defendants);
+            }
+            if (Array.isArray(draft.chargesList) && draft.chargesList.length > 0) {
+              setChargesList(draft.chargesList);
+            }
+            if (draft.crimeFacts !== undefined) {
+              setCrimeFacts(draft.crimeFacts);
+            }
+            if (draft.customEvidenceText !== undefined) {
+              setCustomEvidenceText(draft.customEvidenceText);
+            }
+            if (draft.confiscationText !== undefined) {
+              setConfiscationText(draft.confiscationText);
+            }
+            if (Array.isArray(draft.selectedEvidenceIds)) {
+              setSelectedEvidenceIds(new Set(draft.selectedEvidenceIds));
+            }
+            if (draft.prosecutorName) setProsecutorName(draft.prosecutorName);
+            if (draft.prosecutorRank) setProsecutorRank(draft.prosecutorRank);
+            if (draft.savedAt) {
+              setLastSavedAt(new Date(draft.savedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+            }
+            setHasSavedDraft(true);
+            loadedFromDraft = true;
+          }
+        }
+      } catch (err) {
+        console.warn("[IndictmentComposer] 저장된 초안 로드 실패:", err);
       }
-      setDefendants(defs);
 
-      // 죄명 및 적용법조 초기화
-      const foundCharge = chargesData.find(
-        (ch) => ch.name === caseItem.chargeName,
-      );
-      setChargesList([
-        {
-          id: "ch-0",
-          name: caseItem.chargeName || "형법 위반",
-          lawArticle: foundCharge?.lawArticle || "형법 제347조 (사기) 등",
-        },
-      ]);
+      // 2. 저장된 초안이 없는 경우 기본 초기화
+      if (!loadedFromDraft) {
+        setHasSavedDraft(false);
+        setLastSavedAt("");
+        setDocNo(caseNo);
+        setProsecutorName(
+          caseItem.prosecutorName || currentUser?.name || "담당검사",
+        );
 
-      // 공소사실 기본 템플릿 생성
-      const defName = defs[0]?.name || "피고인";
-      const incDate = caseItem.incidentDate || caseItem.bookingDate || todayStr;
-      setCrimeFacts(
-        `피고인 ${defName}은(는) ${incDate}경 도스온라인 관할 구역 내에서,\n\n피해자에게 부정한 방법으로 손해를 가할 목적으로 고의로 위법 행위를 감행하여,\n\n이로써 피고인은 ${caseItem.chargeName || "해당 범죄"}의 죄책을 면할 수 없다.`,
-      );
+        // 피고인 목록 초기화
+        let defs = [];
+        if (Array.isArray(caseItem.suspects) && caseItem.suspects.length > 0) {
+          defs = caseItem.suspects.map((s, idx) => ({
+            id: s.id || `def-${idx}`,
+            name: s.name || caseItem.suspectName || "",
+            uuid: s.uuid || caseItem.suspectUuid || "",
+            address:
+              s.address ||
+              s.residence ||
+              s.residentialAddress ||
+              caseItem.address ||
+              caseItem.residence ||
+              "",
+            job:
+              s.job || s.occupation || caseItem.job || caseItem.occupation || "",
+            detentionStatus: getDetentionStatus(
+              s.detentionStatus || s.bookingStatus || caseItem.bookingStatus,
+            ),
+          }));
+        } else {
+          defs = [
+            {
+              id: "def-0",
+              name: caseItem.suspectName || "",
+              uuid: caseItem.suspectUuid || "",
+              address: caseItem.address || caseItem.residence || "",
+              job: caseItem.job || caseItem.occupation || "",
+              detentionStatus: getDetentionStatus(caseItem.bookingStatus),
+            },
+          ];
+        }
+        setDefendants(defs);
 
-      // 압수물
-      if (caseItem.confiscation) {
-        setConfiscationText(caseItem.confiscation);
+        // 죄명 및 적용법조 초기화
+        const foundCharge = chargesData.find(
+          (ch) => ch.name === caseItem.chargeName,
+        );
+        setChargesList([
+          {
+            id: "ch-0",
+            name: caseItem.chargeName || "형법 위반",
+            lawArticle: foundCharge?.lawArticle || "형법 제347조 (사기) 등",
+          },
+        ]);
+
+        // 공소사실 기본 템플릿 생성
+        const defName = defs[0]?.name || "피고인";
+        const incDate = caseItem.incidentDate || caseItem.bookingDate || todayStr;
+        setCrimeFacts(
+          `피고인 ${defName}은(는) ${incDate}경 도스온라인 관할 구역 내에서,\n\n피해자에게 부정한 방법으로 손해를 가할 목적으로 고의로 위법 행위를 감행하여,\n\n이로써 피고인은 ${caseItem.chargeName || "해당 범죄"}의 죄책을 면할 수 없다.`,
+        );
+
+        // 압수물
+        if (caseItem.confiscation) {
+          setConfiscationText(caseItem.confiscation);
+        } else {
+          setConfiscationText("");
+        }
       }
 
       // 증거자료 로드
@@ -138,8 +196,9 @@ export default function IndictmentComposerModal({
           .then((res) => {
             const list = Array.isArray(res) ? res : res?.evidence || [];
             setEvidenceList(list);
-            // 기본 전체 선택
-            setSelectedEvidenceIds(new Set(list.map((e) => e.id)));
+            if (!loadedFromDraft) {
+              setSelectedEvidenceIds(new Set(list.map((e) => e.id)));
+            }
           })
           .catch(() => {});
       }
@@ -528,6 +587,138 @@ ${indictmentHtml}
     );
   };
 
+  // 공소장 저장 (로컬스토리지 영구 보존)
+  const handleSaveIndictment = (silent = false) => {
+    const caseItem =
+      ledgerData.find((c) => String(c.id) === String(selectedCaseId)) ||
+      initialCase;
+    const caseNo = docNo || caseItem?.sujeNo || caseItem?.hyeongjeNo || "";
+    const storageKey = getStorageKey(caseItem?.id, caseNo);
+
+    const draftData = {
+      caseId: selectedCaseId,
+      docNo,
+      courtName,
+      defendants,
+      chargesList,
+      crimeFacts,
+      customEvidenceText,
+      confiscationText,
+      selectedEvidenceIds: Array.from(selectedEvidenceIds),
+      prosecutorName,
+      prosecutorRank,
+      savedAt: new Date().toISOString(),
+    };
+
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(draftData));
+      const nowStr = new Date().toLocaleTimeString("ko-KR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+      setLastSavedAt(nowStr);
+      setHasSavedDraft(true);
+      if (!silent) {
+        showToast?.("💾 공소장 작성 내용이 저장되었습니다.", "success");
+      }
+    } catch (err) {
+      console.error("[IndictmentComposer] 저장 실패:", err);
+      if (!silent) {
+        showToast?.("저장에 실패했습니다.", "error");
+      }
+    }
+  };
+
+  // 기본 서식으로 초기화 (저장된 초안 삭제 후 초기 상태 복원)
+  const handleResetIndictment = () => {
+    if (
+      !window.confirm(
+        "작성 중인 공소장 내용을 초기화하고 사건 기본 서식으로 되돌리시겠습니까?",
+      )
+    ) {
+      return;
+    }
+
+    const caseItem =
+      ledgerData.find((c) => String(c.id) === String(selectedCaseId)) ||
+      initialCase;
+    const caseNo = caseItem?.sujeNo || caseItem?.hyeongjeNo || "";
+    const storageKey = getStorageKey(caseItem?.id, caseNo);
+
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {}
+
+    setHasSavedDraft(false);
+    setLastSavedAt("");
+
+    if (caseItem) {
+      setDocNo(caseNo);
+      setCourtName("도스온라인 지방법원 형사부 귀중");
+      setProsecutorName(
+        caseItem.prosecutorName || currentUser?.name || "담당검사",
+      );
+
+      let defs = [];
+      if (Array.isArray(caseItem.suspects) && caseItem.suspects.length > 0) {
+        defs = caseItem.suspects.map((s, idx) => ({
+          id: s.id || `def-${idx}`,
+          name: s.name || caseItem.suspectName || "",
+          uuid: s.uuid || caseItem.suspectUuid || "",
+          address:
+            s.address ||
+            s.residence ||
+            s.residentialAddress ||
+            caseItem.address ||
+            caseItem.residence ||
+            "",
+          job:
+            s.job || s.occupation || caseItem.job || caseItem.occupation || "",
+          detentionStatus: getDetentionStatus(
+            s.detentionStatus || s.bookingStatus || caseItem.bookingStatus,
+          ),
+        }));
+      } else {
+        defs = [
+          {
+            id: "def-0",
+            name: caseItem.suspectName || "",
+            uuid: caseItem.suspectUuid || "",
+            address: caseItem.address || caseItem.residence || "",
+            job: caseItem.job || caseItem.occupation || "",
+            detentionStatus: getDetentionStatus(caseItem.bookingStatus),
+          },
+        ];
+      }
+      setDefendants(defs);
+
+      const foundCharge = chargesData.find(
+        (ch) => ch.name === caseItem.chargeName,
+      );
+      setChargesList([
+        {
+          id: "ch-0",
+          name: caseItem.chargeName || "형법 위반",
+          lawArticle: foundCharge?.lawArticle || "형법 제347조 (사기) 등",
+        },
+      ]);
+
+      const defName = defs[0]?.name || "피고인";
+      const incDate = caseItem.incidentDate || caseItem.bookingDate || todayStr;
+      setCrimeFacts(
+        `피고인 ${defName}은(는) ${incDate}경 도스온라인 관할 구역 내에서,\n\n피해자에게 부정한 방법으로 손해를 가할 목적으로 고의로 위법 행위를 감행하여,\n\n이로써 피고인은 ${caseItem.chargeName || "해당 범죄"}의 죄책을 면할 수 없다.`,
+      );
+
+      setCustomEvidenceText("");
+      setConfiscationText(caseItem.confiscation || "");
+      if (evidenceList.length > 0) {
+        setSelectedEvidenceIds(new Set(evidenceList.map((e) => e.id)));
+      }
+    }
+    showToast?.("🔄 공소장이 기본 서식으로 초기화되었습니다.", "info");
+  };
+
   return (
     <div
       style={{
@@ -628,20 +819,54 @@ ${indictmentHtml}
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 6,
+                  justifyContent: "space-between",
                   marginBottom: 8,
                 }}
               >
-                <Wand2 size={15} color="var(--primary-amber)" />
-                <span
-                  style={{
-                    fontSize: "0.82rem",
-                    fontWeight: 800,
-                    color: "var(--text-main)",
-                  }}
-                >
-                  1. 사건 연동 및 법원 지정
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Wand2 size={15} color="var(--primary-amber)" />
+                  <span
+                    style={{
+                      fontSize: "0.82rem",
+                      fontWeight: 800,
+                      color: "var(--text-main)",
+                    }}
+                  >
+                    1. 사건 연동 및 법원 지정
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveIndictment(false)}
+                    className="btn btn-outline"
+                    style={{
+                      fontSize: "0.72rem",
+                      padding: "3px 8px",
+                      gap: 4,
+                      background: "rgba(16, 185, 129, 0.15)",
+                      color: "#34d399",
+                      borderColor: "rgba(16, 185, 129, 0.3)",
+                    }}
+                    title="현재 작성 중인 공소장 내용을 저장합니다."
+                  >
+                    <Save size={12} /> 저장
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetIndictment}
+                    className="btn btn-outline"
+                    style={{
+                      fontSize: "0.72rem",
+                      padding: "3px 8px",
+                      gap: 4,
+                      color: "var(--text-muted)",
+                    }}
+                    title="저장된 내용을 비우고 사건 기본값으로 초기화합니다."
+                  >
+                    <RotateCcw size={12} /> 초기화
+                  </button>
+                </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <div>
@@ -1247,9 +1472,42 @@ ${indictmentHtml}
                 >
                   표준 규격 HWP 공소장 미리보기
                 </span>
+                {lastSavedAt && (
+                  <span
+                    style={{
+                      fontSize: "0.72rem",
+                      color: "#34d399",
+                      background: "rgba(16, 185, 129, 0.12)",
+                      border: "1px solid rgba(16, 185, 129, 0.25)",
+                      padding: "2px 7px",
+                      borderRadius: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Check size={11} /> 저장됨 ({lastSavedAt})
+                  </span>
+                )}
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => handleSaveIndictment(false)}
+                  className="btn btn-outline"
+                  style={{
+                    fontSize: "0.8rem",
+                    padding: "7px 14px",
+                    gap: 5,
+                    background: "rgba(16, 185, 129, 0.18)",
+                    color: "#34d399",
+                    borderColor: "rgba(16, 185, 129, 0.4)",
+                  }}
+                  title="현재 작성된 공소장 내용을 저장합니다."
+                >
+                  <Save size={14} /> 💾 공소장 저장
+                </button>
                 <button
                   onClick={handleCopy}
                   className="btn btn-gold"

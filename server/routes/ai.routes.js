@@ -101,10 +101,10 @@ ${currentText}
     }
 
     const fallbackModels = [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-1.5-flash",
-      "gemini-1.5-pro",
+      "gemini-3.8-flash",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
     ];
 
     const geminiBody = {
@@ -155,9 +155,13 @@ ${currentText}
             lastErrorMsg = errText || `HTTP ${geminiRes.status}`;
           }
 
+          // 404(모델 없음)이거나 400(잘못된 요청)인 경우 재시도 없이 즉시 다음 모델로 이동
+          if (geminiRes.status === 404 || geminiRes.status === 400) {
+            break;
+          }
+
           const shouldRetry = [429, 503].includes(geminiRes.status);
           if (!shouldRetry) {
-            // 429/503이 아닌 다른 오류(예: 400 등)는 모델 변경 전 즉시 중단
             break;
           }
 
