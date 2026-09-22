@@ -100,7 +100,13 @@ ${currentText}
       });
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const fallbackModels = [
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash",
+      "gemini-1.5-pro",
+    ];
+
     const geminiBody = {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
@@ -109,64 +115,79 @@ ${currentText}
       },
     };
 
-    let geminiRes;
-    const maxAttempts = 3;
-    try {
+    let lastErrorMsg = "";
+    let lastStatusCode = 500;
+    let successResult = null;
+
+    for (const model of fallbackModels) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+      const maxAttempts = 2;
+
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-        geminiRes = await fetch(geminiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(geminiBody),
-        });
+        try {
+          const geminiRes = await fetch(geminiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(geminiBody),
+          });
 
-        const shouldRetry = [429, 503].includes(geminiRes.status);
-        if (!shouldRetry || attempt === maxAttempts) break;
+          if (geminiRes.ok) {
+            const geminiData = await geminiRes.json();
+            const text =
+              geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+            if (text) {
+              successResult = text;
+              break;
+            }
+          }
 
-        const retryDelayMs = 1000 * 2 ** (attempt - 1);
-        console.warn(
-          `[AI /indictment-draft] Gemini ${geminiRes.status}, ${retryDelayMs}ms 후 재시도 (${attempt}/${maxAttempts - 1})`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+          lastStatusCode = geminiRes.status;
+          const errText = await geminiRes.text();
+          console.warn(
+            `[AI /indictment-draft] 모델 ${model} 시도 ${attempt}/${maxAttempts} 실패 (${geminiRes.status}):`,
+            errText.slice(0, 200),
+          );
+
+          try {
+            const parsed = JSON.parse(errText);
+            lastErrorMsg = parsed.error?.message || errText;
+          } catch {
+            lastErrorMsg = errText || `HTTP ${geminiRes.status}`;
+          }
+
+          const shouldRetry = [429, 503].includes(geminiRes.status);
+          if (!shouldRetry) {
+            // 429/503이 아닌 다른 오류(예: 400 등)는 모델 변경 전 즉시 중단
+            break;
+          }
+
+          if (attempt < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, 800));
+          }
+        } catch (fetchErr) {
+          console.error(`[AI /indictment-draft] ${model} fetch 실패:`, fetchErr);
+          lastErrorMsg = fetchErr.message;
+        }
       }
-    } catch (fetchErr) {
-      console.error("[AI /indictment-draft] Gemini fetch 실패:", fetchErr);
-      return res
-        .status(502)
-        .json({ success: false, message: "AI 서버에 연결할 수 없습니다." });
+
+      if (successResult) break;
     }
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error(
-        "[AI /indictment-draft] Gemini 오류:",
-        geminiRes.status,
-        errText,
-      );
-      let upstreamMessage = "AI 서버에서 요청을 처리하지 못했습니다.";
-      try {
-        const parsedError = JSON.parse(errText);
-        upstreamMessage = parsedError.error?.message || upstreamMessage;
-      } catch {
-        if (errText) upstreamMessage = errText;
+    if (!successResult) {
+      let userFriendlyMsg = lastErrorMsg;
+      if (lastStatusCode === 503 || lastErrorMsg.includes("high demand") || lastErrorMsg.includes("overloaded")) {
+        userFriendlyMsg = "현재 AI 서버 사용량이 많아 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.";
+      } else if (lastStatusCode === 429 || lastErrorMsg.includes("quota") || lastErrorMsg.includes("rate")) {
+        userFriendlyMsg = "AI 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.";
       }
+
       return res.status(502).json({
         success: false,
-        message: `AI 오류 (${geminiRes.status}): ${upstreamMessage}`,
+        message: userFriendlyMsg || "AI 응답을 생성하지 못했습니다. 다시 시도해주세요.",
       });
     }
 
-    const geminiData = await geminiRes.json();
-    const result =
-      geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-
-    if (!result) {
-      return res.status(502).json({
-        success: false,
-        message: "AI가 응답을 생성하지 못했습니다. 다시 시도해주세요.",
-      });
-    }
-
-    res.json({ success: true, result });
+    res.json({ success: true, result: successResult });
   }),
 );
 
