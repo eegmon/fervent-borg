@@ -1581,7 +1581,7 @@ export default function MyCasesLedger({
                 marginBottom: 16,
               }}
             >
-              {statusChangeCase.hyeongjeNo}호 | 피의자:{" "}
+              {statusChangeCase.sujeNo}호 | 피의자:{" "}
               {statusChangeCase.suspectName}
             </div>
             {statusChangeCase.supervisorDesignated &&
